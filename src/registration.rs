@@ -32,7 +32,7 @@ pub fn gray_images(
         let u_f32 = mat_from_vec(height, width, &|&x| x as f32, &imgs);
         let svd0 = u_f32.svd(false, false);
         println!("===================================");
-        println!("Iteration 0 - nucl_norm: {:?}", svd0.singular_values.sum());
+        println!("Initial nucl_norm: {:?}", svd0.singular_values.sum());
     }
 
     // Scale lambda by the number of pixels.
