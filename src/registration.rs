@@ -31,8 +31,7 @@ pub fn gray_images(
     if config.trace {
         let u_f32 = mat_from_vec(height, width, &|&x| x as f32, &imgs);
         let svd0 = u_f32.svd(false, false);
-        println!("===================================");
-        println!("Initial nucl_norm: {:?}", svd0.singular_values.sum());
+        eprintln!("Initial nucl_norm: {:?}", svd0.singular_values.sum());
     }
 
     // Scale lambda by the number of pixels.
@@ -52,7 +51,7 @@ pub fn gray_images(
     // Main loop.
     for iteration in 0..config.max_iterations {
         if config.trace {
-            println!("===================================");
+            eprintln!("\n===================================\n");
         }
 
         // A-update: low-rank approximation
@@ -124,18 +123,12 @@ pub fn gray_images(
                 + l1_norm
                 + (lagrange_mult.component_mul(&r)).sum()
                 + 0.5 * config.rho * (norm_sqr(&r) as f32);
-            println!("Iteration {} - Nucl norm: {}", iteration, nuclear_norm);
-            println!("Iteration {} - L1 norm: {}", iteration, l1_norm);
-            println!(
-                "Iteration {} - Nucl + L1: {}",
-                iteration,
-                l1_norm + nuclear_norm
-            );
-            println!(
-                "Iteration {} - Aug. Lagrangian: {}",
-                iteration, augmented_lagrangian
-            );
-            println!("Iteration {} - residual: {}", iteration, residual);
+            eprintln!("Iteration {}:", iteration);
+            eprintln!("    Nucl norm: {}", nuclear_norm);
+            eprintln!("    L1 norm: {}", l1_norm);
+            eprintln!("    Nucl + L1: {}", l1_norm + nuclear_norm);
+            eprintln!("    Aug. Lagrangian: {}", augmented_lagrangian);
+            eprintln!("    residual: {}", residual);
         }
         old_imgs_hat = imgs_hat;
         if residual < config.threshold {
@@ -143,7 +136,7 @@ pub fn gray_images(
         }
     }
 
-    // TODO: write singular values to a file.
+    // Generate final registered images.
     let final_imgs_registered = (0..nb_imgs)
         .map(|i| {
             crate::utils::reshape(

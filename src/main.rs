@@ -22,7 +22,7 @@ fn main() {
 }
 
 fn display_help() {
-    println!(
+    eprintln!(
         r#"
 lowrr
 
@@ -189,10 +189,11 @@ enum Dataset {
 fn load_dataset<P: AsRef<Path>>(
     paths: &[P],
 ) -> Result<(Dataset, (usize, usize)), Box<dyn std::error::Error>> {
+    eprintln!("Images to be processed:");
     let images_types: Vec<_> = paths
         .iter()
         .map(|path| {
-            eprintln!("{:?}", path.as_ref());
+            eprintln!("    {:?}", path.as_ref());
             match path
                 .as_ref()
                 .extension()
