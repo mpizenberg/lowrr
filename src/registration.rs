@@ -74,22 +74,32 @@ pub fn gray_images(
         // v-update: linear least-squares registration
         if config.do_registration {
             for (i, (ux, uy)) in imgs_gradients.iter().enumerate() {
+                // Build Ai.
                 #[allow(non_snake_case)]
                 let Ai = MatrixMN::<f32, Dynamic, U2>::from_iterator(
                     height * width,
                     ux.iter().chain(uy.iter()).map(|&x| x as f32),
                 );
-                let img = DVector::from_iterator(height * width, imgs[i].iter().map(|&x| x as f32));
+
+                // Build bi.
+                let img_i =
+                    DVector::from_iterator(height * width, imgs[i].iter().map(|&x| x as f32));
                 let bi = imgs_hat.column(i)
                     - lagrange_mult.column(i) / config.rho
-                    - img // There is a shape issue here right?
+                    - img_i
                     - errors.column(i);
+
+                // Solve linear problem to find motion vector.
                 #[allow(non_snake_case)]
                 let Ai_svd = Ai.svd(true, true);
                 let motion = Ai_svd.solve(&bi, 1e-12)?;
+
+                // Save motion for this image.
+                motion_vec[i] = motion;
+
+                // Recompute the registered image.
                 let dx = motion.x;
                 let dy = motion.y;
-                motion_vec[i] = motion;
                 let mut idx = 0;
                 for x in 0..width {
                     for y in 0..height {
