@@ -56,8 +56,8 @@ pub fn gray_images(
         }
 
         // A-update: low-rank approximation
-        let imgs_step = &imgs_registered + &errors + &lagrange_mult / config.rho;
-        let mut svd = imgs_step.svd(true, true);
+        let imgs_hat_temp = &imgs_registered + &errors + &lagrange_mult / config.rho;
+        let mut svd = imgs_hat_temp.svd(true, true);
         for x in svd.singular_values.iter_mut() {
             *x = shrink(1.0 / config.rho, *x);
         }
