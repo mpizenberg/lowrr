@@ -212,7 +212,7 @@ fn load_dataset<P: AsRef<Path>>(
         .collect();
 
     if images_types.is_empty() {
-        Err("There is no such image".into())
+        Err("There is no such image. Use --help to know how to use this tool.".into())
     } else if images_types.iter().all(|&t| t == "raw") {
         unimplemented!("imread raw")
     } else if images_types.iter().all(|&t| t == "image") {
