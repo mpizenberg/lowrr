@@ -154,15 +154,11 @@ fn run(args: Args) -> Result<(), Box<dyn std::error::Error>> {
     // Load the dataset in memory.
     let (dataset, (width, height)) = load_dataset(&args.images_paths)?;
 
-    // Scale lambda by the number of pixels.
-    let mut config = args.config;
-    config.lambda = config.lambda / ((width * height) as f32).sqrt();
-
     // Use the algorithm corresponding to the type of data.
     match dataset {
         Dataset::GrayImages(imgs) => {
             let (registered_imgs, motion_vec) =
-                registration::gray_images(config, width, height, &imgs)?;
+                registration::gray_images(args.config, width, height, &imgs)?;
 
             // Write the registered images to the output directory.
             std::fs::create_dir_all(&out_dir_path)

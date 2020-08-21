@@ -35,6 +35,9 @@ pub fn gray_images(
         println!("Iteration 0 - nucl_norm: {:?}", svd0.singular_values.sum());
     }
 
+    // Scale lambda by the number of pixels.
+    let lambda = config.lambda / ((width * height) as f32).sqrt();
+
     // Initialize loop variables.
     let nb_imgs = imgs.len();
     let mut imgs_registered = mat_from_vec(height, width, &|&x| x as f32, &imgs);
@@ -61,7 +64,7 @@ pub fn gray_images(
         if config.do_image_correction {
             errors = &imgs_hat - &imgs_registered - &lagrange_mult / config.rho;
             for x in errors.iter_mut() {
-                *x = shrink(config.lambda / config.rho, *x);
+                *x = shrink(lambda / config.rho, *x);
             }
         }
 
@@ -102,7 +105,7 @@ pub fn gray_images(
         let residual = norm(&(&imgs_hat - &old_imgs_hat)) / 1e-12.max(norm(&old_imgs_hat));
         if config.trace {
             let nuclear_norm = svd.singular_values.sum();
-            let l1_norm = config.lambda * errors.map(|x| x.abs()).sum();
+            let l1_norm = lambda * errors.map(|x| x.abs()).sum();
             let r = &imgs_registered - &imgs_hat + &errors;
             let augmented_lagrangian = nuclear_norm
                 + l1_norm
