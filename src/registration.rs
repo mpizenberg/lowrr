@@ -38,9 +38,12 @@ pub fn gray_images(
     // Scale lambda by the number of pixels.
     let lambda = config.lambda / ((width * height) as f32).sqrt();
 
+    // Scaling factor to bring image values in [0..1].
+    let imax_inv = 1.0 / config.image_max;
+
     // Initialize loop variables.
     let nb_imgs = imgs.len();
-    let mut imgs_registered = mat_from_vec(height, width, &|&x| x as f32, &imgs);
+    let mut imgs_registered = mat_from_vec(height, width, &|&x| x as f32 * imax_inv, &imgs);
     let mut old_imgs_hat = DMatrix::<f32>::zeros(height * width, nb_imgs);
     let mut errors = DMatrix::<f32>::zeros(height * width, nb_imgs);
     let mut lagrange_mult = DMatrix::<f32>::zeros(height * width, nb_imgs);
@@ -90,8 +93,8 @@ pub fn gray_images(
                 let mut idx = 0;
                 for x in 0..width {
                     for y in 0..height {
-                        imgs_registered[(idx, i)] =
-                            crate::interpolation::linear(x as f32 + dx, y as f32 + dy, &imgs[i]);
+                        imgs_registered[(idx, i)] = imax_inv
+                            * crate::interpolation::linear(x as f32 + dx, y as f32 + dy, &imgs[i]);
                         idx += 1;
                     }
                 }
@@ -132,7 +135,15 @@ pub fn gray_images(
 
     // TODO: write singular values to a file.
     let final_imgs_registered = (0..nb_imgs)
-        .map(|i| crate::utils::reshape(imgs_registered.column(i).map(|x| x as u8), height, width))
+        .map(|i| {
+            crate::utils::reshape(
+                imgs_registered
+                    .column(i)
+                    .map(|x| (config.image_max * x).min(255.0) as u8),
+                height,
+                width,
+            )
+        })
         .collect();
     Ok((final_imgs_registered, motion_vec))
 }
