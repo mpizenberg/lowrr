@@ -23,7 +23,8 @@ pub fn gray_images(
     // Precompute image gradients on smoothed images.
     let imgs_gradients: Vec<_> = imgs
         .iter()
-        // .map(smooth)
+        .map(crate::filter::smooth)
+        .map(|img| crate::filter::smooth(&img))
         .map(|im| crate::gradients::centered(&im))
         .collect();
 
