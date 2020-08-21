@@ -29,7 +29,7 @@ pub fn gray_images(
 
     // Debugging trace.
     if config.trace {
-        let u_f32 = reshape(height, width, &|&x| x as f32, &imgs);
+        let u_f32 = mat_from_vec(height, width, &|&x| x as f32, &imgs);
         let svd0 = u_f32.svd(false, false);
         println!("===================================");
         println!("Iteration 0 - nucl_norm: {:?}", svd0.singular_values.sum());
@@ -37,7 +37,7 @@ pub fn gray_images(
 
     // Initialize loop variables.
     let nb_imgs = imgs.len();
-    let mut imgs_registered: Vec<DMatrix<u8>> = imgs.iter().cloned().collect();
+    let mut imgs_registered = mat_from_vec(height, width, &|&x| x as f32, &imgs);
     let mut old_imgs_hat = DMatrix::<f32>::zeros(height * width, nb_imgs);
     let mut errors = DMatrix::<f32>::zeros(height * width, nb_imgs);
     let mut lagrange_mult = DMatrix::<f32>::zeros(height * width, nb_imgs);
@@ -50,8 +50,7 @@ pub fn gray_images(
         }
 
         // A-update: low-rank approximation
-        let u_registered = reshape(height, width, &|&x| x as f32, &imgs_registered);
-        let imgs_step = &u_registered + &errors + &lagrange_mult / config.rho;
+        let imgs_step = &imgs_registered + &errors + &lagrange_mult / config.rho;
         let mut svd = imgs_step.svd(true, true);
         for x in svd.singular_values.iter_mut() {
             *x = shrink(1.0 / config.rho, *x);
@@ -60,7 +59,7 @@ pub fn gray_images(
 
         // e-update: L1-regularized least-squares
         if config.do_image_correction {
-            errors = &imgs_hat - &u_registered - &lagrange_mult / config.rho;
+            errors = &imgs_hat - &imgs_registered - &lagrange_mult / config.rho;
             for x in errors.iter_mut() {
                 *x = shrink(config.lambda / config.rho, *x);
             }
@@ -85,26 +84,26 @@ pub fn gray_images(
                 let dx = motion.x;
                 let dy = motion.y;
                 motion_vec[i] = motion;
+                let mut idx = 0;
                 for x in 0..width {
                     for y in 0..height {
-                        imgs_registered[i][(y, x)] =
-                            crate::interpolation::linear(x as f32 + dx, y as f32 + dy, &imgs[i])
-                                as u8;
+                        imgs_registered[(idx, i)] =
+                            crate::interpolation::linear(x as f32 + dx, y as f32 + dy, &imgs[i]);
+                        idx += 1;
                     }
                 }
             }
         }
 
         // w-update: dual ascent
-        let u_registered = reshape(height, width, &|&x| x as f32, &imgs_registered);
-        lagrange_mult += config.rho * (&u_registered - &imgs_hat + &errors);
+        lagrange_mult += config.rho * (&imgs_registered - &imgs_hat + &errors);
 
         // Check convergence
         let residual = norm(&(&imgs_hat - &old_imgs_hat)) / 1e-12.max(norm(&old_imgs_hat));
         if config.trace {
             let nuclear_norm = svd.singular_values.sum();
             let l1_norm = config.lambda * errors.map(|x| x.abs()).sum();
-            let r = &u_registered - &imgs_hat + &errors;
+            let r = &imgs_registered - &imgs_hat + &errors;
             let augmented_lagrangian = nuclear_norm
                 + l1_norm
                 + (lagrange_mult.component_mul(&r)).sum()
@@ -129,8 +128,10 @@ pub fn gray_images(
     }
 
     // TODO: write singular values to a file.
-    // TODO: I should return a reshaped version of old_imgs_hat instead of registered.
-    Ok((imgs_registered, motion_vec))
+    let final_imgs_registered = (0..nb_imgs)
+        .map(|i| crate::utils::reshape(imgs_registered.column(i).map(|x| x as u8), height, width))
+        .collect();
+    Ok((final_imgs_registered, motion_vec))
 }
 
 /// Computes the sqrt of the sum of squared values.
@@ -143,7 +144,7 @@ fn norm_sqr(matrix: &DMatrix<f32>) -> f64 {
     matrix.iter().map(|&x| (x as f64).powi(2)).sum()
 }
 
-fn reshape<T1: Scalar, T2: Scalar, F: Fn(&T1) -> T2>(
+fn mat_from_vec<T1: Scalar, T2: Scalar, F: Fn(&T1) -> T2>(
     rows: usize,
     columns: usize,
     convert: &F,
