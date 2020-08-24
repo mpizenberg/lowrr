@@ -41,7 +41,7 @@ pub fn gray_images(
 
     // Debugging trace.
     if config.trace {
-        let u_f32 = mat_from_vec(height, width, &|&x| x, &imgs);
+        let u_f32 = mat_from_vec(height, width, |&x| x, &imgs);
         let svd0 = u_f32.svd(false, false);
         eprintln!("Initial nucl_norm: {:?}", svd0.singular_values.sum());
     }
@@ -51,7 +51,7 @@ pub fn gray_images(
 
     // Initialize loop variables.
     let nb_imgs = imgs.len();
-    let mut imgs_registered = mat_from_vec(height, width, &|&x| x, &imgs);
+    let mut imgs_registered = mat_from_vec(height, width, |&x| x, &imgs);
     let mut old_imgs_hat = DMatrix::<f32>::zeros(height * width, nb_imgs);
     let mut errors = DMatrix::<f32>::zeros(height * width, nb_imgs);
     let mut lagrange_mult = DMatrix::<f32>::zeros(height * width, nb_imgs);
@@ -172,7 +172,7 @@ fn norm_sqr(matrix: &DMatrix<f32>) -> f64 {
 fn mat_from_vec<T1: Scalar, T2: Scalar, F: Fn(&T1) -> T2>(
     rows: usize,
     columns: usize,
-    convert: &F,
+    convert: F,
     imgs: &[DMatrix<T1>],
 ) -> DMatrix<T2> {
     let nb_imgs = imgs.len();
@@ -180,7 +180,7 @@ fn mat_from_vec<T1: Scalar, T2: Scalar, F: Fn(&T1) -> T2>(
     DMatrix::from_iterator(
         rows * columns,
         nb_imgs,
-        imgs.iter().flat_map(|img| img.iter().map(convert)),
+        imgs.iter().flat_map(|img| img.iter().map(|x| convert(x))),
     )
 }
 
