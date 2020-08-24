@@ -108,17 +108,16 @@ pub fn gray_images(
 
         // v-update: linear least-squares registration
         if config.do_registration {
-            for (i, (ux, uy)) in imgs_gradients.iter().enumerate() {
+            for (i, (ux, uy)) in imgs_gradients_f32.iter().enumerate() {
                 // Build Ai.
                 #[allow(non_snake_case)]
                 let Ai = MatrixMN::<f32, Dynamic, U2>::from_iterator(
                     height * width,
-                    ux.iter().chain(uy.iter()).map(|&x| x as f32),
+                    ux.iter().chain(uy.iter()).cloned(),
                 );
 
                 // Build bi.
-                let img_i =
-                    DVector::from_iterator(height * width, imgs[i].iter().map(|&x| x as f32));
+                let img_i = DVector::from_iterator(height * width, imgs_f32[i].iter().cloned());
                 let bi = imgs_hat.column(i)
                     - lagrange_mult.column(i) / config.rho
                     - img_i
