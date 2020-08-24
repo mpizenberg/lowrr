@@ -79,13 +79,13 @@ pub fn centered_4_f32(img: &na::DMatrix<f32>) -> (na::DMatrix<f32>, na::DMatrix<
 
     let left_2 = img.slice((2, 0), (nb_rows - 4, nb_cols - 4));
     let left_1 = img.slice((2, 1), (nb_rows - 4, nb_cols - 4));
-    let right_1 = img.slice((2, 2), (nb_rows - 4, nb_cols - 4));
-    let right_2 = img.slice((2, 3), (nb_rows - 4, nb_cols - 4));
+    let right_1 = img.slice((2, 3), (nb_rows - 4, nb_cols - 4));
+    let right_2 = img.slice((2, 4), (nb_rows - 4, nb_cols - 4));
 
     let top_2 = img.slice((0, 2), (nb_rows - 4, nb_cols - 4));
     let top_1 = img.slice((1, 2), (nb_rows - 4, nb_cols - 4));
-    let bottom_1 = img.slice((2, 2), (nb_rows - 4, nb_cols - 4));
-    let bottom_2 = img.slice((3, 2), (nb_rows - 4, nb_cols - 4));
+    let bottom_1 = img.slice((3, 2), (nb_rows - 4, nb_cols - 4));
+    let bottom_2 = img.slice((4, 2), (nb_rows - 4, nb_cols - 4));
 
     let mut grad_x = na::DMatrix::zeros(nb_rows, nb_cols);
     let mut grad_y = na::DMatrix::zeros(nb_rows, nb_cols);
