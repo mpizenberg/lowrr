@@ -20,52 +20,28 @@ pub fn gray_images(
     height: usize,
     imgs: &[DMatrix<u8>],
 ) -> Result<(Vec<DMatrix<u8>>, Vec<Vector2<f32>>), Box<dyn std::error::Error>> {
-    // Convert images into f32.
-    let imgs_f32: Vec<_> = imgs.iter().map(|im| im.map(|x| x as f32)).collect();
+    // Scaling factor to bring image values in [0..1].
+    let imax_inv = 1.0 / config.image_max;
+
+    // Convert images into f32 with values in [0..1].
+    let imgs: Vec<_> = imgs
+        .iter()
+        .map(|im| im.map(|x| x as f32 * imax_inv))
+        .collect();
 
     // Precompute image gradients on smoothed images.
     let kernel = crate::filter::gaussian_kernel(3.0, 13);
-    let imgs_conv: Vec<_> = imgs
-        .iter()
-        .map(|im| crate::filter::conv_2d_direct_same(im, &kernel))
-        .collect();
 
-    let imgs_gradients: Vec<_> = imgs_conv
-        .iter()
-        .map(|im| crate::gradients::centered_4(&im))
-        .collect();
-
-    let imgs_conv_f32: Vec<_> = imgs_f32
+    let imgs_gradients_f32: Vec<_> = imgs
         .iter()
         .map(|im| crate::filter::conv_2d_direct_same_f32(im, &kernel))
-        .collect();
-
-    let imgs_gradients_f32: Vec<_> = imgs_conv_f32
-        .iter()
         // .map(|im| crate::gradients::centered_4_f32(&im))
         .map(|im| crate::filter::gradients_f32(&im))
         .collect();
 
-    // TEMP DEBUG
-    for (i, conv) in imgs_conv_f32.iter().enumerate() {
-        let conv_u8 = conv.map(|x| x.round().max(0.0).min(255.0) as u8);
-        crate::interop::image_from_matrix(&conv_u8)
-            .save(format!("out/conv_{}.png", i))
-            .expect("Error saving image");
-    }
-    // TEMP DEBUG
-    for (i, (gx, _)) in imgs_gradients_f32.iter().enumerate() {
-        // let gx_u8 = gx.map(|x| x.abs().min(255) as u8);
-        let gx_u8 = gx.map(|x| x.abs().round().min(255.0) as u8);
-        crate::interop::image_from_matrix(&gx_u8)
-            .save(format!("out/gx_{}.png", i))
-            .expect("Error saving image");
-    }
-
     // Debugging trace.
     if config.trace {
-        // let u_f32 = mat_from_vec(height, width, &|&x| x as f32, &imgs);
-        let u_f32 = mat_from_vec(height, width, &|&x| x, &imgs_f32);
+        let u_f32 = mat_from_vec(height, width, &|&x| x, &imgs);
         let svd0 = u_f32.svd(false, false);
         eprintln!("Initial nucl_norm: {:?}", svd0.singular_values.sum());
     }
@@ -73,12 +49,9 @@ pub fn gray_images(
     // Scale lambda by the number of pixels.
     let lambda = config.lambda / ((width * height) as f32).sqrt();
 
-    // Scaling factor to bring image values in [0..1].
-    let imax_inv = 1.0 / config.image_max;
-
     // Initialize loop variables.
     let nb_imgs = imgs.len();
-    let mut imgs_registered = mat_from_vec(height, width, &|&x| x as f32 * imax_inv, &imgs);
+    let mut imgs_registered = mat_from_vec(height, width, &|&x| x, &imgs);
     let mut old_imgs_hat = DMatrix::<f32>::zeros(height * width, nb_imgs);
     let mut errors = DMatrix::<f32>::zeros(height * width, nb_imgs);
     let mut lagrange_mult = DMatrix::<f32>::zeros(height * width, nb_imgs);
@@ -117,7 +90,7 @@ pub fn gray_images(
                 );
 
                 // Build bi.
-                let img_i = DVector::from_iterator(height * width, imgs_f32[i].iter().cloned());
+                let img_i = DVector::from_iterator(height * width, imgs[i].iter().cloned());
                 let bi = imgs_hat.column(i)
                     - lagrange_mult.column(i) / config.rho
                     - img_i
@@ -137,8 +110,8 @@ pub fn gray_images(
                 let mut idx = 0;
                 for x in 0..width {
                     for y in 0..height {
-                        imgs_registered[(idx, i)] = imax_inv
-                            * crate::interpolation::linear(x as f32 + dx, y as f32 + dy, &imgs[i]);
+                        imgs_registered[(idx, i)] =
+                            crate::interpolation::linear(x as f32 + dx, y as f32 + dy, &imgs[i]);
                         idx += 1;
                     }
                 }

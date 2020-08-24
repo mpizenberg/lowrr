@@ -4,6 +4,7 @@
 
 //! Helper functions to interpolate / extrapolate warped images.
 
+use na::base::Scalar;
 use nalgebra as na;
 
 type Float = f32;
@@ -14,7 +15,10 @@ type Float = f32;
 #[allow(clippy::cast_possible_truncation)]
 #[allow(clippy::cast_sign_loss)]
 #[allow(clippy::cast_precision_loss)]
-pub fn linear(x: Float, y: Float, image: &na::DMatrix<u8>) -> Float {
+pub fn linear<T>(x: Float, y: Float, image: &na::DMatrix<T>) -> Float
+where
+    T: Scalar + Copy + Into<Float>,
+{
     let (height, width) = image.shape();
     let u = x.floor();
     let v = y.floor();
@@ -24,10 +28,10 @@ pub fn linear(x: Float, y: Float, image: &na::DMatrix<u8>) -> Float {
         let v_0 = v as usize;
         let u_1 = u_0 + 1;
         let v_1 = v_0 + 1;
-        let vu_00 = Float::from(image[(v_0, u_0)]);
-        let vu_10 = Float::from(image[(v_1, u_0)]);
-        let vu_01 = Float::from(image[(v_0, u_1)]);
-        let vu_11 = Float::from(image[(v_1, u_1)]);
+        let vu_00: Float = image[(v_0, u_0)].into();
+        let vu_10: Float = image[(v_1, u_0)].into();
+        let vu_01: Float = image[(v_0, u_1)].into();
+        let vu_11: Float = image[(v_1, u_1)].into();
         let a = x - u;
         let b = y - v;
         (1.0 - b) * (1.0 - a) * vu_00
@@ -36,7 +40,7 @@ pub fn linear(x: Float, y: Float, image: &na::DMatrix<u8>) -> Float {
             + b * a * vu_11
     } else {
         // Nearest neighbour extrapolation outside boundaries.
-        image[nearest_border(x, y, width, height)] as f32
+        image[nearest_border(x, y, width, height)].into()
     }
 }
 
