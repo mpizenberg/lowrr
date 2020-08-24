@@ -20,6 +20,9 @@ pub fn gray_images(
     height: usize,
     imgs: &[DMatrix<u8>],
 ) -> Result<(Vec<DMatrix<u8>>, Vec<Vector2<f32>>), Box<dyn std::error::Error>> {
+    // Convert images into f32.
+    let imgs_f32: Vec<_> = imgs.iter().map(|im| im.map(|x| x as f32)).collect();
+
     // Precompute image gradients on smoothed images.
     let kernel = crate::filter::gaussian_kernel(3.0, 13);
     let imgs_conv: Vec<_> = imgs
@@ -27,21 +30,32 @@ pub fn gray_images(
         .map(|im| crate::filter::conv_2d_direct_same(im, &kernel))
         .collect();
 
-    // TEMP DEBUG
-    for i in 0..imgs.len() {
-        crate::interop::image_from_matrix(&imgs_conv[i])
-            .save(format!("out/conv_{}.png", i))
-            .expect("Error saving image");
-    }
-
     let imgs_gradients: Vec<_> = imgs_conv
         .iter()
         .map(|im| crate::gradients::centered_4(&im))
         .collect();
 
+    let imgs_conv_f32: Vec<_> = imgs_f32
+        .iter()
+        .map(|im| crate::filter::conv_2d_direct_same_f32(im, &kernel))
+        .collect();
+
+    let imgs_gradients_f32: Vec<_> = imgs_conv_f32
+        .iter()
+        .map(|im| crate::gradients::centered_4_f32(&im))
+        .collect();
+
     // TEMP DEBUG
-    for (i, (gx, _)) in imgs_gradients.iter().enumerate() {
-        let gx_u8 = gx.map(|x| x.abs().min(255) as u8);
+    for (i, conv) in imgs_conv_f32.iter().enumerate() {
+        let conv_u8 = conv.map(|x| x.round().max(0.0).min(255.0) as u8);
+        crate::interop::image_from_matrix(&conv_u8)
+            .save(format!("out/conv_{}.png", i))
+            .expect("Error saving image");
+    }
+    // TEMP DEBUG
+    for (i, (gx, _)) in imgs_gradients_f32.iter().enumerate() {
+        // let gx_u8 = gx.map(|x| x.abs().min(255) as u8);
+        let gx_u8 = gx.map(|x| x.abs().round().min(255.0) as u8);
         crate::interop::image_from_matrix(&gx_u8)
             .save(format!("out/gx_{}.png", i))
             .expect("Error saving image");
@@ -49,7 +63,8 @@ pub fn gray_images(
 
     // Debugging trace.
     if config.trace {
-        let u_f32 = mat_from_vec(height, width, &|&x| x as f32, &imgs);
+        // let u_f32 = mat_from_vec(height, width, &|&x| x as f32, &imgs);
+        let u_f32 = mat_from_vec(height, width, &|&x| x, &imgs_f32);
         let svd0 = u_f32.svd(false, false);
         eprintln!("Initial nucl_norm: {:?}", svd0.singular_values.sum());
     }

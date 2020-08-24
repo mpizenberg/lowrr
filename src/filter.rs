@@ -57,6 +57,34 @@ pub fn conv_2d_direct_same(img: &DMatrix<u8>, kernel: &DMatrix<f32>) -> DMatrix<
     result_f32.map(|x| x.round().max(0.0).min(255.0) as u8)
 }
 
+/// Direct 2D convolution that keeps the original matrix size,
+/// by repeating the border elements.
+pub fn conv_2d_direct_same_f32(img: &DMatrix<f32>, kernel: &DMatrix<f32>) -> DMatrix<f32> {
+    let (k_rows, k_cols) = kernel.shape();
+    let (nrows, ncols) = img.shape();
+    let mut result: DMatrix<f32> = DMatrix::zeros(nrows, ncols);
+
+    assert!(k_rows == k_cols);
+    assert!(k_rows % 2 == 1);
+    let shift = (k_rows as isize - 1) / 2;
+    for j in 0..ncols {
+        for i in 0..nrows {
+            for kj in 0..k_cols {
+                for ki in 0..k_rows {
+                    let img_i = (i as isize) + (ki as isize) - shift;
+                    let img_i = img_i.min(nrows as isize - 1).max(0) as usize;
+
+                    let img_j = (j as isize) + (kj as isize) - shift;
+                    let img_j = img_j.min(ncols as isize - 1).max(0) as usize;
+
+                    result[(i, j)] += img[(img_i, img_j)] as f32 * kernel[(ki, kj)];
+                }
+            }
+        }
+    }
+    result
+}
+
 pub fn gaussian_kernel(sigma: f32, size: usize) -> DMatrix<f32> {
     assert!(sigma > 0.0);
     let exp_coef = -1.0 / (2.0 * sigma * sigma);
