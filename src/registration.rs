@@ -42,7 +42,8 @@ pub fn gray_images(
 
     let imgs_gradients_f32: Vec<_> = imgs_conv_f32
         .iter()
-        .map(|im| crate::gradients::centered_4_f32(&im))
+        // .map(|im| crate::gradients::centered_4_f32(&im))
+        .map(|im| crate::filter::gradients_f32(&im))
         .collect();
 
     // TEMP DEBUG
