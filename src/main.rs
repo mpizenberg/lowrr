@@ -220,8 +220,12 @@ fn load_dataset<P: AsRef<Path>>(
             .iter()
             .map(|path| image::open(path).unwrap())
             // Temporary convert color to gray.
-            .map(|i| i.into_luma())
-            .map(interop::matrix_from_image)
+            // .map(|i| i.into_luma())
+            // .map(interop::matrix_from_image)
+            .map(|i| i.into_rgb())
+            .map(interop::matrix_from_rgb_image)
+            // Temporary only keep red channel.
+            .map(|m| m.map(|(red, _, _)| red))
             .collect();
         let (height, width) = images[0].shape();
         Ok((Dataset::GrayImages(images), (width, height)))
