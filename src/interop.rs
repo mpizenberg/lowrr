@@ -54,3 +54,20 @@ pub fn matrix_from_image(img: GrayImage) -> DMatrix<u8> {
     let (width, height) = img.dimensions();
     DMatrix::from_row_slice(height as usize, width as usize, &img.into_raw())
 }
+
+/// Convert a `RgbImage` into an `(u8, u8, u8)` matrix.
+/// Inverse operation of `rgb_from_matrix`.
+pub fn matrix_from_rgb_image(img: RgbImage) -> DMatrix<(u8, u8, u8)> {
+    let (width, height) = img.dimensions();
+    // TODO: suboptimal allocation in addition to transposition.
+    let mut matrix = DMatrix::from_iterator(
+        width as usize,
+        height as usize,
+        img.into_raw()
+            .as_slice()
+            .chunks(3)
+            .map(|s| (s[0], s[1], s[2])),
+    );
+    matrix.transpose_mut();
+    matrix
+}
