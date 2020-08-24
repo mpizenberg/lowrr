@@ -28,3 +28,19 @@ pub fn smooth(img: &DMatrix<u8>) -> DMatrix<u8> {
     }
     smoothed
 }
+
+pub fn gaussian_kernel(sigma: f32, size: usize) -> DMatrix<f32> {
+    assert!(sigma > 0.0);
+    let exp_coef = -1.0 / (2.0 * sigma * sigma);
+    let shift = (size as f32 - 1.0) / 2.0;
+    let mut sum_kernel = 0.0;
+    let gauss_2d = |i, j| {
+        let x = j as f32 - shift;
+        let y = i as f32 - shift;
+        let res = (exp_coef * (x * x + y * y)).exp();
+        sum_kernel += res;
+        res
+    };
+    let kernel = DMatrix::from_fn(size, size, gauss_2d);
+    kernel / sum_kernel
+}
