@@ -39,6 +39,14 @@ pub fn gray_images(
         .map(|im| crate::gradients::centered_4(&im))
         .collect();
 
+    // TEMP DEBUG
+    for (i, (gx, _)) in imgs_gradients.iter().enumerate() {
+        let gx_u8 = gx.map(|x| x.abs().min(255) as u8);
+        crate::interop::image_from_matrix(&gx_u8)
+            .save(format!("out/gx_{}.png", i))
+            .expect("Error saving image");
+    }
+
     // Debugging trace.
     if config.trace {
         let u_f32 = mat_from_vec(height, width, &|&x| x as f32, &imgs);
