@@ -22,9 +22,20 @@ pub fn gray_images(
 ) -> Result<(Vec<DMatrix<u8>>, Vec<Vector2<f32>>), Box<dyn std::error::Error>> {
     // Precompute image gradients on smoothed images.
     let kernel = crate::filter::gaussian_kernel(3.0, 13);
-    let imgs_gradients: Vec<_> = imgs
+    let imgs_conv: Vec<_> = imgs
         .iter()
         .map(|im| crate::filter::conv_2d_direct_same(im, &kernel))
+        .collect();
+
+    // TEMP DEBUG
+    for i in 0..imgs.len() {
+        crate::interop::image_from_matrix(&imgs_conv[i])
+            .save(format!("out/conv_{}.png", i))
+            .expect("Error saving image");
+    }
+
+    let imgs_gradients: Vec<_> = imgs_conv
+        .iter()
         .map(|im| crate::gradients::centered_4(&im))
         .collect();
 
