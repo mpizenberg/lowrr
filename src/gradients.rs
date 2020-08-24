@@ -32,6 +32,42 @@ pub fn centered(img: &na::DMatrix<u8>) -> (na::DMatrix<i16>, na::DMatrix<i16>) {
     (grad_x, grad_y)
 }
 
+/// Compute a centered gradient of 4th order.
+///
+/// The coefficients are 1/12 * [ 1  -8  8  -1 ]
+///
+/// Gradients of pixels at the border of the image are set to 0.
+#[allow(clippy::similar_names)]
+pub fn centered_4(img: &na::DMatrix<u8>) -> (na::DMatrix<i16>, na::DMatrix<i16>) {
+    let (nb_rows, nb_cols) = img.shape();
+    let img_i16 = img.map(|x| x as i16);
+
+    let left_2 = img_i16.slice((2, 0), (nb_rows - 4, nb_cols - 4));
+    let left_1 = img_i16.slice((2, 1), (nb_rows - 4, nb_cols - 4));
+    let right_1 = img_i16.slice((2, 2), (nb_rows - 4, nb_cols - 4));
+    let right_2 = img_i16.slice((2, 3), (nb_rows - 4, nb_cols - 4));
+
+    let top_2 = img_i16.slice((0, 2), (nb_rows - 4, nb_cols - 4));
+    let top_1 = img_i16.slice((1, 2), (nb_rows - 4, nb_cols - 4));
+    let bottom_1 = img_i16.slice((2, 2), (nb_rows - 4, nb_cols - 4));
+    let bottom_2 = img_i16.slice((3, 2), (nb_rows - 4, nb_cols - 4));
+
+    let mut grad_x = na::DMatrix::zeros(nb_rows, nb_cols);
+    let mut grad_y = na::DMatrix::zeros(nb_rows, nb_cols);
+    let mut grad_x_inner = grad_x.slice_mut((2, 2), (nb_rows - 4, nb_cols - 4));
+    let mut grad_y_inner = grad_y.slice_mut((2, 2), (nb_rows - 4, nb_cols - 4));
+
+    // TODO: clearly not memory efficient regarding allocations...
+    //
+    // One solution would be to decompose each operation with .axpy()
+    // Another would be to use iterators.
+    // Both are very unreadable.
+    grad_x_inner.copy_from(&((left_2 - 8 * left_1 + 8 * right_1 - right_2) / 12));
+    grad_y_inner.copy_from(&((top_2 - 8 * top_1 + 8 * bottom_1 - bottom_2) / 12));
+
+    (grad_x, grad_y)
+}
+
 /// Compute squared gradient norm from x and y gradient matrices.
 #[allow(clippy::cast_possible_truncation)]
 #[allow(clippy::cast_sign_loss)]

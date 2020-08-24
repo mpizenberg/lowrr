@@ -25,7 +25,7 @@ pub fn gray_images(
     let imgs_gradients: Vec<_> = imgs
         .iter()
         .map(|im| crate::filter::conv_2d_direct_same(im, &kernel))
-        .map(|im| crate::gradients::centered(&im))
+        .map(|im| crate::gradients::centered_4(&im))
         .collect();
 
     // Debugging trace.
