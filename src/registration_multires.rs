@@ -155,6 +155,8 @@ pub fn gray_images(
 
         // Update the motion vec before next level
         motion_vec = state.motion_vec;
+        eprintln!("motion_vec:");
+        motion_vec.iter().for_each(|v| eprintln!("   {:?}", v.data));
     } // End of levels
 
     // Return the final motion vector.
@@ -190,12 +192,10 @@ fn step(config: &StepConfig, obs: &Obs, nb_iter: usize, state: State) -> (State,
         }
     }
 
-    // v-update: linear least-squares registration
+    // v-update: inverse compositional step.
     for (i, (ux, uy)) in obs.gradients.iter().enumerate() {
-        // Use an inverse compositional approach.
-        let img_i = DVector::from_iterator(height * width, obs.images[i].iter().cloned());
         let mut new_image = crate::utils::reshape(
-            imgs_hat.column(i) - lagrange_mult.column(i) / config.rho - &img_i - errors.column(i),
+            imgs_hat.column(i) - lagrange_mult.column(i) / config.rho - errors.column(i),
             height,
             width,
         );
@@ -204,8 +204,7 @@ fn step(config: &StepConfig, obs: &Obs, nb_iter: usize, state: State) -> (State,
         new_image = DMatrix::from_fn(height, width, |i, j| {
             crate::interpolation::linear(j as f32 + dx, i as f32 + dy, &new_image)
         });
-        new_image = crate::utils::reshape(new_image, width * height, 1);
-        let residuals = &img_i - &new_image;
+        let residuals = &new_image - &obs.images[i];
         let mut g = Vector2::zeros();
         ux.iter()
             .zip(uy.iter())
@@ -216,7 +215,10 @@ fn step(config: &StepConfig, obs: &Obs, nb_iter: usize, state: State) -> (State,
         let motion_step = &obs.hessians_inv[i] * g;
 
         // Save motion for this image.
-        motion_vec[i] -= motion_step;
+        // We should do -= since we prepend the inverse
+        // but since we use motion_vec on U later for registration,
+        // we might as well re-inverse it on the fly here.
+        motion_vec[i] += motion_step;
     }
 
     reproject_f32(
