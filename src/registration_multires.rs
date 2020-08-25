@@ -44,7 +44,7 @@ struct State {
 
 type Levels<T> = Vec<T>;
 
-pub fn gray_images_multires(
+pub fn gray_images(
     config: Config,
     imgs: Vec<DMatrix<u8>>,
 ) -> Result<Vec<Vector2<f32>>, Box<dyn std::error::Error>> {

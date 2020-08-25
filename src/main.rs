@@ -1,6 +1,6 @@
 use lowrr::interop;
 use lowrr::registration;
-use lowrr::registration_tris;
+use lowrr::registration_multires;
 mod unused;
 
 use glob::glob;
@@ -59,7 +59,7 @@ FLAGS:
 #[derive(Debug)]
 /// Type holding command line arguments.
 struct Args {
-    config: registration_tris::Config,
+    config: registration_multires::Config,
     help: bool,
     version: bool,
     out_dir: String,
@@ -99,7 +99,7 @@ fn parse_args() -> Result<Args, Box<dyn std::error::Error>> {
 
     // Return Args struct.
     Ok(Args {
-        config: registration_tris::Config {
+        config: registration_multires::Config {
             do_registration,
             do_image_correction,
             trace,
@@ -160,8 +160,8 @@ fn run(args: Args) -> Result<(), Box<dyn std::error::Error>> {
         Dataset::GrayImages(imgs) => {
             // let (registered_imgs, motion_vec) =
             //     registration::gray_images(args.config, width, height, &imgs)?;
-            let motion_vec = registration_tris::gray_images_multires(args.config, imgs.clone())?;
-            let registered_imgs = registration_tris::reproject_u8(&imgs, &motion_vec);
+            let motion_vec = registration_multires::gray_images(args.config, imgs.clone())?;
+            let registered_imgs = registration_multires::reproject_u8(&imgs, &motion_vec);
 
             // Write the registered images to the output directory.
             std::fs::create_dir_all(&out_dir_path)
