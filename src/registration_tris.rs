@@ -1,5 +1,4 @@
-use nalgebra::base::dimension::{Dynamic, U2};
-use nalgebra::{DMatrix, DVector, MatrixMN, RealField, Vector2};
+use nalgebra::{DMatrix, DVector, Matrix2, RealField, Vector2};
 
 #[derive(Debug)]
 pub struct Config {
@@ -26,6 +25,7 @@ struct Obs<'a> {
     image_size: (usize, usize),
     images: &'a [DMatrix<f32>],
     gradients: &'a [(DMatrix<f32>, DMatrix<f32>)],
+    hessians_inv: &'a [Matrix2<f32>],
 }
 
 #[derive(PartialEq)]
@@ -53,16 +53,18 @@ pub fn gray_images_multires(
     // Precompute multi-resolution images.
     let multires_imgs: Vec<Levels<_>> = imgs
         .into_iter()
-        .map(|im| crate::multires::mean_pyramid(4, im))
+        .map(|im| crate::multires::mean_pyramid(2, im))
         .collect();
 
     // Precompute multi-resolution gradients.
+    let kernel = crate::filter::gaussian_kernel(2.0, 9);
     let multires_gradients: Vec<Levels<_>> = multires_imgs
         .iter()
         .map(|multi| {
             multi
                 .iter()
-                .map(|im| crate::gradients::centered(im))
+                .map(|im| crate::filter::conv_2d_direct_same(im, &kernel))
+                .map(|im| crate::gradients::centered(&im))
                 .collect()
         })
         .collect();
@@ -94,12 +96,27 @@ pub fn gray_images_multires(
             .map(|(gx, gy)| (i16_to_float(gx), i16_to_float(gy)))
             .collect();
 
+        // Precompute inverse of hessian matrices.
+        let hessians_inv: Vec<_> = gradients_f32
+            .iter()
+            .map(|(gradients_x, gradients_y)| {
+                let mut hessian = Matrix2::zeros();
+                for (gx, gy) in gradients_x.iter().zip(gradients_y.iter()) {
+                    hessian += Matrix2::new(gx * gx, gx * gy, gx * gy, gy * gy);
+                }
+                hessian
+                    .try_inverse()
+                    .expect("Error while inverting hessian")
+            })
+            .collect();
+
         // Algorithm parameters.
         let (height, width) = imgs_f32[0].shape();
         let obs = Obs {
             image_size: (width, height),
             images: &imgs_f32,
             gradients: &gradients_f32,
+            hessians_inv: &hessians_inv,
         };
         let step_config = StepConfig {
             do_image_correction: config.do_image_correction,
@@ -175,28 +192,33 @@ fn step(config: &StepConfig, obs: &Obs, nb_iter: usize, state: State) -> (State,
 
     // v-update: linear least-squares registration
     for (i, (ux, uy)) in obs.gradients.iter().enumerate() {
-        // Build Ai.
-        #[allow(non_snake_case)]
-        let Ai = MatrixMN::<f32, Dynamic, U2>::from_iterator(
-            height * width,
-            ux.iter().chain(uy.iter()).cloned(),
-        );
-
-        // Build bi.
+        // Use an inverse compositional approach.
         let img_i = DVector::from_iterator(height * width, obs.images[i].iter().cloned());
-        let bi =
-            imgs_hat.column(i) - lagrange_mult.column(i) / config.rho - img_i - errors.column(i);
-
-        // Solve linear problem to find motion vector.
-        #[allow(non_snake_case)]
-        let Ai_svd = Ai.svd(true, true);
-        let motion = Ai_svd
-            .solve(&bi, 1e-12)
-            .expect("There was an error when computing motion");
+        let mut new_image = crate::utils::reshape(
+            imgs_hat.column(i) - lagrange_mult.column(i) / config.rho - &img_i - errors.column(i),
+            height,
+            width,
+        );
+        let dx = motion_vec[i].x;
+        let dy = motion_vec[i].y;
+        new_image = DMatrix::from_fn(height, width, |i, j| {
+            crate::interpolation::linear(j as f32 + dx, i as f32 + dy, &new_image)
+        });
+        new_image = crate::utils::reshape(new_image, width * height, 1);
+        let residuals = &img_i - &new_image;
+        let mut g = Vector2::zeros();
+        ux.iter()
+            .zip(uy.iter())
+            .zip(residuals.iter())
+            .for_each(|((&gx, &gy), &res)| {
+                g += res * Vector2::new(gx, gy);
+            });
+        let motion_step = &obs.hessians_inv[i] * g;
 
         // Save motion for this image.
-        motion_vec[i] = motion;
+        motion_vec[i] -= motion_step;
     }
+
     reproject_f32(
         width,
         height,
