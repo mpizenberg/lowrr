@@ -34,3 +34,28 @@ where
     let new_data = VecStorage::new(Dynamic::new(nrows), Dynamic::new(ncols), matrix.data.into());
     DMatrix::from_data(new_data)
 }
+
+/// Transpose a Vec of Vec.
+/// Will crash if the inner vecs are not all the same size.
+pub fn transpose<T: Clone>(v: Vec<Vec<T>>) -> Vec<Vec<T>> {
+    // Checking case of an empty vec.
+    if v.is_empty() {
+        return Vec::new();
+    }
+
+    // Checking case of vec of empty vec.
+    let transposed_len = v[0].len();
+    assert!(v.iter().all(|vi| vi.len() == transposed_len));
+    if transposed_len == 0 {
+        return Vec::new();
+    }
+
+    // Normal case.
+    let mut v_transposed = vec![Vec::new(); transposed_len];
+    for vi in v.into_iter() {
+        for (v_tj, vj) in v_transposed.iter_mut().zip(vi.into_iter()) {
+            v_tj.push(vj);
+        }
+    }
+    v_transposed
+}

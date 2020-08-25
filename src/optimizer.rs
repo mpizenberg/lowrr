@@ -13,7 +13,7 @@ pub enum Continue {
     Forward,
 }
 
-/// An `State<Observations, EvalState, Model, Error>`
+/// An `optimizer::Iterative<Observations, EvalState, Model, Error>`
 /// is capable of iteratively minimizing an energy function,
 /// if provided few functions that are evaluated during iterations.
 ///
@@ -21,15 +21,14 @@ pub enum Continue {
 /// that I have found to be flexible enough for all my past needs.
 /// Here is a simple description of its generic types.
 ///
-/// * `Self`: State of the iterative optimizer.
 /// * `Observations`: Data used as reference during energy evaluations.
 /// * `EvalState`: Data computed while evaluating a model just computed.
-///   Will typically be result successfully containing all the data
+///   Will typically be a `Result` successfully containing all the data
 ///   needed to update the optimizer state,
 ///   or an error meaning that we stopped the evaluation because the energy increased.
 /// * `Model`: The model of what you are trying to optimize.
 /// * `Error`: Custom error type for potential failures in step computation.
-pub trait State<Observations, EvalState, Model, Error>
+pub trait Iterative<Observations, EvalState, Model, Error>
 where
     Self: std::marker::Sized,
 {
@@ -48,7 +47,12 @@ where
 
     /// Function deciding if iterations should continue.
     /// Also return the state that will be used for next iteration.
-    fn stop_criterion(self, nb_iter: usize, eval_state: EvalState) -> (Self, Continue);
+    fn stop_criterion(
+        self,
+        obs: &Observations,
+        nb_iter: usize,
+        eval_state: EvalState,
+    ) -> (Self, Continue);
 
     /// Iteratively solve your optimization problem,
     /// with the provided functions by the trait implementation.
@@ -61,7 +65,7 @@ where
             nb_iter += 1;
             let new_model = state.step()?;
             let eval_state = state.eval(obs, new_model);
-            let (kept_state, continuation) = state.stop_criterion(nb_iter, eval_state);
+            let (kept_state, continuation) = state.stop_criterion(obs, nb_iter, eval_state);
             state = kept_state;
             if let Continue::Stop = continuation {
                 return Ok((state, nb_iter));

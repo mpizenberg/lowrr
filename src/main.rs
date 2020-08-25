@@ -1,5 +1,6 @@
 use lowrr::interop;
 use lowrr::registration;
+use lowrr::registration_tris;
 mod unused;
 
 use glob::glob;
@@ -58,7 +59,7 @@ FLAGS:
 #[derive(Debug)]
 /// Type holding command line arguments.
 struct Args {
-    config: registration::Config,
+    config: registration_tris::Config,
     help: bool,
     version: bool,
     out_dir: String,
@@ -98,7 +99,7 @@ fn parse_args() -> Result<Args, Box<dyn std::error::Error>> {
 
     // Return Args struct.
     Ok(Args {
-        config: registration::Config {
+        config: registration_tris::Config {
             do_registration,
             do_image_correction,
             trace,
@@ -157,8 +158,10 @@ fn run(args: Args) -> Result<(), Box<dyn std::error::Error>> {
     // Use the algorithm corresponding to the type of data.
     match dataset {
         Dataset::GrayImages(imgs) => {
-            let (registered_imgs, motion_vec) =
-                registration::gray_images(args.config, width, height, &imgs)?;
+            // let (registered_imgs, motion_vec) =
+            //     registration::gray_images(args.config, width, height, &imgs)?;
+            let motion_vec = registration_tris::gray_images_multires(args.config, imgs.clone())?;
+            let registered_imgs = registration_tris::reproject_u8(&imgs, &motion_vec);
 
             // Write the registered images to the output directory.
             std::fs::create_dir_all(&out_dir_path)

@@ -12,6 +12,8 @@ pub mod filter;
 pub mod gradients;
 pub mod interop;
 pub mod interpolation;
+pub mod multires;
 pub mod optimizer;
 pub mod registration;
+pub mod registration_tris;
 pub mod utils;
