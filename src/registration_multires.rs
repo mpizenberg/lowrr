@@ -192,6 +192,10 @@ fn step(config: &StepConfig, obs: &Obs, nb_iter: usize, state: State) -> (State,
 
     // v-update: inverse compositional step.
     for (i, (ux, uy)) in obs.gradients.iter().enumerate() {
+        // Use the first image as the reference frame.
+        if i == 0 {
+            continue;
+        }
         let mut new_image = crate::utils::reshape(
             imgs_hat.column(i) - lagrange_mult.column(i) / config.rho - errors.column(i),
             height,
