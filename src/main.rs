@@ -28,19 +28,25 @@ fn display_help() {
 lowrr
 
 Low-rank registration of slightly unaligned images for photometric stereo.
+Some algorithm info is output to stderr while running.
+You can ignore them by redirecting stderr to /dev/null.
+The final motion vector is written to stdout,
+you can redirect it to a file with the usual pipes.
 
 USAGE:
     lowrr [FLAGS] IMAGE_FILES
     For example:
         lowrr --trace *.png
+        lowrr *.jpg 2> /dev/null
+        lowrr *.png > result.txt
 
 FLAGS:
     --help                 # Print this message and exit
     --version              # Print version and exit
-    --out-dir dir/         # Output directory to write results (default: {})
-    --trace                # Print some debug output while running
-    --levels int           # Number of levels for the multi-resolution approach (default: {})
+    --out-dir dir/         # Output directory to save registered images (default: {})
+    --trace                # Print more debug output to stderr while running
     --no-image-correction  # Avoid image correction
+    --levels int           # Number of levels for the multi-resolution approach (default: {})
     --lambda float         # Weight of the L1 term (high means no correction) (default: {})
     --rho float            # Lagrangian penalty (default: {})
     --threshold float      # Stop when relative diff between two estimate of corrected image falls below this (default: {})
@@ -172,6 +178,11 @@ fn run(args: Args) -> Result<(), Box<dyn std::error::Error>> {
                     .save(&out_dir_path.join(format!("{}.png", i)))
                     .expect("Error saving image");
             });
+
+            // Write motion_vec to stdout.
+            for v in motion_vec.iter() {
+                println!("{} {}", v.x, v.y)
+            }
             Ok(())
         }
         Dataset::RgbImages { red, green, blue } => unimplemented!(),
