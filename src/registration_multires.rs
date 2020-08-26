@@ -202,7 +202,7 @@ fn step(config: &StepConfig, obs: &Obs, nb_iter: usize, state: State) -> (State,
         let dx = motion_vec[i].x;
         let dy = motion_vec[i].y;
         new_image = DMatrix::from_fn(height, width, |i, j| {
-            crate::interpolation::linear(j as f32 + dx, i as f32 + dy, &new_image)
+            crate::interpolation::linear(j as f32 - dx, i as f32 - dy, &new_image)
         });
         let residuals = &new_image - &obs.images[i];
         let mut g = Vector2::zeros();
