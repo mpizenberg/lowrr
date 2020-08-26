@@ -15,5 +15,4 @@ pub mod interpolation;
 pub mod multires;
 pub mod optimizer;
 pub mod registration;
-pub mod registration_multires;
 pub mod utils;
