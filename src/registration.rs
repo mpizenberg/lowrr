@@ -1,5 +1,12 @@
-use nalgebra::{DMatrix, DVector, Matrix2, RealField, Vector2};
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+//! Registration algorithm for a sequence of slightly misaligned images.
+
+use nalgebra::{DMatrix, Matrix2, RealField, Vector2};
+
+/// Configuration (parameters) of the registration algorithm.
 #[derive(Debug)]
 pub struct Config {
     pub do_registration: bool,
@@ -12,45 +19,23 @@ pub struct Config {
     pub trace: bool,
 }
 
-struct StepConfig {
-    do_image_correction: bool,
-    lambda: f32,
-    rho: f32,
-    max_iterations: usize,
-    threshold: f32,
-    debug_trace: bool,
-}
-
-struct Obs<'a> {
-    image_size: (usize, usize),
-    images: &'a [DMatrix<f32>],
-    gradients: &'a [(DMatrix<f32>, DMatrix<f32>)],
-    hessians_inv: &'a [Matrix2<f32>],
-}
-
-#[derive(PartialEq)]
-enum Continue {
-    Forward,
-    Stop,
-}
-
-struct State {
-    imgs_registered: DMatrix<f32>,
-    old_imgs_hat: DMatrix<f32>,
-    errors: DMatrix<f32>,
-    lagrange_mult: DMatrix<f32>,
-    motion_vec: Vec<Vector2<f32>>,
-}
-
+/// Type alias just to visually differenciate Vec<Vec<_>>
+/// when it is Vec<Levels<_>> or Levels<Vec<_>>.
 type Levels<T> = Vec<T>;
 
+/// Registration of single channel images.
+///
+/// Internally, this uses a multi-resolution approach,
+/// where the motion vector computed at one resolution serves
+/// as initialization for the next one.
 pub fn gray_images(
     config: Config,
     imgs: Vec<DMatrix<u8>>,
 ) -> Result<Vec<Vector2<f32>>, Box<dyn std::error::Error>> {
+    // Get the number of images to align.
     let nb_imgs = imgs.len();
 
-    // Precompute multi-resolution images.
+    // Precompute a hierarchy of multi-resolution images.
     let multires_imgs: Vec<Levels<_>> = imgs
         .into_iter()
         .map(|im| crate::multires::mean_pyramid(2, im))
@@ -67,7 +52,8 @@ pub fn gray_images(
         })
         .collect();
 
-    // Transpose multires images and gradients to have each level in its own vec.
+    // Transpose the `Vec<Levels<_>>` structure of multires images and gradients
+    // into a `Levels<Vec<_>>` to have each level in its own vec.
     let multires_imgs: Levels<Vec<_>> = crate::utils::transpose(multires_imgs);
     let multires_gradients: Levels<Vec<_>> = crate::utils::transpose(multires_gradients);
 
@@ -75,16 +61,19 @@ pub fn gray_images(
     let mut motion_vec = vec![Vector2::zeros(); nb_imgs];
 
     // Multi-resolution algorithm.
+    // Does the same thing at each level for the corresponding images and gradients.
+    // The iterator is reversed to start at last level (lowest resolution).
+    // Level 0 are the initial images.
     for (level, (l_imgs, l_gradients)) in multires_imgs
         .iter()
         .zip(multires_gradients.iter())
         .enumerate()
-        // Reverse iterator to start at lowest resolution.
         .rev()
     {
         eprintln!("\n=============  Start level {}  =============\n", level);
 
         // Build f32 float versions of the images and gradients.
+        // Normalize values to [0..1].
         let u8_to_float = |m: &DMatrix<u8>| m.map(|x| x as f32 / config.image_max);
         let imgs_f32: Vec<DMatrix<f32>> = l_imgs.iter().map(u8_to_float).collect();
 
@@ -94,7 +83,14 @@ pub fn gray_images(
             .map(|(gx, gy)| (i16_to_float(gx), i16_to_float(gy)))
             .collect();
 
-        // Precompute inverse of hessian matrices.
+        // Precompute inverse of Hessian matrices.
+        // They will be used later to estimate motion steps.
+        //
+        // H = J^t * J
+        //
+        // Where J is the NxM Jacobian
+        // N: number of model parameters
+        // M: number of pixels in an image
         let hessians_inv: Vec<_> = gradients_f32
             .iter()
             .map(|(gradients_x, gradients_y)| {
@@ -126,14 +122,18 @@ pub fn gray_images(
             debug_trace: config.trace,
         };
 
-        // Initialize loop variables.
-        // motion_vec is doubled when changing level.
+        // motion_vec is adapted when changing level.
         for motion in motion_vec.iter_mut() {
             *motion *= 2.0;
         }
+
+        // We also recompute the registered images before starting the algorithm loop.
         let mut imgs_registered = DMatrix::zeros(height * width, nb_imgs);
         reproject_f32(width, height, &mut imgs_registered, &imgs_f32, &motion_vec);
-        let mut state = State {
+
+        // Updated state variables for the loops.
+        let mut loop_state = State {
+            nb_iter: 0,
             imgs_registered,
             old_imgs_hat: DMatrix::zeros(height * width, nb_imgs),
             errors: DMatrix::zeros(height * width, nb_imgs),
@@ -142,17 +142,15 @@ pub fn gray_images(
         };
 
         // Main loop.
-        let mut nb_iter = 0;
         let mut continuation = Continue::Forward;
         while continuation == Continue::Forward {
-            let (new_state, new_continuation) = step(&step_config, &obs, nb_iter, state);
-            nb_iter += 1;
-            state = new_state;
+            let (new_state, new_continuation) = step(&step_config, &obs, loop_state);
+            loop_state = new_state;
             continuation = new_continuation;
         }
 
         // Update the motion vec before next level
-        motion_vec = state.motion_vec;
+        motion_vec = loop_state.motion_vec;
         eprintln!("motion_vec:");
         motion_vec.iter().for_each(|v| eprintln!("   {:?}", v.data));
     } // End of levels
@@ -161,11 +159,49 @@ pub fn gray_images(
     Ok(motion_vec)
 }
 
+/// Configuration parameters for the core loop of the algorithm.
+struct StepConfig {
+    do_image_correction: bool,
+    lambda: f32,
+    rho: f32,
+    max_iterations: usize,
+    threshold: f32,
+    debug_trace: bool,
+}
+
+/// "Observations" contains the data provided outside the core of the algorithm.
+/// These are immutable references since we are not supposed to mutate them.
+struct Obs<'a> {
+    image_size: (usize, usize),
+    images: &'a [DMatrix<f32>],
+    gradients: &'a [(DMatrix<f32>, DMatrix<f32>)],
+    hessians_inv: &'a [Matrix2<f32>],
+}
+
+/// Simple enum type to indicate if we should continue to loop.
+/// This is to avoid the ambiguity of booleans.
+#[derive(PartialEq)]
+enum Continue {
+    Forward,
+    Stop,
+}
+
+/// State variables of the loop.
+struct State {
+    nb_iter: usize,
+    imgs_registered: DMatrix<f32>,
+    old_imgs_hat: DMatrix<f32>,
+    errors: DMatrix<f32>,
+    lagrange_mult: DMatrix<f32>,
+    motion_vec: Vec<Vector2<f32>>,
+}
+
 /// Core iteration step of the algorithm.
-fn step(config: &StepConfig, obs: &Obs, nb_iter: usize, state: State) -> (State, Continue) {
-    // Retrieve state variables.
+fn step(config: &StepConfig, obs: &Obs, state: State) -> (State, Continue) {
+    // Extract state variables to avoid prefixed notation later.
     let (width, height) = obs.image_size;
     let State {
+        nb_iter,
         old_imgs_hat,
         mut imgs_registered,
         mut errors,
@@ -190,22 +226,35 @@ fn step(config: &StepConfig, obs: &Obs, nb_iter: usize, state: State) -> (State,
         }
     }
 
-    // v-update: inverse compositional step.
+    // v-update: inverse compositional step of a Gauss-Newton approximation.
     for (i, (ux, uy)) in obs.gradients.iter().enumerate() {
         // Use the first image as the reference frame.
+        // So we skip the iteration 0 such that motions_vec[0] is [0, 0].
         if i == 0 {
             continue;
         }
+
+        // Compute the image that we want to be aligned with.
         let mut new_image = crate::utils::reshape(
             imgs_hat.column(i) - lagrange_mult.column(i) / config.rho - errors.column(i),
             height,
             width,
         );
+
+        // Reproject that image back to something near to our original image.
+        // This is important to upheld the "small displacement" requirement
+        // for our Gauss-Newton approximation of Jacobians.
+        //
+        // Beware that we use (-dx, -dy) since motion_vec stores the motion
+        // required to align the original images, so this is the opposite.
         let dx = motion_vec[i].x;
         let dy = motion_vec[i].y;
         new_image = DMatrix::from_fn(height, width, |i, j| {
             crate::interpolation::linear(j as f32 - dx, i as f32 - dy, &new_image)
         });
+
+        // Compute residuals and motion step,
+        // following the inverse compositional scheme (CF Baker and Matthews).
         let residuals = &new_image - &obs.images[i];
         let mut g = Vector2::zeros();
         ux.iter()
@@ -217,12 +266,13 @@ fn step(config: &StepConfig, obs: &Obs, nb_iter: usize, state: State) -> (State,
         let motion_step = &obs.hessians_inv[i] * g;
 
         // Save motion for this image.
-        // We should do -= since we prepend the inverse
+        // We should do -= since we prepend the inverse of the motion step,
         // but since we use motion_vec on U later for registration,
         // we might as well re-inverse it on the fly here.
         motion_vec[i] += motion_step;
     }
 
+    // Update imgs_registered.
     reproject_f32(
         width,
         height,
@@ -257,8 +307,11 @@ fn step(config: &StepConfig, obs: &Obs, nb_iter: usize, state: State) -> (State,
     if nb_iter >= config.max_iterations || residual < config.threshold {
         continuation = Continue::Stop;
     }
+
+    // Returned value
     (
         State {
+            nb_iter: nb_iter + 1,
             imgs_registered,
             old_imgs_hat: imgs_hat,
             errors,
@@ -269,7 +322,7 @@ fn step(config: &StepConfig, obs: &Obs, nb_iter: usize, state: State) -> (State,
     )
 }
 
-/// Recompute the registered image.
+/// Recompute the registered image (modify in place).
 fn reproject_f32(
     width: usize,
     height: usize,
@@ -318,6 +371,7 @@ fn norm_sqr(matrix: &DMatrix<f32>) -> f64 {
     matrix.iter().map(|&x| (x as f64).powi(2)).sum()
 }
 
+/// Shrink values toward 0.
 fn shrink<T: RealField>(alpha: T, x: T) -> T {
     let alpha = alpha.abs();
     if x.is_sign_positive() {

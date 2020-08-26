@@ -1,3 +1,9 @@
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
+//! Helper module around filtering operations (such as convolutions).
+
 use nalgebra::DMatrix;
 
 /// Direct convolution with the following 3x3 kernel:
@@ -57,6 +63,11 @@ pub fn conv_2d_direct_same(img: &DMatrix<u8>, kernel: &DMatrix<f32>) -> DMatrix<
     result_f32.map(|x| x.round().max(0.0).min(255.0) as u8)
 }
 
+/// Compute 4th order centered gradients:
+///
+/// 1/12 * [ 1  -8  0  8  -1 ]
+///
+/// Implemented with a direct convolution.
 pub fn gradients_f32(img: &DMatrix<f32>) -> (DMatrix<f32>, DMatrix<f32>) {
     let kernel_x: DMatrix<f32> =
         DMatrix::from_iterator(1, 5, [1.0, -8.0, 0.0, 8.0, -1.0].iter().map(|x| x / 12.0));
@@ -96,6 +107,8 @@ pub fn conv_2d_direct_same_f32(img: &DMatrix<f32>, kernel: &DMatrix<f32>) -> DMa
     result
 }
 
+/// Generate a square gaussian kernel of a given size and standard deviation.
+/// Coefficients are normalized such that their sum is 1.
 pub fn gaussian_kernel(sigma: f32, size: usize) -> DMatrix<f32> {
     assert!(sigma > 0.0);
     let exp_coef = -1.0 / (2.0 * sigma * sigma);

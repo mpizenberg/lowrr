@@ -148,28 +148,26 @@ fn run(args: Args) -> Result<(), Box<dyn std::error::Error>> {
     // Get the path of output directory.
     let out_dir_path = PathBuf::from(args.out_dir);
 
-    // Number of images in the dataset.
-    let nb_images = args.images_paths.len();
-
     // Load the dataset in memory.
-    let (dataset, (width, height)) = load_dataset(&args.images_paths)?;
+    let (dataset, _) = load_dataset(&args.images_paths)?;
 
     // Use the algorithm corresponding to the type of data.
     match dataset {
         Dataset::GrayImages(imgs) => {
-            // let (registered_imgs, motion_vec) =
-            //     registration::gray_images(args.config, width, height, &imgs)?;
+            // Compute the motion of each image for registration.
             let motion_vec = registration::gray_images(args.config, imgs.clone())?;
+
+            // Reproject (interpolation + extrapolation) images according to that motion.
             let registered_imgs = registration::reproject_u8(&imgs, &motion_vec);
 
             // Write the registered images to the output directory.
             std::fs::create_dir_all(&out_dir_path)
                 .expect(&format!("Could not create output dir: {:?}", &out_dir_path));
-            for i in 0..nb_images {
-                interop::image_from_matrix(&registered_imgs[i])
+            registered_imgs.iter().enumerate().for_each(|(i, img)| {
+                interop::image_from_matrix(img)
                     .save(&out_dir_path.join(format!("{}.png", i)))
                     .expect("Error saving image");
-            }
+            });
             Ok(())
         }
         Dataset::RgbImages { red, green, blue } => unimplemented!(),

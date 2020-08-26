@@ -1,7 +1,14 @@
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
+//! Helper module for functions that didn't fit anywhere else.
+
 use nalgebra::base::dimension::{Dim, Dynamic};
 use nalgebra::base::{Scalar, VecStorage};
 use nalgebra::{DMatrix, Matrix};
 
+/// Same as rgb2gray matlab function, but for u8.
 pub fn rgb_to_gray(red: &DMatrix<u8>, green: &DMatrix<u8>, blue: &DMatrix<u8>) -> DMatrix<u8> {
     let (rows, cols) = red.shape();
     DMatrix::from_iterator(
@@ -16,10 +23,10 @@ pub fn rgb_to_gray(red: &DMatrix<u8>, green: &DMatrix<u8>, blue: &DMatrix<u8>) -
     )
 }
 
-/// Reshapes `self` in-place such that it has dimensions `new_nrows × new_ncols`.
+/// Reshapes `self` in-place such that it has dimensions `nrows × ncols`.
 ///
-/// The values are not copied or moved. This function will panic if dynamic sizes are provided
-/// and not compatible.
+/// The values are not copied or moved. This function will panic if
+/// provided dynamic sizes are not compatible.
 pub fn reshape<N, R, C>(
     matrix: Matrix<N, R, C, VecStorage<N, R, C>>,
     nrows: usize,

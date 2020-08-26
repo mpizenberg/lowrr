@@ -59,7 +59,7 @@ pub fn matrix_from_image(img: GrayImage) -> DMatrix<u8> {
 /// Inverse operation of `rgb_from_matrix`.
 pub fn matrix_from_rgb_image(img: RgbImage) -> DMatrix<(u8, u8, u8)> {
     let (width, height) = img.dimensions();
-    // TODO: suboptimal allocation in addition to transposition.
+    // TODO: improve the suboptimal allocation in addition to transposition.
     let mut matrix = DMatrix::from_iterator(
         width as usize,
         height as usize,
