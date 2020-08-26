@@ -15,6 +15,7 @@ pub struct Config {
     pub max_iterations: usize,
     pub threshold: f32,
     pub image_max: f32,
+    pub levels: usize,
     pub trace: bool,
 }
 
@@ -37,7 +38,7 @@ pub fn gray_images(
     // Precompute a hierarchy of multi-resolution images.
     let multires_imgs: Vec<Levels<_>> = imgs
         .into_iter()
-        .map(|im| crate::multires::mean_pyramid(2, im))
+        .map(|im| crate::multires::mean_pyramid(config.levels, im))
         .collect();
 
     // Precompute multi-resolution gradients.

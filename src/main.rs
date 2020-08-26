@@ -8,10 +8,11 @@ use std::path::{Path, PathBuf};
 
 // Default values for some of the program arguments.
 const DEFAULT_OUT_DIR: &str = "out";
+const DEFAULT_LEVELS: usize = 4;
 const DEFAULT_LAMBDA: f32 = 1.5;
 const DEFAULT_RHO: f32 = 0.1;
 const DEFAULT_THRESHOLD: f32 = 1e-3;
-const DEFAULT_MAX_ITERATIONS: usize = 100;
+const DEFAULT_MAX_ITERATIONS: usize = 20;
 const DEFAULT_IMAGE_MAX: f32 = 255.0;
 
 /// Entry point of the program.
@@ -38,6 +39,7 @@ FLAGS:
     --version              # Print version and exit
     --out-dir dir/         # Output directory to write results (default: {})
     --trace                # Print some debug output while running
+    --levels int           # Number of levels for the multi-resolution approach (default: {})
     --no-image-correction  # Avoid image correction
     --lambda float         # Weight of the L1 term (high means no correction) (default: {})
     --rho float            # Lagrangian penalty (default: {})
@@ -46,6 +48,7 @@ FLAGS:
     --image-max float      # Maximum possible value of the images for scaling (default: {})
 "#,
         DEFAULT_OUT_DIR,
+        DEFAULT_LEVELS,
         DEFAULT_LAMBDA,
         DEFAULT_RHO,
         DEFAULT_THRESHOLD,
@@ -83,6 +86,9 @@ fn parse_args() -> Result<Args, Box<dyn std::error::Error>> {
     let max_iterations = args
         .opt_value_from_str("--max-iterations")?
         .unwrap_or(DEFAULT_MAX_ITERATIONS);
+    let levels = args
+        .opt_value_from_str("--levels")?
+        .unwrap_or(DEFAULT_LEVELS);
     let image_max = args
         .opt_value_from_str("--image-max")?
         .unwrap_or(DEFAULT_IMAGE_MAX);
@@ -103,6 +109,7 @@ fn parse_args() -> Result<Args, Box<dyn std::error::Error>> {
             rho,
             threshold,
             max_iterations,
+            levels,
             image_max,
         },
         help,
