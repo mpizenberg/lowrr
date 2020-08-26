@@ -1,5 +1,4 @@
 # image: 'rust:latest'
-# image: 'ekidd/rust-musl-builder:latest'
 image: 'clux/muslrust:stable'
 
 stages:
@@ -11,10 +10,6 @@ variables:
   CARGO_HOME: $CI_PROJECT_DIR/cargo
   APT_CACHE_DIR: $CI_PROJECT_DIR/apt
 
-# before_script:
-#   - apt-get update -yq
-#   - apt-get install -o dir::cache::archives="$APT_CACHE_DIR" -y {{ DEPENDENCIES }}
-
 test:
   stage: test
   script:
@@ -23,6 +18,7 @@ test:
     - cargo test --verbose
   only:
     - master
+    - tags
 
 pages:
   stage: doc
@@ -34,17 +30,17 @@ pages:
     paths:
       - public
   only:
-    - master
+    - tags
 
 linux-musl:
   stage: build
   artifacts:
-    paths:
-      - target/x86_64-unknown-linux-musl/release/lowrr
+    expose_as: 'lowrr'
+    paths: ['target/x86_64-unknown-linux-musl/release/lowrr']
   script:
     - cargo build --release --target x86_64-unknown-linux-musl
   only:
-    - master
+    - tags
 
 cache:
   paths:
