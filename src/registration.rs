@@ -9,7 +9,6 @@ use nalgebra::{DMatrix, Matrix2, RealField, Vector2};
 /// Configuration (parameters) of the registration algorithm.
 #[derive(Debug)]
 pub struct Config {
-    pub do_registration: bool,
     pub do_image_correction: bool,
     pub lambda: f32,
     pub rho: f32,

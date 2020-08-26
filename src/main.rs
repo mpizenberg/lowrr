@@ -38,7 +38,6 @@ FLAGS:
     --version              # Print version and exit
     --out-dir dir/         # Output directory to write results (default: {})
     --trace                # Print some debug output while running
-    --no-registration      # Avoid image registration
     --no-image-correction  # Avoid image correction
     --lambda float         # Weight of the L1 term (high means no correction) (default: {})
     --rho float            # Lagrangian penalty (default: {})
@@ -72,7 +71,6 @@ fn parse_args() -> Result<Args, Box<dyn std::error::Error>> {
     // Retrieve command line arguments.
     let help = args.contains(["-h", "--help"]);
     let version = args.contains(["-v", "--version"]);
-    let do_registration = !args.contains("--no-registration");
     let do_image_correction = !args.contains("--no-image-correction");
     let trace = args.contains("--trace");
     let lambda = args
@@ -99,7 +97,6 @@ fn parse_args() -> Result<Args, Box<dyn std::error::Error>> {
     // Return Args struct.
     Ok(Args {
         config: registration::Config {
-            do_registration,
             do_image_correction,
             trace,
             lambda,
