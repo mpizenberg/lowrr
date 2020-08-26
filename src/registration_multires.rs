@@ -57,13 +57,11 @@ pub fn gray_images(
         .collect();
 
     // Precompute multi-resolution gradients.
-    let kernel = crate::filter::gaussian_kernel(2.0, 9);
     let multires_gradients: Vec<Levels<_>> = multires_imgs
         .iter()
         .map(|multi| {
             multi
                 .iter()
-                .map(|im| crate::filter::conv_2d_direct_same(im, &kernel))
                 .map(|im| crate::gradients::centered(&im))
                 .collect()
         })
