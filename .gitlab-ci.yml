@@ -1,0 +1,53 @@
+# image: 'rust:latest'
+# image: 'ekidd/rust-musl-builder:latest'
+image: 'clux/muslrust:stable'
+
+stages:
+  - test
+  - doc
+  - build
+
+variables:
+  CARGO_HOME: $CI_PROJECT_DIR/cargo
+  APT_CACHE_DIR: $CI_PROJECT_DIR/apt
+
+# before_script:
+#   - apt-get update -yq
+#   - apt-get install -o dir::cache::archives="$APT_CACHE_DIR" -y {{ DEPENDENCIES }}
+
+test:
+  stage: test
+  script:
+    - rustc --version
+    - cargo --version
+    - cargo test --verbose
+  only:
+    - master
+
+pages:
+  stage: doc
+  script:
+    - cargo doc --no-deps
+    - mv target/doc public
+    - echo '<meta http-equiv="refresh" content="0; url=lowrr">' > public/index.html
+  artifacts:
+    paths:
+      - public
+  only:
+    - master
+
+linux-musl:
+  stage: build
+  artifacts:
+    paths:
+      - target/x86_64-unknown-linux-musl/release/lowrr
+  script:
+    - cargo build --release --target x86_64-unknown-linux-musl
+  only:
+    - master
+
+cache:
+  paths:
+    - apt/
+    - cargo/
+    - target/
