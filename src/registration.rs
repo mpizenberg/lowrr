@@ -4,7 +4,7 @@
 
 //! Registration algorithm for a sequence of slightly misaligned images.
 
-use nalgebra::{DMatrix, Matrix2, RealField, Vector2};
+use nalgebra::{DMatrix, Matrix3, Matrix6, RealField, Vector2, Vector3, Vector6};
 
 /// Configuration (parameters) of the registration algorithm.
 #[derive(Debug)]
@@ -31,7 +31,7 @@ type Levels<T> = Vec<T>;
 pub fn gray_images(
     config: Config,
     imgs: Vec<DMatrix<u8>>,
-) -> Result<Vec<Vector2<f32>>, Box<dyn std::error::Error>> {
+) -> Result<Vec<Vector6<f32>>, Box<dyn std::error::Error>> {
     // Get the number of images to align.
     let nb_imgs = imgs.len();
 
@@ -58,7 +58,7 @@ pub fn gray_images(
     let multires_gradients: Levels<Vec<_>> = crate::utils::transpose(multires_gradients);
 
     // Initialize the motion vector.
-    let mut motion_vec = vec![Vector2::zeros(); nb_imgs];
+    let mut motion_vec = vec![Vector6::zeros(); nb_imgs];
 
     // Multi-resolution algorithm.
     // Does the same thing at each level for the corresponding images and gradients.
@@ -83,6 +83,41 @@ pub fn gray_images(
             .map(|(gx, gy)| (i16_to_float(gx), i16_to_float(gy)))
             .collect();
 
+        // Precompute the Jacobian for an affine model
+        // | 1+a  c   e |
+        // |  b  1+d  f |
+        //
+        // J = | x*gx  x*gy  y*gx  y*gy  gx  gy |
+        let jacobians_transposed_all: Vec<Vec<_>> = gradients_f32
+            .iter()
+            .map(|(gradients_x, gradients_y)| {
+                // In one image:
+                let (height, _) = gradients_x.shape();
+                let mut x = 0;
+                let mut y = 0;
+                gradients_x
+                    .iter()
+                    .zip(gradients_y.iter())
+                    .map(|(&gx, &gy)| {
+                        let jac = Vector6::new(
+                            x as f32 * gx,
+                            x as f32 * gy,
+                            y as f32 * gx,
+                            y as f32 * gy,
+                            gx,
+                            gy,
+                        );
+                        y += 1;
+                        if y == height {
+                            x += 1;
+                            y = 0;
+                        }
+                        jac
+                    })
+                    .collect()
+            })
+            .collect();
+
         // Precompute inverse of Hessian matrices.
         // They will be used later to estimate motion steps.
         //
@@ -91,12 +126,12 @@ pub fn gray_images(
         // Where J is the NxM Jacobian
         // N: number of model parameters
         // M: number of pixels in an image
-        let hessians_inv: Vec<_> = gradients_f32
+        let hessians_inv: Vec<_> = jacobians_transposed_all
             .iter()
-            .map(|(gradients_x, gradients_y)| {
-                let mut hessian = Matrix2::zeros();
-                for (gx, gy) in gradients_x.iter().zip(gradients_y.iter()) {
-                    hessian += Matrix2::new(gx * gx, gx * gy, gx * gy, gy * gy);
+            .map(|jac_t_vec| {
+                let mut hessian = Matrix6::zeros();
+                for jac_t in jac_t_vec.iter() {
+                    hessian += jac_t * jac_t.transpose();
                 }
                 hessian
                     .try_inverse()
@@ -110,6 +145,7 @@ pub fn gray_images(
             image_size: (width, height),
             images: &imgs_f32,
             gradients: &gradients_f32,
+            jacobians_transposed_all: &jacobians_transposed_all,
             hessians_inv: &hessians_inv,
         };
         let step_config = StepConfig {
@@ -124,7 +160,8 @@ pub fn gray_images(
 
         // motion_vec is adapted when changing level.
         for motion in motion_vec.iter_mut() {
-            *motion *= 2.0;
+            motion[4] = 2.0 * motion[4];
+            motion[5] = 2.0 * motion[5];
         }
 
         // We also recompute the registered images before starting the algorithm loop.
@@ -175,7 +212,8 @@ struct Obs<'a> {
     image_size: (usize, usize),
     images: &'a [DMatrix<f32>],
     gradients: &'a [(DMatrix<f32>, DMatrix<f32>)],
-    hessians_inv: &'a [Matrix2<f32>],
+    jacobians_transposed_all: &'a [Vec<Vector6<f32>>],
+    hessians_inv: &'a [Matrix6<f32>],
 }
 
 /// Simple enum type to indicate if we should continue to loop.
@@ -193,7 +231,7 @@ struct State {
     old_imgs_hat: DMatrix<f32>,
     errors: DMatrix<f32>,
     lagrange_mult: DMatrix<f32>,
-    motion_vec: Vec<Vector2<f32>>,
+    motion_vec: Vec<Vector6<f32>>,
 }
 
 /// Core iteration step of the algorithm.
@@ -227,7 +265,7 @@ fn step(config: &StepConfig, obs: &Obs, state: State) -> (State, Continue) {
     }
 
     // v-update: inverse compositional step of a Gauss-Newton approximation.
-    for (i, (ux, uy)) in obs.gradients.iter().enumerate() {
+    for i in 0..obs.images.len() {
         // Use the first image as the reference frame.
         // So we skip the iteration 0 such that motions_vec[0] is [0, 0].
         if i == 0 {
@@ -247,29 +285,33 @@ fn step(config: &StepConfig, obs: &Obs, state: State) -> (State, Continue) {
         //
         // Beware that we use (-dx, -dy) since motion_vec stores the motion
         // required to align the original images, so this is the opposite.
-        let dx = motion_vec[i].x;
-        let dy = motion_vec[i].y;
+        let motion_mat = projection_mat(motion_vec[i])
+            .try_inverse()
+            .expect("woops inverse projection matrix");
         new_image = DMatrix::from_fn(height, width, |i, j| {
-            crate::interpolation::linear(j as f32 - dx, i as f32 - dy, &new_image)
+            let new_pos = motion_mat * Vector3::new(j as f32, i as f32, 1.0);
+            crate::interpolation::linear(new_pos.x, new_pos.y, &new_image)
         });
 
         // Compute residuals and motion step,
         // following the inverse compositional scheme (CF Baker and Matthews).
         let residuals = &new_image - &obs.images[i];
-        let mut g = Vector2::zeros();
-        ux.iter()
-            .zip(uy.iter())
+        let jac_t_vec = &obs.jacobians_transposed_all[i];
+        let mut g = Vector6::zeros();
+        jac_t_vec
+            .iter()
             .zip(residuals.iter())
-            .for_each(|((&gx, &gy), &res)| {
-                g += res * Vector2::new(gx, gy);
+            .for_each(|(&jac_t, &res)| {
+                g += res * jac_t;
             });
-        let motion_step = &obs.hessians_inv[i] * g;
+        let step_params = &obs.hessians_inv[i] * g;
 
         // Save motion for this image.
-        // We should do -= since we prepend the inverse of the motion step,
+        // We should prepend the inverse of the motion step,
         // but since we use motion_vec on U later for registration,
         // we might as well re-inverse it on the fly here.
-        motion_vec[i] += motion_step;
+        motion_vec[i] =
+            projection_params(projection_mat(step_params) * projection_mat(motion_vec[i]));
     }
 
     // Update imgs_registered.
@@ -322,22 +364,41 @@ fn step(config: &StepConfig, obs: &Obs, state: State) -> (State, Continue) {
     )
 }
 
+#[rustfmt::skip]
+fn projection_mat(params: Vector6<f32>) -> Matrix3<f32> {
+    Matrix3::new(
+        1.0 + params[0], params[2], params[4],
+        params[1], 1.0 + params[3], params[5],
+        0.0, 0.0, 1.0,
+    )
+}
+
+fn projection_params(mat: Matrix3<f32>) -> Vector6<f32> {
+    Vector6::new(
+        mat.m11 - 1.0,
+        mat.m21,
+        mat.m12,
+        mat.m22 - 1.0,
+        mat.m13,
+        mat.m23,
+    )
+}
+
 /// Recompute the registered image (modify in place).
 fn reproject_f32(
     width: usize,
     height: usize,
     registered: &mut DMatrix<f32>,
     imgs: &[DMatrix<f32>],
-    motion_vec: &[Vector2<f32>],
+    motion_vec: &[Vector6<f32>],
 ) {
     for (i, motion) in motion_vec.iter().enumerate() {
-        let dx = motion.x;
-        let dy = motion.y;
+        let motion_mat = projection_mat(*motion);
         let mut idx = 0;
         for x in 0..width {
             for y in 0..height {
-                registered[(idx, i)] =
-                    crate::interpolation::linear(x as f32 + dx, y as f32 + dy, &imgs[i]);
+                let new_pos = motion_mat * Vector3::new(x as f32, y as f32, 1.0);
+                registered[(idx, i)] = crate::interpolation::linear(new_pos.x, new_pos.y, &imgs[i]);
                 idx += 1;
             }
         }
@@ -345,14 +406,14 @@ fn reproject_f32(
 }
 
 /// Generate final registered images.
-pub fn reproject_u8(imgs: &[DMatrix<u8>], motion_vec: &[Vector2<f32>]) -> Vec<DMatrix<u8>> {
+pub fn reproject_u8(imgs: &[DMatrix<u8>], motion_vec: &[Vector6<f32>]) -> Vec<DMatrix<u8>> {
     let (height, width) = imgs[0].shape();
     let mut all_registered = Vec::new();
     for (im, motion) in imgs.iter().zip(motion_vec.iter()) {
-        let dx = motion.x;
-        let dy = motion.y;
+        let motion_mat = projection_mat(*motion);
         let registered = DMatrix::from_fn(height, width, |i, j| {
-            crate::interpolation::linear(j as f32 + dx, i as f32 + dy, im)
+            let new_pos = motion_mat * Vector3::new(j as f32, i as f32, 1.0);
+            crate::interpolation::linear(new_pos.x, new_pos.y, im)
                 .max(0.0)
                 .min(255.0) as u8
         });
