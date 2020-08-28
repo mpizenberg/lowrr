@@ -42,11 +42,13 @@ pub fn gray_images(
         .collect();
 
     // Precompute multi-resolution gradients.
+    // let kernel = crate::filter::gaussian_kernel(1.0, 5);
     let multires_gradients: Vec<Levels<_>> = multires_imgs
         .iter()
         .map(|multi| {
             multi
                 .iter()
+                // .map(|im| crate::filter::conv_2d_direct_same(im, &kernel))
                 .map(|im| crate::gradients::centered(&im))
                 .collect()
         })
@@ -129,9 +131,22 @@ pub fn gray_images(
         let hessians_inv: Vec<_> = jacobians_transposed_all
             .iter()
             .map(|jac_t_vec| {
+                let mut x = 0;
+                let mut y = 0;
                 let mut hessian = Matrix6::zeros();
+                let (height, width) = l_imgs[0].shape();
+                let border = (0.02 * height as f32) as usize;
                 for jac_t in jac_t_vec.iter() {
-                    hessian += jac_t * jac_t.transpose();
+                    if x > border && x + border < width {
+                        if y > border && y + border < height {
+                            hessian += jac_t * jac_t.transpose();
+                        }
+                    }
+                    y += 1;
+                    if y >= height {
+                        y = 0;
+                        x += 1;
+                    }
                 }
                 hessian
                     .try_inverse()
@@ -298,11 +313,23 @@ fn step(config: &StepConfig, obs: &Obs, state: State) -> (State, Continue) {
         let residuals = &new_image - &obs.images[i];
         let jac_t_vec = &obs.jacobians_transposed_all[i];
         let mut g = Vector6::zeros();
+        let mut x = 0;
+        let mut y = 0;
+        let border = (0.02 * height as f32) as usize;
         jac_t_vec
             .iter()
             .zip(residuals.iter())
             .for_each(|(&jac_t, &res)| {
-                g += res * jac_t;
+                if x > border && x + border < width {
+                    if y > border && y + border < height {
+                        g += res * jac_t;
+                    }
+                }
+                y += 1;
+                if y >= height {
+                    y = 0;
+                    x += 1;
+                }
             });
         let step_params = &obs.hessians_inv[i] * g;
 
