@@ -242,11 +242,11 @@ enum Continue {
 /// State variables of the loop.
 struct State {
     nb_iter: usize,
-    imgs_registered: DMatrix<f32>,
-    old_imgs_hat: DMatrix<f32>,
-    errors: DMatrix<f32>,
-    lagrange_mult: DMatrix<f32>,
-    motion_vec: Vec<Vector6<f32>>,
+    imgs_registered: DMatrix<f32>, // W(u; theta) in paper
+    old_imgs_hat: DMatrix<f32>,    // A in paper
+    errors: DMatrix<f32>,          // e in paper
+    lagrange_mult: DMatrix<f32>,   // w in paper
+    motion_vec: Vec<Vector6<f32>>, // theta in paper
 }
 
 /// Core iteration step of the algorithm.
