@@ -284,7 +284,7 @@ fn step(config: &StepConfig, obs: &Obs, state: State) -> (State, Continue) {
         // Use the first image as the reference frame.
         // So we skip the iteration 0 such that motions_vec[0] is [0, 0].
         if i == 0 {
-            continue;
+            // continue;
         }
 
         // Compute the image that we want to be aligned with.
