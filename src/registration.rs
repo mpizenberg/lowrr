@@ -300,7 +300,7 @@ fn step(config: &StepConfig, obs: &Obs, state: State) -> (State, Continue) {
         //
         // Beware that we use (-dx, -dy) since motion_vec stores the motion
         // required to align the original images, so this is the opposite.
-        let motion_mat = projection_mat(motion_vec[i])
+        let motion_mat = projection_mat(&motion_vec[i])
             .try_inverse()
             .expect("woops inverse projection matrix");
         new_image = DMatrix::from_fn(height, width, |i, j| {
@@ -338,7 +338,15 @@ fn step(config: &StepConfig, obs: &Obs, state: State) -> (State, Continue) {
         // but since we use motion_vec on U later for registration,
         // we might as well re-inverse it on the fly here.
         motion_vec[i] =
-            projection_params(projection_mat(step_params) * projection_mat(motion_vec[i]));
+            projection_params(&(projection_mat(&step_params) * projection_mat(&motion_vec[i])));
+    }
+
+    // Transform all motion parameters such that image 0 is the reference.
+    let inverse_motion_ref = projection_mat(&motion_vec[0])
+        .try_inverse()
+        .expect("Error while inversing motion of reference image");
+    for motion_params in motion_vec.iter_mut() {
+        *motion_params = projection_params(&(inverse_motion_ref * projection_mat(&motion_params)));
     }
 
     // Update imgs_registered.
@@ -392,7 +400,7 @@ fn step(config: &StepConfig, obs: &Obs, state: State) -> (State, Continue) {
 }
 
 #[rustfmt::skip]
-fn projection_mat(params: Vector6<f32>) -> Matrix3<f32> {
+fn projection_mat(params: &Vector6<f32>) -> Matrix3<f32> {
     Matrix3::new(
         1.0 + params[0], params[2], params[4],
         params[1], 1.0 + params[3], params[5],
@@ -400,7 +408,7 @@ fn projection_mat(params: Vector6<f32>) -> Matrix3<f32> {
     )
 }
 
-fn projection_params(mat: Matrix3<f32>) -> Vector6<f32> {
+fn projection_params(mat: &Matrix3<f32>) -> Vector6<f32> {
     Vector6::new(
         mat.m11 - 1.0,
         mat.m21,
@@ -420,7 +428,7 @@ fn reproject_f32(
     motion_vec: &[Vector6<f32>],
 ) {
     for (i, motion) in motion_vec.iter().enumerate() {
-        let motion_mat = projection_mat(*motion);
+        let motion_mat = projection_mat(motion);
         let mut idx = 0;
         for x in 0..width {
             for y in 0..height {
@@ -437,7 +445,7 @@ pub fn reproject_u8(imgs: &[DMatrix<u8>], motion_vec: &[Vector6<f32>]) -> Vec<DM
     let (height, width) = imgs[0].shape();
     let mut all_registered = Vec::new();
     for (im, motion) in imgs.iter().zip(motion_vec.iter()) {
-        let motion_mat = projection_mat(*motion);
+        let motion_mat = projection_mat(motion);
         let registered = DMatrix::from_fn(height, width, |i, j| {
             let new_pos = motion_mat * Vector3::new(j as f32, i as f32, 1.0);
             crate::interpolation::linear(new_pos.x, new_pos.y, im)
