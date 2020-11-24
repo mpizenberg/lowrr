@@ -320,6 +320,9 @@ fn load_dataset<P: AsRef<Path>>(
     } else if images_types.iter().all(|&t| t == "raw") {
         unimplemented!("imread raw")
     } else if images_types.iter().all(|&t| t == "image") {
+        let img_count = images_types.len();
+        eprintln!("Loading {} images ...", img_count);
+        let pb = indicatif::ProgressBar::new(img_count as u64);
         let images: Vec<DMatrix<u8>> = paths
             .iter()
             .map(|path| image::open(path).unwrap())
@@ -330,8 +333,13 @@ fn load_dataset<P: AsRef<Path>>(
             .map(interop::matrix_from_rgb_image)
             // Temporary only keep one channel.
             .map(|m| m.map(|(_red, green, _blue)| green))
+            .map(|x| {
+                pb.inc(1);
+                x
+            })
             .collect();
         let (height, width) = images[0].shape();
+        pb.finish();
         Ok((Dataset::GrayImages(images), (width, height)))
     } else {
         panic!("There is a mix of image types")
