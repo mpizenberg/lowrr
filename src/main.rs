@@ -189,17 +189,22 @@ fn run(args: Args) -> Result<(), Box<dyn std::error::Error>> {
     let out_dir_path = PathBuf::from(args.out_dir);
 
     // Load the dataset in memory.
+    let now = std::time::Instant::now();
     let (dataset, _) = load_dataset(&args.images_paths)?;
+    eprintln!("Loading took {:.1} s", now.elapsed().as_secs_f32());
+    // panic!("stop");
 
     // Use the algorithm corresponding to the type of data.
     match dataset {
         Dataset::GrayImages(imgs) => {
+            let now = std::time::Instant::now();
             // Extract the cropped area from the images.
             let cropped_imgs = crop_u8(&args.crop, &imgs);
 
             // Compute the motion of each image for registration.
             let motion_vec_crop = registration::gray_images(args.config, cropped_imgs.clone())?;
             let motion_vec = inverse_crop(&args.crop, &motion_vec_crop);
+            eprintln!("Registration took {:.1} s", now.elapsed().as_secs_f32());
 
             // Reproject (interpolation + extrapolation) images according to that motion.
             // Write the registered images to the output directory.
