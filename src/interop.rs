@@ -60,14 +60,10 @@ pub fn matrix_from_image(img: GrayImage) -> DMatrix<u8> {
 pub fn matrix_from_rgb_image(img: RgbImage) -> DMatrix<(u8, u8, u8)> {
     let (width, height) = img.dimensions();
     // TODO: improve the suboptimal allocation in addition to transposition.
-    let mut matrix = DMatrix::from_iterator(
+    DMatrix::from_iterator(
         width as usize,
         height as usize,
-        img.into_raw()
-            .as_slice()
-            .chunks(3)
-            .map(|s| (s[0], s[1], s[2])),
-    );
-    matrix.transpose_mut();
-    matrix
+        img.as_raw().chunks_exact(3).map(|s| (s[0], s[1], s[2])),
+    )
+    .transpose()
 }

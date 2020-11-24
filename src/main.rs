@@ -237,9 +237,9 @@ fn load_dataset<P: AsRef<Path>>(
             // Temporary convert color to gray.
             // .map(|i| i.into_luma())
             // .map(interop::matrix_from_image)
-            .map(|i| i.into_rgb())
+            .map(|i| i.into_rgb8())
             .map(interop::matrix_from_rgb_image)
-            // Temporary only keep red channel.
+            // Temporary only keep one channel.
             .map(|m| m.map(|(_red, green, _blue)| green))
             .collect();
         let (height, width) = images[0].shape();

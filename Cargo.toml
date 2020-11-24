@@ -9,6 +9,6 @@ edition = "2018"
 [dependencies]
 glob = "0.3.0"
 pico-args = "0.3.4"
-nalgebra = "0.21.1"
-image = "0.23.8"
+nalgebra = "0.23.1"
+image = "0.23.12"
 itertools = "0.9"
