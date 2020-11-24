@@ -31,7 +31,7 @@ type Levels<T> = Vec<T>;
 pub fn gray_images(
     config: Config,
     imgs: Vec<DMatrix<u8>>,
-) -> Result<Vec<Vector6<f32>>, Box<dyn std::error::Error>> {
+) -> Result<(Vec<Vector6<f32>>, Vec<DMatrix<u8>>), Box<dyn std::error::Error>> {
     // Get the number of images to align.
     let nb_imgs = imgs.len();
 
@@ -208,7 +208,9 @@ pub fn gray_images(
     } // End of levels
 
     // Return the final motion vector.
-    Ok(motion_vec)
+    // And give back the images at original resolution.
+    let imgs = multires_imgs.into_iter().next().unwrap();
+    Ok((motion_vec, imgs))
 }
 
 /// Configuration parameters for the core loop of the algorithm.
