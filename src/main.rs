@@ -192,7 +192,7 @@ fn run(args: Args) -> Result<(), Box<dyn std::error::Error>> {
     let now = std::time::Instant::now();
     let (dataset, _) = load_dataset(&args.images_paths)?;
     eprintln!("Loading took {:.1} s", now.elapsed().as_secs_f32());
-    panic!("stop");
+    // panic!("stop");
 
     // Use the algorithm corresponding to the type of data.
     match dataset {
@@ -333,8 +333,9 @@ fn load_dataset<P: AsRef<Path>>(
             .iter()
             .map(|path| {
                 let rgb_img = image::open(path).unwrap().into_rgb8();
-                let rgb_mat = interop::matrix_from_rgb_image(rgb_img);
-                let mono_mat = rgb_mat.map(|(_r, g, _b)| g);
+                // let rgb_mat = interop::matrix_from_rgb_image(rgb_img);
+                // let mono_mat = rgb_mat.map(|(_r, g, _b)| g);
+                let mono_mat = interop::green_mat_from_rgb_image(rgb_img);
                 pb.inc(1);
                 mono_mat
             })
