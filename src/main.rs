@@ -1,3 +1,4 @@
+use image::GenericImageView;
 use lowrr::interop;
 use lowrr::registration;
 mod unused;
@@ -5,9 +6,11 @@ mod unused;
 use glob::glob;
 use nalgebra::DMatrix;
 use std::path::{Path, PathBuf};
+use std::str::FromStr;
 
 // Default values for some of the program arguments.
 const DEFAULT_OUT_DIR: &str = "out";
+const DEFAULT_CROP: Crop = Crop::NoCrop;
 const DEFAULT_LEVELS: usize = 4;
 const DEFAULT_LAMBDA: f32 = 1.5;
 const DEFAULT_RHO: f32 = 0.1;
@@ -45,6 +48,7 @@ FLAGS:
     --version              # Print version and exit
     --out-dir dir/         # Output directory to save registered images (default: {})
     --trace                # Print more debug output to stderr while running
+    --crop x1,y1,x2,y2     # Crop image into a restricted working area (use no space between coordinates)
     --no-image-correction  # Avoid image correction
     --levels int           # Number of levels for the multi-resolution approach (default: {})
     --lambda float         # Weight of the L1 term (high means no correction) (default: {})
@@ -71,6 +75,7 @@ struct Args {
     version: bool,
     out_dir: String,
     images_paths: Vec<PathBuf>,
+    crop: Crop,
 }
 
 /// Function parsing the command line arguments and returning an Args object or an error.
@@ -82,6 +87,7 @@ fn parse_args() -> Result<Args, Box<dyn std::error::Error>> {
     let version = args.contains(["-v", "--version"]);
     let do_image_correction = !args.contains("--no-image-correction");
     let trace = args.contains("--trace");
+    let crop = args.opt_value_from_str("--crop")?.unwrap_or(DEFAULT_CROP);
     let lambda = args
         .opt_value_from_str("--lambda")?
         .unwrap_or(DEFAULT_LAMBDA);
@@ -122,6 +128,7 @@ fn parse_args() -> Result<Args, Box<dyn std::error::Error>> {
         version,
         out_dir,
         images_paths,
+        crop,
     })
 }
 
@@ -144,6 +151,29 @@ fn paths_from_glob(p: &str) -> Result<Vec<PathBuf>, Box<dyn std::error::Error>> 
     Ok(paths.into_iter().filter_map(|x| x.ok()).collect())
 }
 
+#[derive(Debug)]
+enum Crop {
+    NoCrop,
+    Area(usize, usize, usize, usize),
+}
+
+impl FromStr for Crop {
+    type Err = std::num::ParseIntError;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let parts: Vec<_> = s.splitn(4, ',').collect();
+        if parts.len() != 4 {
+            panic!(
+                "--crop argument must be of the shape x1,y1,x2,y2 with no space between elements"
+            );
+        }
+        let x1 = parts[0].parse()?;
+        let y1 = parts[1].parse()?;
+        let x2 = parts[2].parse()?;
+        let y2 = parts[3].parse()?;
+        Ok(Crop::Area(x1, y1, x2, y2))
+    }
+}
+
 /// Start actual program with command line arguments successfully parsed.
 fn run(args: Args) -> Result<(), Box<dyn std::error::Error>> {
     // Check if the --help or --version flags are present.
@@ -159,7 +189,7 @@ fn run(args: Args) -> Result<(), Box<dyn std::error::Error>> {
     let out_dir_path = PathBuf::from(args.out_dir);
 
     // Load the dataset in memory.
-    let (dataset, _) = load_dataset(&args.images_paths)?;
+    let (dataset, _) = load_dataset(args.crop, &args.images_paths)?;
 
     // Use the algorithm corresponding to the type of data.
     match dataset {
@@ -202,6 +232,7 @@ enum Dataset {
 
 /// Load all images into memory.
 fn load_dataset<P: AsRef<Path>>(
+    crop: Crop,
     paths: &[P],
 ) -> Result<(Dataset, (usize, usize)), Box<dyn std::error::Error>> {
     eprintln!("Images to be processed:");
@@ -234,6 +265,22 @@ fn load_dataset<P: AsRef<Path>>(
         let images: Vec<DMatrix<u8>> = paths
             .iter()
             .map(|path| image::open(path).unwrap())
+            .map(|mut i| match crop {
+                Crop::NoCrop => i,
+                Crop::Area(x1, y1, x2, y2) => {
+                    let x1 = x1 as u32;
+                    let y1 = y1 as u32;
+                    let x2 = x2 as u32;
+                    let y2 = y2 as u32;
+                    assert!(x1 < i.width(), "Error: x1 >= image width");
+                    assert!(x2 < i.width(), "Error: x2 >= image width");
+                    assert!(y1 < i.height(), "Error: y1 >= image height");
+                    assert!(y2 < i.height(), "Error: y2 >= image height");
+                    assert!(x1 <= x2, "Error: x2 must be greater than x1");
+                    assert!(y1 <= y2, "Error: y2 must be greater than y1");
+                    i.crop(x1, y1, x2 - x1, y2 - y1)
+                }
+            })
             // Temporary convert color to gray.
             // .map(|i| i.into_luma())
             // .map(interop::matrix_from_image)
