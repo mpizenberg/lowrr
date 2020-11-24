@@ -192,7 +192,7 @@ fn run(args: Args) -> Result<(), Box<dyn std::error::Error>> {
     let now = std::time::Instant::now();
     let (dataset, _) = load_dataset(&args.images_paths)?;
     eprintln!("Loading took {:.1} s", now.elapsed().as_secs_f32());
-    // panic!("stop");
+    panic!("stop");
 
     // Use the algorithm corresponding to the type of data.
     match dataset {
@@ -331,17 +331,12 @@ fn load_dataset<P: AsRef<Path>>(
         let pb = indicatif::ProgressBar::new(img_count as u64);
         let images: Vec<DMatrix<u8>> = paths
             .iter()
-            .map(|path| image::open(path).unwrap())
-            // Temporary convert color to gray.
-            // .map(|i| i.into_luma())
-            // .map(interop::matrix_from_image)
-            .map(|i| i.into_rgb8())
-            .map(interop::matrix_from_rgb_image)
-            // Temporary only keep one channel.
-            .map(|m| m.map(|(_red, green, _blue)| green))
-            .map(|x| {
+            .map(|path| {
+                let rgb_img = image::open(path).unwrap().into_rgb8();
+                let rgb_mat = interop::matrix_from_rgb_image(rgb_img);
+                let mono_mat = rgb_mat.map(|(_r, g, _b)| g);
                 pb.inc(1);
-                x
+                mono_mat
             })
             .collect();
         let (height, width) = images[0].shape();
