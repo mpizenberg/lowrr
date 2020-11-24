@@ -4,7 +4,7 @@ use lowrr::registration;
 mod unused;
 
 use glob::glob;
-use nalgebra::DMatrix;
+use nalgebra::{DMatrix, Vector6};
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
@@ -189,25 +189,36 @@ fn run(args: Args) -> Result<(), Box<dyn std::error::Error>> {
     let out_dir_path = PathBuf::from(args.out_dir);
 
     // Load the dataset in memory.
-    let (dataset, _) = load_dataset(args.crop, &args.images_paths)?;
+    let (dataset, _) = load_dataset(&args.images_paths)?;
 
     // Use the algorithm corresponding to the type of data.
     match dataset {
         Dataset::GrayImages(imgs) => {
+            // Extract the cropped area from the images.
+            let cropped_imgs = crop_u8(&args.crop, &imgs);
+
             // Compute the motion of each image for registration.
-            let motion_vec = registration::gray_images(args.config, imgs.clone())?;
+            let motion_vec_crop = registration::gray_images(args.config, cropped_imgs.clone())?;
+            let motion_vec = inverse_crop(&args.crop, &motion_vec_crop);
 
             // Reproject (interpolation + extrapolation) images according to that motion.
-            let registered_imgs = registration::reproject_u8(&imgs, &motion_vec);
-
             // Write the registered images to the output directory.
-            std::fs::create_dir_all(&out_dir_path)
-                .expect(&format!("Could not create output dir: {:?}", &out_dir_path));
-            registered_imgs.iter().enumerate().for_each(|(i, img)| {
-                interop::image_from_matrix(img)
-                    .save(&out_dir_path.join(format!("{}.png", i)))
-                    .expect("Error saving image");
-            });
+            let registered_imgs = registration::reproject_u8(&imgs, &motion_vec);
+            drop(imgs);
+            save_u8_imgs(&out_dir_path, &registered_imgs);
+            drop(registered_imgs);
+
+            // Visualization of registered cropped images.
+            let registered_cropped_imgs =
+                registration::reproject_u8(&cropped_imgs, &motion_vec_crop);
+            let cropped_aligned_dir = &out_dir_path.join("cropped_aligned");
+            save_u8_imgs(&cropped_aligned_dir, &registered_cropped_imgs);
+            drop(registered_cropped_imgs);
+
+            // Visualization of original cropped images.
+            let cropped_dir = &out_dir_path.join("cropped");
+            save_u8_imgs(&cropped_dir, &cropped_imgs);
+            drop(cropped_imgs);
 
             // Write motion_vec to stdout.
             for v in motion_vec.iter() {
@@ -217,6 +228,34 @@ fn run(args: Args) -> Result<(), Box<dyn std::error::Error>> {
         }
         Dataset::RgbImages { red, green, blue } => unimplemented!(),
         Dataset::RawImages(imgs) => unimplemented!(),
+    }
+}
+
+fn save_u8_imgs(dir: &Path, imgs: &[DMatrix<u8>]) {
+    std::fs::create_dir_all(dir).expect(&format!("Could not create output dir: {:?}", dir));
+    imgs.iter().enumerate().for_each(|(i, img)| {
+        interop::image_from_matrix(img)
+            .save(dir.join(format!("{}.png", i)))
+            .expect("Error saving image");
+    });
+}
+
+fn inverse_crop(crop: &Crop, motion_vec_crop: &[Vector6<f32>]) -> Vec<Vector6<f32>> {
+    match crop {
+        Crop::NoCrop => motion_vec_crop.iter().cloned().collect(),
+        Crop::Area(x1, y1, _, _) => {
+            let translation = registration::projection_mat(&Vector6::new(
+                0.0, 0.0, 0.0, 0.0, *x1 as f32, *y1 as f32,
+            ));
+            let translation_inv = translation.try_inverse().unwrap();
+            motion_vec_crop
+                .iter()
+                .map(|m| {
+                    let motion = registration::projection_mat(m);
+                    registration::projection_params(&(translation * motion * translation_inv))
+                })
+                .collect()
+        }
     }
 }
 
@@ -230,9 +269,28 @@ enum Dataset {
     },
 }
 
+fn crop_u8(crop: &Crop, imgs: &[DMatrix<u8>]) -> Vec<DMatrix<u8>> {
+    imgs.iter()
+        .map(|im| match crop {
+            Crop::NoCrop => im.clone(),
+            Crop::Area(x1, y1, x2, y2) => {
+                let (height, width) = im.shape();
+                assert!(x1 < &width, "Error: x1 >= image width");
+                assert!(x2 < &width, "Error: x2 >= image width");
+                assert!(y1 < &height, "Error: y1 >= image height");
+                assert!(y2 < &height, "Error: y2 >= image height");
+                assert!(x1 <= x2, "Error: x2 must be greater than x1");
+                assert!(y1 <= y2, "Error: y2 must be greater than y1");
+                let nrows = y2 - y1;
+                let ncols = x2 - x1;
+                im.slice((*y1, *x1), (nrows, ncols)).into_owned()
+            }
+        })
+        .collect()
+}
+
 /// Load all images into memory.
 fn load_dataset<P: AsRef<Path>>(
-    crop: Crop,
     paths: &[P],
 ) -> Result<(Dataset, (usize, usize)), Box<dyn std::error::Error>> {
     eprintln!("Images to be processed:");
@@ -265,22 +323,6 @@ fn load_dataset<P: AsRef<Path>>(
         let images: Vec<DMatrix<u8>> = paths
             .iter()
             .map(|path| image::open(path).unwrap())
-            .map(|mut i| match crop {
-                Crop::NoCrop => i,
-                Crop::Area(x1, y1, x2, y2) => {
-                    let x1 = x1 as u32;
-                    let y1 = y1 as u32;
-                    let x2 = x2 as u32;
-                    let y2 = y2 as u32;
-                    assert!(x1 < i.width(), "Error: x1 >= image width");
-                    assert!(x2 < i.width(), "Error: x2 >= image width");
-                    assert!(y1 < i.height(), "Error: y1 >= image height");
-                    assert!(y2 < i.height(), "Error: y2 >= image height");
-                    assert!(x1 <= x2, "Error: x2 must be greater than x1");
-                    assert!(y1 <= y2, "Error: y2 must be greater than y1");
-                    i.crop(x1, y1, x2 - x1, y2 - y1)
-                }
-            })
             // Temporary convert color to gray.
             // .map(|i| i.into_luma())
             // .map(interop::matrix_from_image)
