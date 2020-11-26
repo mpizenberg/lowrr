@@ -151,7 +151,7 @@ struct State {
     imgs_registered: DMatrix<f32>, // W(u; theta) in paper
     old_imgs_a: DMatrix<f32>,      // A in paper
     errors: DMatrix<f32>,          // e in paper
-    lagrange_mult: DMatrix<f32>,   // w in paper
+    lagrange_mult: DMatrix<f32>,   // y in paper
     motion_vec: Vec<Vector6<f32>>, // theta in paper
 }
 
@@ -168,7 +168,7 @@ fn step(config: &StepConfig, obs: &Obs, state: State) -> (State, Continue) {
         mut motion_vec,
     } = state;
     // TODO: change lambda
-    let lambda = config.lambda / (width as f32 * height as f32).sqrt();
+    let lambda = config.lambda / ((width * height) as f32).sqrt();
 
     // A-update: low-rank approximation
     let imgs_a_temp = &imgs_registered + &errors + &lagrange_mult / config.rho;
@@ -186,14 +186,17 @@ fn step(config: &StepConfig, obs: &Obs, state: State) -> (State, Continue) {
         errors = errors_temp.map(|x| shrink(lambda / config.rho, x));
     }
 
-    // v-update: forwards compositional step of a Gauss-Newton approximation.
+    // theta-update: forwards compositional step of a Gauss-Newton approximation.
     let residuals = &errors_temp - &errors;
+    let imgs_a_temp = &imgs_a - &lagrange_mult / config.rho - &errors;
     for i in 0..obs.images.len() {
         // Compute residuals and motion step,
         // following the forwards compositional scheme (CF Baker and Matthews).
         let res_i = DMatrix::from_columns(&[residuals.column(i)]);
         let res_i_shaped = crate::utils::reshape(res_i, height, width);
-        let grads_i_shaped = crate::gradients::centered_f32(&res_i_shaped);
+        let img_temp_i = DMatrix::from_columns(&[imgs_a_temp.column(i)]);
+        let img_temp_i_shaped = crate::utils::reshape(img_temp_i, height, width);
+        let grads_i_shaped = crate::gradients::centered_f32(&img_temp_i_shaped);
 
         let mut descent_params = Vector6::zeros();
         let mut hessian = Matrix6::zeros();
