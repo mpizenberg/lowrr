@@ -207,12 +207,12 @@ fn run(args: Args) -> Result<(), Box<dyn std::error::Error>> {
             let motion_vec = inverse_crop(&args.crop, &motion_vec_crop);
             eprintln!("Registration took {:.1} s", now.elapsed().as_secs_f32());
 
-            // Reproject (interpolation + extrapolation) images according to that motion.
-            // Write the registered images to the output directory.
-            let registered_imgs = registration::reproject_u8(&imgs, &motion_vec);
-            drop(imgs);
-            save_u8_imgs(&out_dir_path, &registered_imgs);
-            drop(registered_imgs);
+            // // Reproject (interpolation + extrapolation) images according to that motion.
+            // // Write the registered images to the output directory.
+            // let registered_imgs = registration::reproject_u8(&imgs, &motion_vec);
+            // drop(imgs);
+            // save_u8_imgs(&out_dir_path, &registered_imgs);
+            // drop(registered_imgs);
 
             // Visualization of registered cropped images.
             let registered_cropped_imgs =

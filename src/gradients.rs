@@ -32,6 +32,31 @@ pub fn centered(img: &na::DMatrix<u8>) -> (na::DMatrix<i16>, na::DMatrix<i16>) {
     (grad_x, grad_y)
 }
 
+/// Compute a centered gradient.
+///
+/// 1/2 * ( img(i+1,j) - img(i-1,j), img(i,j+1) - img(i,j-1) )
+///
+/// Gradients of pixels at the border of the image are set to 0.
+#[allow(clippy::similar_names)]
+pub fn centered_f32(img: &na::DMatrix<f32>) -> na::DMatrix<(f32, f32)> {
+    // TODO: might be better to return DMatrix<(i16,i16)>?
+    let (nb_rows, nb_cols) = img.shape();
+    let top = img.slice((0, 1), (nb_rows - 2, nb_cols - 2));
+    let bottom = img.slice((2, 1), (nb_rows - 2, nb_cols - 2));
+    let left = img.slice((1, 0), (nb_rows - 2, nb_cols - 2));
+    let right = img.slice((1, 2), (nb_rows - 2, nb_cols - 2));
+    let mut grad = na::DMatrix::repeat(nb_rows, nb_cols, (0.0, 0.0));
+    let mut grad_inner = grad.slice_mut((1, 1), (nb_rows - 2, nb_cols - 2));
+    for j in 0..nb_cols - 2 {
+        for i in 0..nb_rows - 2 {
+            let gx = 0.5 * (right[(i, j)] - left[(i, j)]);
+            let gy = 0.5 * (bottom[(i, j)] - top[(i, j)]);
+            grad_inner[(i, j)] = (gx, gy);
+        }
+    }
+    grad
+}
+
 /// Compute a centered gradient of 4th order.
 ///
 /// The coefficients are 1/12 * [ 1  -8  8  -1 ]
