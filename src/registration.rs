@@ -85,8 +85,6 @@ pub fn gray_images(
         let pixels_count = height * width;
         let mut imgs_registered = DMatrix::zeros(pixels_count, imgs_count);
         project_f32(width, height, &mut imgs_registered, &l_imgs, &motion_vec);
-        let compute_registered_gradients =
-            |i| compute_registered_gradients_full((height, width), i, &imgs_registered);
 
         // Updated state variables for the loops.
         let mut loop_state = State {
@@ -96,7 +94,7 @@ pub fn gray_images(
             errors: DMatrix::zeros(pixels_count, imgs_count),
             lagrange_mult_rho: DMatrix::zeros(pixels_count, imgs_count),
             motion_vec: motion_vec.clone(),
-            compute_registered_gradients,
+            compute_registered_gradients: Box::new(|_| DMatrix::repeat(0, 0, (0.0, 0.0))),
         };
         let obs = Obs {
             image_size: (width, height),
@@ -106,6 +104,11 @@ pub fn gray_images(
         // Main loop.
         let mut continuation = Continue::Forward;
         while continuation == Continue::Forward {
+            let imgs_registered_cloned = loop_state.imgs_registered.clone();
+            let compute_registered_gradients = move |i| {
+                compute_registered_gradients_full((height, width), i, &imgs_registered_cloned)
+            };
+            loop_state.compute_registered_gradients = Box::new(compute_registered_gradients);
             continuation = loop_state.step(&step_config, &obs);
         }
 
@@ -147,17 +150,17 @@ enum Continue {
 }
 
 /// State variables of the loop.
-struct State<F: Fn(usize) -> DMatrix<(f32, f32)>> {
+struct State {
     nb_iter: usize,
     imgs_registered: DMatrix<f32>,   // W(u; theta) in paper
     old_imgs_a: DMatrix<f32>,        // A in paper
     errors: DMatrix<f32>,            // e in paper
     lagrange_mult_rho: DMatrix<f32>, // y / rho in paper
     motion_vec: Vec<Vector6<f32>>,   // theta in paper
-    compute_registered_gradients: F,
+    compute_registered_gradients: Box<dyn Fn(usize) -> DMatrix<(f32, f32)>>,
 }
 
-impl<F: Fn(usize) -> DMatrix<(f32, f32)>> State<F> {
+impl State {
     /// Core iteration step of the algorithm.
     fn step(&mut self, config: &StepConfig, obs: &Obs) -> Continue {
         // Extract state variables to avoid prefixed notation later.
@@ -165,16 +168,16 @@ impl<F: Fn(usize) -> DMatrix<(f32, f32)>> State<F> {
         let State {
             nb_iter,
             old_imgs_a,
-            mut imgs_registered,
-            mut errors,
-            mut lagrange_mult_rho,
-            mut motion_vec,
-            mut compute_registered_gradients,
+            imgs_registered,
+            errors,
+            lagrange_mult_rho,
+            motion_vec,
+            compute_registered_gradients,
         } = self;
         let lambda = config.lambda / (imgs_registered.nrows() as f32).sqrt();
 
         // A-update: low-rank approximation
-        let imgs_a_temp = &imgs_registered + &errors + &lagrange_mult_rho;
+        let imgs_a_temp = &*imgs_registered + &*errors + &*lagrange_mult_rho;
         let mut svd = imgs_a_temp.svd(true, true);
         for x in svd.singular_values.iter_mut() {
             *x = shrink(1.0 / config.rho, *x);
@@ -183,13 +186,13 @@ impl<F: Fn(usize) -> DMatrix<(f32, f32)>> State<F> {
         let imgs_a = svd.recompose().unwrap();
 
         // e-update: L1-regularized least-squares
-        let errors_temp = &imgs_a - &imgs_registered - &lagrange_mult_rho;
+        let errors_temp = &imgs_a - &*imgs_registered - &*lagrange_mult_rho;
         if config.do_image_correction {
-            errors = errors_temp.map(|x| shrink(lambda / config.rho, x));
+            *errors = errors_temp.map(|x| shrink(lambda / config.rho, x));
         }
 
         // theta-update: forwards compositional step of a Gauss-Newton approximation.
-        let residuals = &errors_temp - &errors;
+        let residuals = &errors_temp - &*errors;
         for i in 0..obs.images.len() {
             // Compute residuals and motion step,
             let gradients = compute_registered_gradients(i);
@@ -216,27 +219,17 @@ impl<F: Fn(usize) -> DMatrix<(f32, f32)>> State<F> {
         }
 
         // Update imgs_registered.
-        project_f32(
-            width,
-            height,
-            &mut imgs_registered,
-            &obs.images,
-            &motion_vec,
-        );
+        project_f32(width, height, imgs_registered, &obs.images, &motion_vec);
 
         // w-update: dual ascent
-        lagrange_mult_rho += &imgs_registered - &imgs_a + &errors;
-
-        // Update the registered gradients computation.
-        compute_registered_gradients =
-            |i| compute_registered_gradients_full((height, width), i, &imgs_registered);
+        *lagrange_mult_rho += &*imgs_registered - &imgs_a + &*errors;
 
         // Check convergence
         let residual = norm(&(&imgs_a - &*old_imgs_a)) / 1e-12.max(norm(old_imgs_a));
         if config.debug_trace {
             let nuclear_norm = singular_values.sum();
             let l1_norm = lambda * errors.map(|x| x.abs()).sum();
-            let r = &imgs_registered - &imgs_a + &errors;
+            let r = &*imgs_registered - &imgs_a + &*errors;
             let augmented_lagrangian = nuclear_norm
                 + l1_norm
                 + config.rho * (lagrange_mult_rho.component_mul(&r)).sum()
