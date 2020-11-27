@@ -98,21 +98,20 @@ pub fn gray_images(
         let coordinates = (0..width)
             .map(|x| (0..height).map(move |y| (x, y)))
             .flatten();
-        project_f32(coordinates, &mut imgs_registered, &lvl_imgs, &motion_vec);
+        project_f32(
+            coordinates.clone(),
+            &mut imgs_registered,
+            &lvl_imgs,
+            &motion_vec,
+        );
 
         // Observations.
         let lvl_sparse_pixels_vec: Vec<_> = lvl_sparse_pixels.iter().cloned().collect();
-        let obs = Obs {
-            image_size: (width, height),
-            images: lvl_imgs.as_slice(),
-            sparse_pixels: &lvl_sparse_pixels_vec,
-        };
         let mut loop_state;
 
         // Sparse filter.
         let pixels_count = height * width;
-        let sparse_count: usize = obs
-            .sparse_pixels
+        let sparse_count: usize = lvl_sparse_pixels_vec
             .iter()
             .map(|x| if *x { 1 } else { 0 })
             .sum();
@@ -122,6 +121,11 @@ pub fn gray_images(
             sparse_count, pixels_count, sparse_ratio
         );
         if sparse_ratio > 0.5 {
+            let obs = Obs {
+                image_size: (width, height),
+                images: lvl_imgs.as_slice(),
+            };
+
             // Updated state variables for the loops.
             loop_state = State {
                 nb_iter: 0,
@@ -144,6 +148,29 @@ pub fn gray_images(
                 continuation = loop_state.step(&step_config, &obs);
             }
         } else {
+            let sparse_coordinates: Vec<(usize, usize)> = extract_sparse(
+                lvl_sparse_pixels_vec.iter().cloned(),
+                (0..width)
+                    .map(|x| (0..height).map(move |y| (x, y)))
+                    .flatten(),
+            )
+            .collect();
+            let compute_gradients = move |img, motion| {
+                compute_registered_gradients_sparse(
+                    img,
+                    motion,
+                    sparse_coordinates.iter().cloned(),
+                    1.0 / 255.0,
+                )
+            };
+            let obs = ObsSparse {
+                image_size: (width, height),
+                images: lvl_imgs.as_slice(),
+                sparse_pixels: &lvl_sparse_pixels_vec,
+                sparse_coordinates: &sparse_coordinates,
+                compute_registered_gradients: Box::new(compute_gradients),
+            };
+
             // Updated state variables for the loops.
             loop_state = State {
                 nb_iter: 0,
@@ -206,7 +233,14 @@ struct StepConfig {
 struct Obs<'a> {
     image_size: (usize, usize),
     images: &'a [DMatrix<u8>],
+}
+
+struct ObsSparse<'a> {
+    image_size: (usize, usize),
+    images: &'a [DMatrix<u8>],
     sparse_pixels: &'a [bool],
+    sparse_coordinates: &'a [(usize, usize)],
+    compute_registered_gradients: Box<dyn Fn(&DMatrix<u8>, &Matrix3<f32>) -> Vec<(f32, f32)>>,
 }
 
 /// Simple enum type to indicate if we should continue to loop.
@@ -328,7 +362,7 @@ impl State {
     }
 
     /// Core iteration step of the algorithm.
-    fn step_sparse(&mut self, config: &StepConfig, obs: &Obs) -> Continue {
+    fn step_sparse(&mut self, config: &StepConfig, obs: &ObsSparse) -> Continue {
         // Extract state variables to avoid prefixed notation later.
         let (width, height) = obs.image_size;
         let State {
@@ -380,17 +414,15 @@ impl State {
         let residuals = &errors_temp - &*errors;
         for i in 0..obs.images.len() {
             // Compute residuals and motion step.
-            let gradients_dense = compute_registered_gradients(i);
-            let gradients_sparse = extract_sparse(
-                obs.sparse_pixels.iter().cloned(),
-                gradients_dense.iter().cloned(),
-            );
-            let coordinates = (0..width).map(|x| (0..height).map(move |y| (x, y)));
             let step_params = forwards_compositional_step(
                 (height, width),
-                extract_sparse(obs.sparse_pixels.iter().cloned(), coordinates.flatten()),
+                obs.sparse_coordinates.iter().cloned(),
                 residuals.column(i).iter().cloned(),
-                gradients_sparse,
+                (obs.compute_registered_gradients)(
+                    &obs.images[i],
+                    &(projection_mat(&motion_vec[i])),
+                )
+                .into_iter(),
             );
 
             // Save motion for this image.
@@ -479,6 +511,42 @@ fn compute_registered_gradients_full(
     let img_registered_i = DMatrix::from_columns(&[imgs_registered.column(i)]);
     let img_registered_i_shaped = crate::utils::reshape(img_registered_i, nrows, ncols);
     crate::gradients::centered_f32(&img_registered_i_shaped)
+}
+
+/// Compute the gradients of warped image.
+/// There are more efficient ways than to interpolate 4 points,
+/// but it would be to much trouble.
+fn compute_registered_gradients_sparse(
+    img: &DMatrix<u8>,
+    motion: &Matrix3<f32>,
+    coordinates: impl Iterator<Item = (usize, usize)>,
+    inv_max: f32, // 1.0 / 255.0
+) -> Vec<(f32, f32)> {
+    coordinates
+        .map(|(x, y)| {
+            // Horizontal gradient (gx).
+            let x_left = x as f32 - 1.0;
+            let x_right = x as f32 + 1.0;
+            let new_left = motion * Vector3::new(x_left, y as f32, 1.0);
+            let new_right = motion * Vector3::new(x_right, y as f32, 1.0);
+            let pixel_left = inv_max * crate::interpolation::linear(new_left.x, new_left.y, img);
+            let pixel_right = inv_max * crate::interpolation::linear(new_right.x, new_right.y, img);
+
+            // Vertical gradient (gy).
+            let y_top = y as f32 - 1.0;
+            let y_bot = y as f32 + 1.0;
+            let new_top = motion * Vector3::new(x as f32, y_top, 1.0);
+            let new_bot = motion * Vector3::new(x as f32, y_bot, 1.0);
+            let pixel_top = inv_max * crate::interpolation::linear(new_top.x, new_top.y, img);
+            let pixel_bot = inv_max * crate::interpolation::linear(new_bot.x, new_bot.y, img);
+
+            // Gradient.
+            (
+                0.5 * (pixel_right - pixel_left),
+                0.5 * (pixel_bot - pixel_top),
+            )
+        })
+        .collect()
 }
 
 fn forwards_compositional_step(
