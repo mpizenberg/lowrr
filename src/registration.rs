@@ -96,7 +96,7 @@ pub fn gray_images(
             imgs_registered,
             old_imgs_a: DMatrix::zeros(pixels_count, imgs_count),
             errors: DMatrix::zeros(pixels_count, imgs_count),
-            lagrange_mult: DMatrix::zeros(pixels_count, imgs_count),
+            lagrange_mult_rho: DMatrix::zeros(pixels_count, imgs_count),
             motion_vec: motion_vec.clone(),
         };
 
@@ -148,11 +148,11 @@ enum Continue {
 /// State variables of the loop.
 struct State {
     nb_iter: usize,
-    imgs_registered: DMatrix<f32>, // W(u; theta) in paper
-    old_imgs_a: DMatrix<f32>,      // A in paper
-    errors: DMatrix<f32>,          // e in paper
-    lagrange_mult: DMatrix<f32>,   // y in paper
-    motion_vec: Vec<Vector6<f32>>, // theta in paper
+    imgs_registered: DMatrix<f32>,   // W(u; theta) in paper
+    old_imgs_a: DMatrix<f32>,        // A in paper
+    errors: DMatrix<f32>,            // e in paper
+    lagrange_mult_rho: DMatrix<f32>, // y / rho in paper
+    motion_vec: Vec<Vector6<f32>>,   // theta in paper
 }
 
 /// Core iteration step of the algorithm.
@@ -164,13 +164,13 @@ fn step(config: &StepConfig, obs: &Obs, state: State) -> (State, Continue) {
         old_imgs_a,
         mut imgs_registered,
         mut errors,
-        mut lagrange_mult,
+        mut lagrange_mult_rho,
         mut motion_vec,
     } = state;
     let lambda = config.lambda / (imgs_registered.nrows() as f32).sqrt();
 
     // A-update: low-rank approximation
-    let imgs_a_temp = &imgs_registered + &errors + &lagrange_mult / config.rho;
+    let imgs_a_temp = &imgs_registered + &errors + &lagrange_mult_rho;
     let mut svd = imgs_a_temp.svd(true, true);
     for x in svd.singular_values.iter_mut() {
         *x = shrink(1.0 / config.rho, *x);
@@ -179,7 +179,7 @@ fn step(config: &StepConfig, obs: &Obs, state: State) -> (State, Continue) {
     let imgs_a = svd.recompose().unwrap();
 
     // e-update: L1-regularized least-squares
-    let errors_temp = &imgs_a - &imgs_registered - &lagrange_mult / config.rho;
+    let errors_temp = &imgs_a - &imgs_registered - &lagrange_mult_rho;
     if config.do_image_correction {
         errors = errors_temp.map(|x| shrink(lambda / config.rho, x));
     }
@@ -226,7 +226,7 @@ fn step(config: &StepConfig, obs: &Obs, state: State) -> (State, Continue) {
     );
 
     // w-update: dual ascent
-    lagrange_mult += config.rho * (&imgs_registered - &imgs_a + &errors);
+    lagrange_mult_rho += &imgs_registered - &imgs_a + &errors;
 
     // Check convergence
     let residual = norm(&(&imgs_a - &old_imgs_a)) / 1e-12.max(norm(&old_imgs_a));
@@ -236,7 +236,7 @@ fn step(config: &StepConfig, obs: &Obs, state: State) -> (State, Continue) {
         let r = &imgs_registered - &imgs_a + &errors;
         let augmented_lagrangian = nuclear_norm
             + l1_norm
-            + (lagrange_mult.component_mul(&r)).sum()
+            + config.rho * (lagrange_mult_rho.component_mul(&r)).sum()
             + 0.5 * config.rho * (norm_sqr(&r) as f32);
         eprintln!("");
         eprintln!("Iteration {}:", nb_iter);
@@ -259,7 +259,7 @@ fn step(config: &StepConfig, obs: &Obs, state: State) -> (State, Continue) {
             imgs_registered,
             old_imgs_a: imgs_a,
             errors,
-            lagrange_mult,
+            lagrange_mult_rho,
             motion_vec,
         },
         continuation,
