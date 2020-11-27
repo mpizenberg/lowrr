@@ -190,10 +190,6 @@ fn step(config: &StepConfig, obs: &Obs, state: State) -> (State, Continue) {
         // Compute residuals and motion step,
         let img_registered_i = DMatrix::from_columns(&[imgs_registered.column(i)]);
         let img_registered_i_shaped = crate::utils::reshape(img_registered_i, height, width);
-        // TODO: actually this is wrong.
-        // gradients should not be computed with imgs_registered because imgs_registered
-        // is the projection of coordinates, while the gradients should be computed
-        // with coordinates in the projected space.
         let gradients = crate::gradients::centered_f32(&img_registered_i_shaped);
         let coordinates = (0..width).map(|x| (0..height).map(move |y| (x, y)));
         let step_params = forwards_compositional_step(
