@@ -66,10 +66,6 @@ pub fn gray_images(
 
         // Algorithm parameters.
         let (height, width) = l_imgs[0].shape();
-        let obs = Obs {
-            image_size: (width, height),
-            images: l_imgs.as_slice(),
-        };
         let step_config = StepConfig {
             do_image_correction: config.do_image_correction,
             lambda: config.lambda,
@@ -89,6 +85,8 @@ pub fn gray_images(
         let pixels_count = height * width;
         let mut imgs_registered = DMatrix::zeros(pixels_count, imgs_count);
         project_f32(width, height, &mut imgs_registered, &l_imgs, &motion_vec);
+        let compute_registered_gradients =
+            |i| compute_registered_gradients_full((height, width), i, &imgs_registered);
 
         // Updated state variables for the loops.
         let mut loop_state = State {
@@ -98,6 +96,11 @@ pub fn gray_images(
             errors: DMatrix::zeros(pixels_count, imgs_count),
             lagrange_mult_rho: DMatrix::zeros(pixels_count, imgs_count),
             motion_vec: motion_vec.clone(),
+            compute_registered_gradients,
+        };
+        let obs = Obs {
+            image_size: (width, height),
+            images: l_imgs.as_slice(),
         };
 
         // Main loop.
@@ -146,17 +149,22 @@ enum Continue {
 }
 
 /// State variables of the loop.
-struct State {
+struct State<F: Fn(usize) -> DMatrix<(f32, f32)>> {
     nb_iter: usize,
     imgs_registered: DMatrix<f32>,   // W(u; theta) in paper
     old_imgs_a: DMatrix<f32>,        // A in paper
     errors: DMatrix<f32>,            // e in paper
     lagrange_mult_rho: DMatrix<f32>, // y / rho in paper
     motion_vec: Vec<Vector6<f32>>,   // theta in paper
+    compute_registered_gradients: F,
 }
 
 /// Core iteration step of the algorithm.
-fn step(config: &StepConfig, obs: &Obs, state: State) -> (State, Continue) {
+fn step<F: Fn(usize) -> DMatrix<(f32, f32)>>(
+    config: &StepConfig,
+    obs: &Obs,
+    state: State<F>,
+) -> (State<F>, Continue) {
     // Extract state variables to avoid prefixed notation later.
     let (width, height) = obs.image_size;
     let State {
@@ -166,6 +174,7 @@ fn step(config: &StepConfig, obs: &Obs, state: State) -> (State, Continue) {
         mut errors,
         mut lagrange_mult_rho,
         mut motion_vec,
+        mut compute_registered_gradients,
     } = state;
     let lambda = config.lambda / (imgs_registered.nrows() as f32).sqrt();
 
@@ -188,9 +197,7 @@ fn step(config: &StepConfig, obs: &Obs, state: State) -> (State, Continue) {
     let residuals = &errors_temp - &errors;
     for i in 0..obs.images.len() {
         // Compute residuals and motion step,
-        let img_registered_i = DMatrix::from_columns(&[imgs_registered.column(i)]);
-        let img_registered_i_shaped = crate::utils::reshape(img_registered_i, height, width);
-        let gradients = crate::gradients::centered_f32(&img_registered_i_shaped);
+        let gradients = compute_registered_gradients(i);
         let coordinates = (0..width).map(|x| (0..height).map(move |y| (x, y)));
         let step_params = forwards_compositional_step(
             (height, width),
@@ -223,6 +230,10 @@ fn step(config: &StepConfig, obs: &Obs, state: State) -> (State, Continue) {
 
     // w-update: dual ascent
     lagrange_mult_rho += &imgs_registered - &imgs_a + &errors;
+
+    // Update the registered gradients computation.
+    compute_registered_gradients =
+        |i| compute_registered_gradients_full((height, width), i, &imgs_registered);
 
     // Check convergence
     let residual = norm(&(&imgs_a - &old_imgs_a)) / 1e-12.max(norm(&old_imgs_a));
@@ -257,9 +268,21 @@ fn step(config: &StepConfig, obs: &Obs, state: State) -> (State, Continue) {
             errors,
             lagrange_mult_rho,
             motion_vec,
+            compute_registered_gradients,
         },
         continuation,
     )
+}
+
+fn compute_registered_gradients_full(
+    shape: (usize, usize),
+    i: usize,
+    imgs_registered: &DMatrix<f32>,
+) -> DMatrix<(f32, f32)> {
+    let (nrows, ncols) = shape;
+    let img_registered_i = DMatrix::from_columns(&[imgs_registered.column(i)]);
+    let img_registered_i_shaped = crate::utils::reshape(img_registered_i, nrows, ncols);
+    crate::gradients::centered_f32(&img_registered_i_shaped)
 }
 
 fn forwards_compositional_step(
