@@ -197,25 +197,7 @@ fn step(config: &StepConfig, obs: &Obs, state: State) -> (State, Continue) {
         let img_temp_i = DMatrix::from_columns(&[imgs_a_temp.column(i)]);
         let img_temp_i_shaped = crate::utils::reshape(img_temp_i, height, width);
         let grads_i_shaped = crate::gradients::centered_f32(&img_temp_i_shaped);
-
-        let mut descent_params = Vector6::zeros();
-        let mut hessian = Matrix6::zeros();
-        let border = (0.04 * height as f32) as usize;
-        for x in 0..width {
-            for y in 0..height {
-                // Only use points within a given margin.
-                if x > border && x + border < width && y > border && y + border < height {
-                    let (gx, gy) = grads_i_shaped[(y, x)];
-                    let x_ = x as f32;
-                    let y_ = y as f32;
-                    let jac_t = Vector6::new(x_ * gx, x_ * gy, y_ * gx, y_ * gy, gx, gy);
-                    hessian += jac_t * jac_t.transpose();
-                    descent_params += res_i_shaped[(y, x)] * jac_t;
-                }
-            }
-        }
-        let hessian_chol = hessian.cholesky().expect("Error hessian choleski");
-        let step_params = hessian_chol.solve(&descent_params);
+        let step_params = forwards_compositional_step(&res_i_shaped, &grads_i_shaped);
 
         // Save motion for this image.
         motion_vec[i] =
@@ -279,6 +261,31 @@ fn step(config: &StepConfig, obs: &Obs, state: State) -> (State, Continue) {
         },
         continuation,
     )
+}
+
+fn forwards_compositional_step(
+    residuals: &DMatrix<f32>,
+    gradients: &DMatrix<(f32, f32)>,
+) -> Vector6<f32> {
+    let (height, width) = residuals.shape();
+    let mut descent_params = Vector6::zeros();
+    let mut hessian = Matrix6::zeros();
+    let border = (0.04 * height.min(width) as f32) as usize;
+    for x in 0..width {
+        for y in 0..height {
+            // Only use points within a given margin.
+            if x > border && x + border < width && y > border && y + border < height {
+                let (gx, gy) = gradients[(y, x)];
+                let x_ = x as f32;
+                let y_ = y as f32;
+                let jac_t = Vector6::new(x_ * gx, x_ * gy, y_ * gx, y_ * gy, gx, gy);
+                hessian += jac_t * jac_t.transpose();
+                descent_params += residuals[(y, x)] * jac_t;
+            }
+        }
+    }
+    let hessian_chol = hessian.cholesky().expect("Error hessian choleski");
+    hessian_chol.solve(&descent_params)
 }
 
 #[rustfmt::skip]
