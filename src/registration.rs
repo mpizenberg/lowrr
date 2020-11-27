@@ -88,7 +88,7 @@ pub fn gray_images(
         // We also recompute the registered images before starting the algorithm loop.
         let pixels_count = height * width;
         let mut imgs_registered = DMatrix::zeros(pixels_count, imgs_count);
-        reproject_f32(width, height, &mut imgs_registered, &l_imgs, &motion_vec);
+        project_f32(width, height, &mut imgs_registered, &l_imgs, &motion_vec);
 
         // Updated state variables for the loops.
         let mut loop_state = State {
@@ -182,7 +182,6 @@ fn step(config: &StepConfig, obs: &Obs, state: State) -> (State, Continue) {
     // e-update: L1-regularized least-squares
     let errors_temp = &imgs_a - &imgs_registered - &lagrange_mult / config.rho;
     if config.do_image_correction {
-        // TODO: change lambda
         errors = errors_temp.map(|x| shrink(lambda / config.rho, x));
     }
 
@@ -192,6 +191,10 @@ fn step(config: &StepConfig, obs: &Obs, state: State) -> (State, Continue) {
         // Compute residuals and motion step,
         let img_registered_i = DMatrix::from_columns(&[imgs_registered.column(i)]);
         let img_registered_i_shaped = crate::utils::reshape(img_registered_i, height, width);
+        // TODO: actually this is wrong.
+        // gradients should not be computed with imgs_registered because imgs_registered
+        // is the projection of coordinates, while the gradients should be computed
+        // with coordinates in the projected space.
         let gradients = crate::gradients::centered_f32(&img_registered_i_shaped);
         let coordinates = (0..width).map(|x| (0..height).map(move |y| (x, y)));
         let step_params = forwards_compositional_step(
@@ -215,7 +218,7 @@ fn step(config: &StepConfig, obs: &Obs, state: State) -> (State, Continue) {
     }
 
     // Update imgs_registered.
-    reproject_f32(
+    project_f32(
         width,
         height,
         &mut imgs_registered,
@@ -230,7 +233,6 @@ fn step(config: &StepConfig, obs: &Obs, state: State) -> (State, Continue) {
     let residual = norm(&(&imgs_a - &old_imgs_a)) / 1e-12.max(norm(&old_imgs_a));
     if config.debug_trace {
         let nuclear_norm = singular_values.sum();
-        // TODO: change lambda
         let l1_norm = lambda * errors.map(|x| x.abs()).sum();
         let r = &imgs_registered - &imgs_a + &errors;
         let augmented_lagrangian = nuclear_norm
@@ -309,8 +311,8 @@ pub fn projection_params(mat: &Matrix3<f32>) -> Vector6<f32> {
     )
 }
 
-/// Recompute the registered image (modify in place).
-fn reproject_f32(
+/// Compute the projection of each pixel of the image (modify in place).
+fn project_f32(
     width: usize,
     height: usize,
     registered: &mut DMatrix<f32>,
@@ -332,7 +334,8 @@ fn reproject_f32(
     }
 }
 
-/// Generate final registered images.
+/// Compute the projection of each pixel of the image.
+/// Outputs a grayscale image (0-255).
 pub fn reproject_u8(imgs: &[DMatrix<u8>], motion_vec: &[Vector6<f32>]) -> Vec<DMatrix<u8>> {
     let (height, width) = imgs[0].shape();
     let mut all_registered = Vec::new();
