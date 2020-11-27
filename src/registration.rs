@@ -188,12 +188,11 @@ fn step(config: &StepConfig, obs: &Obs, state: State) -> (State, Continue) {
 
     // theta-update: forwards compositional step of a Gauss-Newton approximation.
     let residuals = &errors_temp - &errors;
-    let imgs_a_temp = &imgs_a - &lagrange_mult / config.rho - &errors;
     for i in 0..obs.images.len() {
         // Compute residuals and motion step,
-        let img_temp_i = DMatrix::from_columns(&[imgs_a_temp.column(i)]);
-        let img_temp_i_shaped = crate::utils::reshape(img_temp_i, height, width);
-        let gradients = crate::gradients::centered_f32(&img_temp_i_shaped);
+        let img_registered_i = DMatrix::from_columns(&[imgs_registered.column(i)]);
+        let img_registered_i_shaped = crate::utils::reshape(img_registered_i, height, width);
+        let gradients = crate::gradients::centered_f32(&img_registered_i_shaped);
         let coordinates = (0..width).map(|x| (0..height).map(move |y| (x, y)));
         let step_params = forwards_compositional_step(
             (height, width),
