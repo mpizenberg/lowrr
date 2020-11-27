@@ -106,9 +106,7 @@ pub fn gray_images(
         // Main loop.
         let mut continuation = Continue::Forward;
         while continuation == Continue::Forward {
-            let (new_state, new_continuation) = step(&step_config, &obs, loop_state);
-            loop_state = new_state;
-            continuation = new_continuation;
+            continuation = loop_state.step(&step_config, &obs);
         }
 
         // Update the motion vec before next level
@@ -159,119 +157,111 @@ struct State<F: Fn(usize) -> DMatrix<(f32, f32)>> {
     compute_registered_gradients: F,
 }
 
-/// Core iteration step of the algorithm.
-fn step<F: Fn(usize) -> DMatrix<(f32, f32)>>(
-    config: &StepConfig,
-    obs: &Obs,
-    state: State<F>,
-) -> (State<F>, Continue) {
-    // Extract state variables to avoid prefixed notation later.
-    let (width, height) = obs.image_size;
-    let State {
-        nb_iter,
-        old_imgs_a,
-        mut imgs_registered,
-        mut errors,
-        mut lagrange_mult_rho,
-        mut motion_vec,
-        mut compute_registered_gradients,
-    } = state;
-    let lambda = config.lambda / (imgs_registered.nrows() as f32).sqrt();
+impl<F: Fn(usize) -> DMatrix<(f32, f32)>> State<F> {
+    /// Core iteration step of the algorithm.
+    fn step(&mut self, config: &StepConfig, obs: &Obs) -> Continue {
+        // Extract state variables to avoid prefixed notation later.
+        let (width, height) = obs.image_size;
+        let State {
+            nb_iter,
+            old_imgs_a,
+            mut imgs_registered,
+            mut errors,
+            mut lagrange_mult_rho,
+            mut motion_vec,
+            mut compute_registered_gradients,
+        } = self;
+        let lambda = config.lambda / (imgs_registered.nrows() as f32).sqrt();
 
-    // A-update: low-rank approximation
-    let imgs_a_temp = &imgs_registered + &errors + &lagrange_mult_rho;
-    let mut svd = imgs_a_temp.svd(true, true);
-    for x in svd.singular_values.iter_mut() {
-        *x = shrink(1.0 / config.rho, *x);
-    }
-    let singular_values = svd.singular_values.clone();
-    let imgs_a = svd.recompose().unwrap();
+        // A-update: low-rank approximation
+        let imgs_a_temp = &imgs_registered + &errors + &lagrange_mult_rho;
+        let mut svd = imgs_a_temp.svd(true, true);
+        for x in svd.singular_values.iter_mut() {
+            *x = shrink(1.0 / config.rho, *x);
+        }
+        let singular_values = svd.singular_values.clone();
+        let imgs_a = svd.recompose().unwrap();
 
-    // e-update: L1-regularized least-squares
-    let errors_temp = &imgs_a - &imgs_registered - &lagrange_mult_rho;
-    if config.do_image_correction {
-        errors = errors_temp.map(|x| shrink(lambda / config.rho, x));
-    }
+        // e-update: L1-regularized least-squares
+        let errors_temp = &imgs_a - &imgs_registered - &lagrange_mult_rho;
+        if config.do_image_correction {
+            errors = errors_temp.map(|x| shrink(lambda / config.rho, x));
+        }
 
-    // theta-update: forwards compositional step of a Gauss-Newton approximation.
-    let residuals = &errors_temp - &errors;
-    for i in 0..obs.images.len() {
-        // Compute residuals and motion step,
-        let gradients = compute_registered_gradients(i);
-        let coordinates = (0..width).map(|x| (0..height).map(move |y| (x, y)));
-        let step_params = forwards_compositional_step(
-            (height, width),
-            coordinates.flatten(),
-            residuals.column(i).iter().cloned(),
-            gradients.iter().cloned(),
+        // theta-update: forwards compositional step of a Gauss-Newton approximation.
+        let residuals = &errors_temp - &errors;
+        for i in 0..obs.images.len() {
+            // Compute residuals and motion step,
+            let gradients = compute_registered_gradients(i);
+            let coordinates = (0..width).map(|x| (0..height).map(move |y| (x, y)));
+            let step_params = forwards_compositional_step(
+                (height, width),
+                coordinates.flatten(),
+                residuals.column(i).iter().cloned(),
+                gradients.iter().cloned(),
+            );
+
+            // Save motion for this image.
+            motion_vec[i] =
+                projection_params(&(projection_mat(&motion_vec[i]) * projection_mat(&step_params)));
+        }
+
+        // Transform all motion parameters such that image 0 is the reference.
+        let inverse_motion_ref = projection_mat(&motion_vec[0])
+            .try_inverse()
+            .expect("Error while inversing motion of reference image");
+        for motion_params in motion_vec.iter_mut() {
+            *motion_params =
+                projection_params(&(inverse_motion_ref * projection_mat(&motion_params)));
+        }
+
+        // Update imgs_registered.
+        project_f32(
+            width,
+            height,
+            &mut imgs_registered,
+            &obs.images,
+            &motion_vec,
         );
 
-        // Save motion for this image.
-        motion_vec[i] =
-            projection_params(&(projection_mat(&motion_vec[i]) * projection_mat(&step_params)));
+        // w-update: dual ascent
+        lagrange_mult_rho += &imgs_registered - &imgs_a + &errors;
+
+        // Update the registered gradients computation.
+        compute_registered_gradients =
+            |i| compute_registered_gradients_full((height, width), i, &imgs_registered);
+
+        // Check convergence
+        let residual = norm(&(&imgs_a - &*old_imgs_a)) / 1e-12.max(norm(old_imgs_a));
+        if config.debug_trace {
+            let nuclear_norm = singular_values.sum();
+            let l1_norm = lambda * errors.map(|x| x.abs()).sum();
+            let r = &imgs_registered - &imgs_a + &errors;
+            let augmented_lagrangian = nuclear_norm
+                + l1_norm
+                + config.rho * (lagrange_mult_rho.component_mul(&r)).sum()
+                + 0.5 * config.rho * (norm_sqr(&r) as f32);
+            eprintln!("");
+            eprintln!("Iteration {}:", nb_iter);
+            eprintln!("    Nucl norm: {}", nuclear_norm);
+            eprintln!("    L1 norm: {}", l1_norm);
+            eprintln!("    Nucl + L1: {}", l1_norm + nuclear_norm);
+            eprintln!("    Aug. Lagrangian: {}", augmented_lagrangian);
+            eprintln!("    residual: {}", residual);
+            eprintln!("");
+        }
+        let mut continuation = Continue::Forward;
+        if *nb_iter >= config.max_iterations || residual < config.threshold {
+            continuation = Continue::Stop;
+        }
+
+        // Update state.
+        *nb_iter += 1;
+        *old_imgs_a = imgs_a;
+
+        // Returned value.
+        continuation
     }
-
-    // Transform all motion parameters such that image 0 is the reference.
-    let inverse_motion_ref = projection_mat(&motion_vec[0])
-        .try_inverse()
-        .expect("Error while inversing motion of reference image");
-    for motion_params in motion_vec.iter_mut() {
-        *motion_params = projection_params(&(inverse_motion_ref * projection_mat(&motion_params)));
-    }
-
-    // Update imgs_registered.
-    project_f32(
-        width,
-        height,
-        &mut imgs_registered,
-        &obs.images,
-        &motion_vec,
-    );
-
-    // w-update: dual ascent
-    lagrange_mult_rho += &imgs_registered - &imgs_a + &errors;
-
-    // Update the registered gradients computation.
-    compute_registered_gradients =
-        |i| compute_registered_gradients_full((height, width), i, &imgs_registered);
-
-    // Check convergence
-    let residual = norm(&(&imgs_a - &old_imgs_a)) / 1e-12.max(norm(&old_imgs_a));
-    if config.debug_trace {
-        let nuclear_norm = singular_values.sum();
-        let l1_norm = lambda * errors.map(|x| x.abs()).sum();
-        let r = &imgs_registered - &imgs_a + &errors;
-        let augmented_lagrangian = nuclear_norm
-            + l1_norm
-            + config.rho * (lagrange_mult_rho.component_mul(&r)).sum()
-            + 0.5 * config.rho * (norm_sqr(&r) as f32);
-        eprintln!("");
-        eprintln!("Iteration {}:", nb_iter);
-        eprintln!("    Nucl norm: {}", nuclear_norm);
-        eprintln!("    L1 norm: {}", l1_norm);
-        eprintln!("    Nucl + L1: {}", l1_norm + nuclear_norm);
-        eprintln!("    Aug. Lagrangian: {}", augmented_lagrangian);
-        eprintln!("    residual: {}", residual);
-        eprintln!("");
-    }
-    let mut continuation = Continue::Forward;
-    if nb_iter >= config.max_iterations || residual < config.threshold {
-        continuation = Continue::Stop;
-    }
-
-    // Returned value
-    (
-        State {
-            nb_iter: nb_iter + 1,
-            imgs_registered,
-            old_imgs_a: imgs_a,
-            errors,
-            lagrange_mult_rho,
-            motion_vec,
-            compute_registered_gradients,
-        },
-        continuation,
-    )
 }
 
 fn compute_registered_gradients_full(
