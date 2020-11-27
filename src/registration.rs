@@ -4,7 +4,7 @@
 
 //! Registration algorithm for a sequence of slightly misaligned images.
 
-use nalgebra::{DMatrix, Matrix3, Matrix6, RealField, Vector2, Vector3, Vector6};
+use nalgebra::{DMatrix, Matrix3, Matrix6, RealField, Vector3, Vector6};
 
 /// Configuration (parameters) of the registration algorithm.
 #[derive(Debug)]
@@ -95,7 +95,10 @@ pub fn gray_images(
         // We also recompute the registered images before starting the algorithm loop.
         let pixels_count = height * width;
         let mut imgs_registered = DMatrix::zeros(pixels_count, imgs_count);
-        project_f32(width, height, &mut imgs_registered, &lvl_imgs, &motion_vec);
+        let coordinates = (0..width)
+            .map(|x| (0..height).map(move |y| (x, y)))
+            .flatten();
+        project_f32(coordinates, &mut imgs_registered, &lvl_imgs, &motion_vec);
 
         // Observations.
         let lvl_sparse_pixels_vec: Vec<_> = lvl_sparse_pixels.iter().cloned().collect();
@@ -284,7 +287,10 @@ impl State {
         }
 
         // Update imgs_registered.
-        project_f32(width, height, imgs_registered, &obs.images, &motion_vec);
+        let coordinates = (0..width)
+            .map(|x| (0..height).map(move |y| (x, y)))
+            .flatten();
+        project_f32(coordinates, imgs_registered, &obs.images, &motion_vec);
 
         // w-update: dual ascent
         *lagrange_mult_rho += &*imgs_registered - &imgs_a + &*errors;
@@ -404,7 +410,10 @@ impl State {
         let now = std::time::Instant::now();
 
         // Update imgs_registered.
-        project_f32(width, height, imgs_registered, &obs.images, &motion_vec);
+        let coordinates = (0..width)
+            .map(|x| (0..height).map(move |y| (x, y)))
+            .flatten();
+        project_f32(coordinates, imgs_registered, &obs.images, &motion_vec);
 
         // y-update: dual ascent
         let imgs_registered_sparse = DMatrix::from_iterator(
@@ -518,8 +527,7 @@ pub fn projection_params(mat: &Matrix3<f32>) -> Vector6<f32> {
 
 /// Compute the projection of each pixel of the image (modify in place).
 fn project_f32(
-    width: usize,
-    height: usize,
+    coordinates: impl Iterator<Item = (usize, usize)> + Clone,
     registered: &mut DMatrix<f32>,
     imgs: &[DMatrix<u8>],
     motion_vec: &[Vector6<f32>],
@@ -527,14 +535,10 @@ fn project_f32(
     let inv_max = 1.0 / 255.0;
     for (i, motion) in motion_vec.iter().enumerate() {
         let motion_mat = projection_mat(motion);
-        let mut idx = 0;
-        for x in 0..width {
-            for y in 0..height {
-                let new_pos = motion_mat * Vector3::new(x as f32, y as f32, 1.0);
-                registered[(idx, i)] =
-                    inv_max * crate::interpolation::linear(new_pos.x, new_pos.y, &imgs[i]);
-                idx += 1;
-            }
+        let mut registered_col = registered.column_mut(i);
+        for ((x, y), pixel) in coordinates.clone().zip(registered_col.iter_mut()) {
+            let new_pos = motion_mat * Vector3::new(x as f32, y as f32, 1.0);
+            *pixel = inv_max * crate::interpolation::linear(new_pos.x, new_pos.y, &imgs[i]);
         }
     }
 }
