@@ -526,6 +526,10 @@ pub fn projection_params(mat: &Matrix3<f32>) -> Vector6<f32> {
 }
 
 /// Compute the projection of each pixel of the image (modify in place).
+/// CAREFUL: coordinates must have the same amount of items that
+/// the number of rows in registered.
+/// Otherwise it may silently compute a wrong projection.
+/// I don't know how to assert the number of items in the coordinates iterator.
 fn project_f32(
     coordinates: impl Iterator<Item = (usize, usize)> + Clone,
     registered: &mut DMatrix<f32>,
