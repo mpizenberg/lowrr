@@ -191,13 +191,16 @@ fn step(config: &StepConfig, obs: &Obs, state: State) -> (State, Continue) {
     let imgs_a_temp = &imgs_a - &lagrange_mult / config.rho - &errors;
     for i in 0..obs.images.len() {
         // Compute residuals and motion step,
-        // following the forwards compositional scheme (CF Baker and Matthews).
-        let res_i = DMatrix::from_columns(&[residuals.column(i)]);
-        let res_i_shaped = crate::utils::reshape(res_i, height, width);
         let img_temp_i = DMatrix::from_columns(&[imgs_a_temp.column(i)]);
         let img_temp_i_shaped = crate::utils::reshape(img_temp_i, height, width);
-        let grads_i_shaped = crate::gradients::centered_f32(&img_temp_i_shaped);
-        let step_params = forwards_compositional_step(&res_i_shaped, &grads_i_shaped);
+        let gradients = crate::gradients::centered_f32(&img_temp_i_shaped);
+        let coordinates = (0..width).map(|x| (0..height).map(move |y| (x, y)));
+        let step_params = forwards_compositional_step(
+            (height, width),
+            coordinates.flatten(),
+            residuals.column(i).iter().cloned(),
+            gradients.iter().cloned(),
+        );
 
         // Save motion for this image.
         motion_vec[i] =
@@ -264,24 +267,23 @@ fn step(config: &StepConfig, obs: &Obs, state: State) -> (State, Continue) {
 }
 
 fn forwards_compositional_step(
-    residuals: &DMatrix<f32>,
-    gradients: &DMatrix<(f32, f32)>,
+    shape: (usize, usize),
+    coordinates: impl Iterator<Item = (usize, usize)>,
+    residuals: impl Iterator<Item = f32>,
+    gradients: impl Iterator<Item = (f32, f32)>,
 ) -> Vector6<f32> {
-    let (height, width) = residuals.shape();
+    let (height, width) = shape;
     let mut descent_params = Vector6::zeros();
     let mut hessian = Matrix6::zeros();
     let border = (0.04 * height.min(width) as f32) as usize;
-    for x in 0..width {
-        for y in 0..height {
-            // Only use points within a given margin.
-            if x > border && x + border < width && y > border && y + border < height {
-                let (gx, gy) = gradients[(y, x)];
-                let x_ = x as f32;
-                let y_ = y as f32;
-                let jac_t = Vector6::new(x_ * gx, x_ * gy, y_ * gx, y_ * gy, gx, gy);
-                hessian += jac_t * jac_t.transpose();
-                descent_params += residuals[(y, x)] * jac_t;
-            }
+    for (((x, y), res), (gx, gy)) in coordinates.zip(residuals).zip(gradients) {
+        // Only use points within a given margin.
+        if x > border && x + border < width && y > border && y + border < height {
+            let x_ = x as f32;
+            let y_ = y as f32;
+            let jac_t = Vector6::new(x_ * gx, x_ * gy, y_ * gx, y_ * gy, gx, gy);
+            hessian += jac_t * jac_t.transpose();
+            descent_params += res * jac_t;
         }
     }
     let hessian_chol = hessian.cholesky().expect("Error hessian choleski");
