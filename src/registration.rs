@@ -37,22 +37,28 @@ pub fn gray_images(
 
     // Precompute a hierarchy of multi-resolution images and gradients norm.
     let mut multires_imgs: Vec<Levels<_>> = Vec::with_capacity(imgs_count);
-    let mut multires_gradient_sqr_norm: Vec<Levels<_>> = Vec::with_capacity(imgs_count);
+    let mut multires_sparse_pixels: Vec<Levels<_>> = Vec::with_capacity(imgs_count);
     for im in imgs.into_iter() {
         let pyramid = crate::multires::mean_pyramid(config.levels, im);
-        let mut gradients = Vec::with_capacity(config.levels);
-        for lvl_im in pyramid.iter() {
-            gradients.push(crate::gradients::squared_norm_direct(lvl_im));
-        }
-        multires_gradient_sqr_norm.push(gradients);
+        let gradients: Levels<_> = pyramid
+            .iter()
+            .map(crate::gradients::squared_norm_direct)
+            .collect();
+        let sparse_pixels = crate::sparse::select(1000, &gradients);
+        multires_sparse_pixels.push(sparse_pixels);
         multires_imgs.push(pyramid);
     }
 
-    // Transpose the `Vec<Levels<_>>` structure of multires images and gradients
+    // Transpose the `Vec<Levels<_>>` structure of multires images
     // into a `Levels<Vec<_>>` to have each level regrouped.
     let multires_imgs: Levels<Vec<_>> = crate::utils::transpose(multires_imgs);
-    let multires_gradient_sqr_norm: Levels<Vec<_>> =
-        crate::utils::transpose(multires_gradient_sqr_norm);
+    let multires_sparse_pixels: Levels<Vec<_>> = crate::utils::transpose(multires_sparse_pixels);
+
+    // Merge sparse pixels by level.
+    let multires_sparse_pixels: Levels<_> = multires_sparse_pixels
+        .iter()
+        .map(|v| merge_sparse(v))
+        .collect();
 
     // Initialize the motion vector.
     let mut motion_vec = vec![Vector6::zeros(); imgs_count];
@@ -61,11 +67,16 @@ pub fn gray_images(
     // Does the same thing at each level for the corresponding images and gradients.
     // The iterator is reversed to start at last level (lowest resolution).
     // Level 0 are the initial images.
-    for (level, l_imgs) in multires_imgs.iter().enumerate().rev() {
+    for (level, (lvl_imgs, lvl_sparse_pixels)) in multires_imgs
+        .iter()
+        .zip(multires_sparse_pixels.iter().rev())
+        .enumerate()
+        .rev()
+    {
         eprintln!("\n=============  Start level {}  =============\n", level);
 
         // Algorithm parameters.
-        let (height, width) = l_imgs[0].shape();
+        let (height, width) = lvl_imgs[0].shape();
         let step_config = StepConfig {
             do_image_correction: config.do_image_correction,
             lambda: config.lambda,
@@ -84,32 +95,73 @@ pub fn gray_images(
         // We also recompute the registered images before starting the algorithm loop.
         let pixels_count = height * width;
         let mut imgs_registered = DMatrix::zeros(pixels_count, imgs_count);
-        project_f32(width, height, &mut imgs_registered, &l_imgs, &motion_vec);
+        project_f32(width, height, &mut imgs_registered, &lvl_imgs, &motion_vec);
 
-        // Updated state variables for the loops.
-        let mut loop_state = State {
-            nb_iter: 0,
-            imgs_registered,
-            old_imgs_a: DMatrix::zeros(pixels_count, imgs_count),
-            errors: DMatrix::zeros(pixels_count, imgs_count),
-            lagrange_mult_rho: DMatrix::zeros(pixels_count, imgs_count),
-            motion_vec: motion_vec.clone(),
-            compute_registered_gradients: Box::new(|_| DMatrix::repeat(0, 0, (0.0, 0.0))),
-        };
+        // Observations.
+        let lvl_sparse_pixels_vec: Vec<_> = lvl_sparse_pixels.iter().cloned().collect();
         let obs = Obs {
             image_size: (width, height),
-            images: l_imgs.as_slice(),
+            images: lvl_imgs.as_slice(),
+            sparse_pixels: &lvl_sparse_pixels_vec,
         };
+        let mut loop_state;
 
-        // Main loop.
-        let mut continuation = Continue::Forward;
-        while continuation == Continue::Forward {
-            let imgs_registered_cloned = loop_state.imgs_registered.clone();
-            let compute_registered_gradients = move |i| {
-                compute_registered_gradients_full((height, width), i, &imgs_registered_cloned)
+        // Sparse filter.
+        let pixels_count = height * width;
+        let sparse_count: usize = obs
+            .sparse_pixels
+            .iter()
+            .map(|x| if *x { 1 } else { 0 })
+            .sum();
+        let sparse_ratio = sparse_count as f32 / pixels_count as f32;
+        eprintln!(
+            "Sparse ratio: {} / {} = {:.2}",
+            sparse_count, pixels_count, sparse_ratio
+        );
+        if sparse_ratio > 0.5 {
+            // Updated state variables for the loops.
+            loop_state = State {
+                nb_iter: 0,
+                imgs_registered,
+                old_imgs_a: DMatrix::zeros(pixels_count, imgs_count),
+                errors: DMatrix::zeros(pixels_count, imgs_count),
+                lagrange_mult_rho: DMatrix::zeros(pixels_count, imgs_count),
+                motion_vec: motion_vec.clone(),
+                compute_registered_gradients: Box::new(|_| DMatrix::repeat(0, 0, (0.0, 0.0))),
             };
-            loop_state.compute_registered_gradients = Box::new(compute_registered_gradients);
-            continuation = loop_state.step(&step_config, &obs);
+
+            // Main loop.
+            let mut continuation = Continue::Forward;
+            while continuation == Continue::Forward {
+                let imgs_registered_cloned = loop_state.imgs_registered.clone();
+                let compute_registered_gradients = move |i| {
+                    compute_registered_gradients_full((height, width), i, &imgs_registered_cloned)
+                };
+                loop_state.compute_registered_gradients = Box::new(compute_registered_gradients);
+                continuation = loop_state.step(&step_config, &obs);
+            }
+        } else {
+            // Updated state variables for the loops.
+            loop_state = State {
+                nb_iter: 0,
+                imgs_registered,
+                old_imgs_a: DMatrix::zeros(sparse_count, imgs_count),
+                errors: DMatrix::zeros(sparse_count, imgs_count),
+                lagrange_mult_rho: DMatrix::zeros(sparse_count, imgs_count),
+                motion_vec: motion_vec.clone(),
+                compute_registered_gradients: Box::new(|_| DMatrix::repeat(0, 0, (0.0, 0.0))),
+            };
+
+            // Main loop.
+            let mut continuation = Continue::Forward;
+            while continuation == Continue::Forward {
+                let imgs_registered_cloned = loop_state.imgs_registered.clone();
+                let compute_registered_gradients = move |i| {
+                    compute_registered_gradients_full((height, width), i, &imgs_registered_cloned)
+                };
+                loop_state.compute_registered_gradients = Box::new(compute_registered_gradients);
+                continuation = loop_state.step_sparse(&step_config, &obs);
+            }
         }
 
         // Update the motion vec before next level
@@ -122,6 +174,18 @@ pub fn gray_images(
     // And give back the images at original resolution.
     let imgs = multires_imgs.into_iter().next().unwrap();
     Ok((motion_vec, imgs))
+}
+
+fn merge_sparse(matrices: &[DMatrix<bool>]) -> DMatrix<bool> {
+    assert!(!matrices.is_empty());
+    let (nrows, ncols) = matrices[0].shape();
+    let mut merged = DMatrix::repeat(nrows, ncols, false);
+    for mat in matrices.iter() {
+        for (b_merged, b) in merged.iter_mut().zip(mat) {
+            *b_merged |= b;
+        }
+    }
+    merged
 }
 
 /// Configuration parameters for the core loop of the algorithm.
@@ -139,6 +203,7 @@ struct StepConfig {
 struct Obs<'a> {
     image_size: (usize, usize),
     images: &'a [DMatrix<u8>],
+    sparse_pixels: &'a [bool],
 }
 
 /// Simple enum type to indicate if we should continue to loop.
@@ -255,6 +320,137 @@ impl State {
         // Returned value.
         continuation
     }
+
+    /// Core iteration step of the algorithm.
+    fn step_sparse(&mut self, config: &StepConfig, obs: &Obs) -> Continue {
+        // Extract state variables to avoid prefixed notation later.
+        let (width, height) = obs.image_size;
+        let State {
+            nb_iter,
+            old_imgs_a,
+            imgs_registered,
+            errors,
+            lagrange_mult_rho,
+            motion_vec,
+            compute_registered_gradients,
+        } = self;
+        let sparse_count = errors.nrows();
+        let imgs_count = errors.ncols();
+
+        // Update lambda.
+        let lambda = config.lambda / (sparse_count as f32).sqrt();
+
+        // Extract sparse registered images.
+        let imgs_registered_sparse = DMatrix::from_iterator(
+            sparse_count,
+            imgs_count,
+            extract_sparse(
+                obs.sparse_pixels.iter().cloned(),
+                imgs_registered.iter().cloned(),
+            ),
+        );
+
+        // A-update: low-rank approximation.
+        let imgs_a_temp = &imgs_registered_sparse + &*errors + &*lagrange_mult_rho;
+        let mut svd = imgs_a_temp.svd(true, true);
+        for x in svd.singular_values.iter_mut() {
+            *x = shrink(1.0 / config.rho, *x);
+        }
+        let singular_values = svd.singular_values.clone();
+        let imgs_a = svd.recompose().unwrap();
+
+        // e-update: L1-regularized least-squares
+        let errors_temp = &imgs_a - &imgs_registered_sparse - &*lagrange_mult_rho;
+        if config.do_image_correction {
+            *errors = errors_temp.map(|x| shrink(lambda / config.rho, x));
+        }
+
+        // theta-update: forwards compositional step of a Gauss-Newton approximation.
+        let residuals = &errors_temp - &*errors;
+        for i in 0..obs.images.len() {
+            // Compute residuals and motion step.
+            let gradients_dense = compute_registered_gradients(i);
+            let gradients_sparse = extract_sparse(
+                obs.sparse_pixels.iter().cloned(),
+                gradients_dense.iter().cloned(),
+            );
+            let coordinates = (0..width).map(|x| (0..height).map(move |y| (x, y)));
+            let step_params = forwards_compositional_step(
+                (height, width),
+                extract_sparse(obs.sparse_pixels.iter().cloned(), coordinates.flatten()),
+                residuals.column(i).iter().cloned(),
+                gradients_sparse,
+            );
+
+            // Save motion for this image.
+            motion_vec[i] =
+                projection_params(&(projection_mat(&motion_vec[i]) * projection_mat(&step_params)));
+        }
+
+        // Transform all motion parameters such that image 0 is the reference.
+        let inverse_motion_ref = projection_mat(&motion_vec[0])
+            .try_inverse()
+            .expect("Error while inversing motion of reference image");
+        for motion_params in motion_vec.iter_mut() {
+            *motion_params =
+                projection_params(&(inverse_motion_ref * projection_mat(&motion_params)));
+        }
+
+        // Update imgs_registered.
+        project_f32(width, height, imgs_registered, &obs.images, &motion_vec);
+
+        // w-update: dual ascent
+        let imgs_registered_sparse = DMatrix::from_iterator(
+            sparse_count,
+            imgs_count,
+            extract_sparse(
+                obs.sparse_pixels.iter().cloned(),
+                imgs_registered.iter().cloned(),
+            ),
+        );
+        *lagrange_mult_rho += &imgs_registered_sparse - &imgs_a + &*errors;
+
+        // Check convergence
+        let residual = norm(&(&imgs_a - &*old_imgs_a)) / 1e-12.max(norm(old_imgs_a));
+        if config.debug_trace {
+            let nuclear_norm = singular_values.sum();
+            let l1_norm = lambda * errors.map(|x| x.abs()).sum();
+            let r = &imgs_registered_sparse - &imgs_a + &*errors;
+            let augmented_lagrangian = nuclear_norm
+                + l1_norm
+                + config.rho * (lagrange_mult_rho.component_mul(&r)).sum()
+                + 0.5 * config.rho * (norm_sqr(&r) as f32);
+            eprintln!("");
+            eprintln!("Iteration {}:", nb_iter);
+            eprintln!("    Nucl norm: {}", nuclear_norm);
+            eprintln!("    L1 norm: {}", l1_norm);
+            eprintln!("    Nucl + L1: {}", l1_norm + nuclear_norm);
+            eprintln!("    Aug. Lagrangian: {}", augmented_lagrangian);
+            eprintln!("    residual: {}", residual);
+            eprintln!("");
+        }
+        let mut continuation = Continue::Forward;
+        if *nb_iter >= config.max_iterations || residual < config.threshold {
+            continuation = Continue::Stop;
+        }
+
+        // Update state.
+        *nb_iter += 1;
+        *old_imgs_a = imgs_a;
+
+        // Returned value.
+        continuation
+    }
+}
+
+fn extract_sparse<T, I: Clone + Iterator<Item = bool>>(
+    sparse_pixels: I,
+    mat: impl Iterator<Item = T>,
+) -> impl Iterator<Item = T> {
+    sparse_pixels
+        .cycle()
+        .zip(mat)
+        .filter_map(|(b, v)| if b { Some(v) } else { None })
 }
 
 fn compute_registered_gradients_full(
