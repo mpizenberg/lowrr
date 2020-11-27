@@ -167,8 +167,7 @@ fn step(config: &StepConfig, obs: &Obs, state: State) -> (State, Continue) {
         mut lagrange_mult,
         mut motion_vec,
     } = state;
-    // TODO: change lambda
-    let lambda = config.lambda / ((width * height) as f32).sqrt();
+    let lambda = config.lambda / (imgs_registered.nrows() as f32).sqrt();
 
     // A-update: low-rank approximation
     let imgs_a_temp = &imgs_registered + &errors + &lagrange_mult / config.rho;
