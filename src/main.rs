@@ -1,4 +1,3 @@
-use image::GenericImageView;
 use lowrr::interop;
 use lowrr::registration;
 mod unused;
@@ -15,6 +14,7 @@ const DEFAULT_LEVELS: usize = 4;
 const DEFAULT_LAMBDA: f32 = 1.5;
 const DEFAULT_RHO: f32 = 0.1;
 const DEFAULT_THRESHOLD: f32 = 1e-3;
+const DEFAULT_SPARSE_RATIO_THRESHOLD: f32 = 0.5;
 const DEFAULT_MAX_ITERATIONS: usize = 20;
 const DEFAULT_IMAGE_MAX: f32 = 255.0;
 
@@ -54,6 +54,8 @@ FLAGS:
     --lambda float         # Weight of the L1 term (high means no correction) (default: {})
     --rho float            # Lagrangian penalty (default: {})
     --threshold float      # Stop when relative diff between two estimate of corrected image falls below this (default: {})
+    --sparse float         # Sparse ratio threshold to switch between dense and sparse resolution (default: {})
+                           # Use dense resolution if the ratio at current level is higher than this threshold
     --max-iterations int   # Maximum number of iterations (default: {})
     --image-max float      # Maximum possible value of the images for scaling (default: {})
 "#,
@@ -62,6 +64,7 @@ FLAGS:
         DEFAULT_LAMBDA,
         DEFAULT_RHO,
         DEFAULT_THRESHOLD,
+        DEFAULT_SPARSE_RATIO_THRESHOLD,
         DEFAULT_MAX_ITERATIONS,
         DEFAULT_IMAGE_MAX,
     )
@@ -95,6 +98,9 @@ fn parse_args() -> Result<Args, Box<dyn std::error::Error>> {
     let threshold = args
         .opt_value_from_str("--threshold")?
         .unwrap_or(DEFAULT_THRESHOLD);
+    let sparse_ratio_threshold = args
+        .opt_value_from_str("--sparse")?
+        .unwrap_or(DEFAULT_SPARSE_RATIO_THRESHOLD);
     let max_iterations = args
         .opt_value_from_str("--max-iterations")?
         .unwrap_or(DEFAULT_MAX_ITERATIONS);
@@ -120,6 +126,7 @@ fn parse_args() -> Result<Args, Box<dyn std::error::Error>> {
             lambda,
             rho,
             threshold,
+            sparse_ratio_threshold,
             max_iterations,
             levels,
             image_max,

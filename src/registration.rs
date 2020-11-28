@@ -15,6 +15,7 @@ pub struct Config {
     pub rho: f32,
     pub max_iterations: usize,
     pub threshold: f32,
+    pub sparse_ratio_threshold: f32,
     pub image_max: f32,
     pub levels: usize,
     pub trace: bool,
@@ -115,7 +116,7 @@ pub fn gray_images(
             dyn for<'a, 'b, 'c> Fn(&'a DMatrix<u8>, &'b Matrix3<f32>, &'c [f32]) -> Vec<(f32, f32)>,
         >;
 
-        if sparse_ratio > 0.5 {
+        if sparse_ratio > config.sparse_ratio_threshold {
             actual_pixel_count = pixels_count;
             pixel_coordinates = Rc::new(
                 (0..width)
