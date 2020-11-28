@@ -191,11 +191,6 @@ pub fn gray_images(
             // Main loop.
             let mut continuation = Continue::Forward;
             while continuation == Continue::Forward {
-                let imgs_registered_cloned = loop_state.imgs_registered.clone();
-                let compute_registered_gradients = move |i| {
-                    compute_registered_gradients_full((height, width), i, &imgs_registered_cloned)
-                };
-                loop_state.compute_registered_gradients = Box::new(compute_registered_gradients);
                 continuation = loop_state.step_sparse(&step_config, &obs);
             }
         }
