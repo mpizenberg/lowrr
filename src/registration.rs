@@ -112,10 +112,21 @@ pub fn gray_images(
                 .map(|x| (0..height).map(move |y| (x, y)))
                 .flatten()
                 .collect();
+            let compute_gradients = move |_: &_, _: &_, registered: &_| {
+                compute_registered_gradients_full((height, width), registered)
+            };
+            let b: Box<
+                dyn for<'a, 'b, 'c> Fn(
+                    &'a DMatrix<u8>,
+                    &'b Matrix3<f32>,
+                    &'c [f32],
+                ) -> Vec<(f32, f32)>,
+            > = Box::new(compute_gradients);
             let obs = Obs {
                 image_size: (width, height),
                 images: lvl_imgs.as_slice(),
                 coordinates: &dense_coordinates,
+                compute_registered_gradients: b,
             };
 
             // We also recompute the registered images before starting the algorithm loop.
@@ -135,39 +146,17 @@ pub fn gray_images(
                 errors: DMatrix::zeros(pixels_count, imgs_count),
                 lagrange_mult_rho: DMatrix::zeros(pixels_count, imgs_count),
                 motion_vec: motion_vec.clone(),
-                compute_registered_gradients: Box::new(|_| DMatrix::repeat(0, 0, (0.0, 0.0))),
             };
 
             // Main loop.
             let mut continuation = Continue::Forward;
             while continuation == Continue::Forward {
-                let imgs_registered_cloned = loop_state.imgs_registered.clone();
-                let compute_registered_gradients = move |i| {
-                    compute_registered_gradients_full((height, width), i, &imgs_registered_cloned)
-                };
-                loop_state.compute_registered_gradients = Box::new(compute_registered_gradients);
                 continuation = loop_state.step(&step_config, &obs);
             }
         } else {
             let sparse_coordinates: Rc<Vec<(usize, usize)>> =
                 Rc::new(coordinates_from_mask(lvl_sparse_pixels));
             let sparse_coordinates_clone = Rc::clone(&sparse_coordinates);
-            let compute_gradients = move |img: &_, motion: &_| {
-                compute_registered_gradients_sparse(
-                    img,
-                    motion,
-                    sparse_coordinates_clone.iter().cloned(),
-                    1.0 / 255.0,
-                )
-            };
-            let b: Box<dyn for<'a, 'b> Fn(&'a DMatrix<u8>, &'b Matrix3<f32>) -> Vec<(f32, f32)>> =
-                Box::new(compute_gradients);
-            let obs = ObsSparse {
-                image_size: (width, height),
-                images: lvl_imgs.as_slice(),
-                coordinates: &sparse_coordinates,
-                compute_registered_gradients: b,
-            };
 
             // We also recompute the registered images before starting the algorithm loop.
             let mut imgs_registered = DMatrix::zeros(sparse_count, imgs_count);
@@ -178,6 +167,28 @@ pub fn gray_images(
                 &motion_vec,
             );
 
+            let compute_gradients = move |img: &_, motion: &_, _: &_| {
+                compute_registered_gradients_sparse(
+                    img,
+                    motion,
+                    sparse_coordinates_clone.iter().cloned(),
+                    1.0 / 255.0,
+                )
+            };
+            let b: Box<
+                dyn for<'a, 'b, 'c> Fn(
+                    &'a DMatrix<u8>,
+                    &'b Matrix3<f32>,
+                    &'c [f32],
+                ) -> Vec<(f32, f32)>,
+            > = Box::new(compute_gradients);
+            let obs = ObsSparse {
+                image_size: (width, height),
+                images: lvl_imgs.as_slice(),
+                coordinates: &sparse_coordinates,
+                compute_registered_gradients: b,
+            };
+
             // Updated state variables for the loops.
             loop_state = State {
                 nb_iter: 0,
@@ -186,7 +197,6 @@ pub fn gray_images(
                 errors: DMatrix::zeros(sparse_count, imgs_count),
                 lagrange_mult_rho: DMatrix::zeros(sparse_count, imgs_count),
                 motion_vec: motion_vec.clone(),
-                compute_registered_gradients: Box::new(|_| DMatrix::repeat(0, 0, (0.0, 0.0))),
             };
 
             // Main loop.
@@ -236,13 +246,17 @@ struct Obs<'a> {
     image_size: (usize, usize),
     images: &'a [DMatrix<u8>],
     coordinates: &'a [(usize, usize)],
+    compute_registered_gradients:
+        Box<dyn Fn(&DMatrix<u8>, &Matrix3<f32>, &[f32]) -> Vec<(f32, f32)>>,
 }
 
 struct ObsSparse<'a> {
     image_size: (usize, usize),
     images: &'a [DMatrix<u8>],
     coordinates: &'a [(usize, usize)],
-    compute_registered_gradients: Box<dyn Fn(&DMatrix<u8>, &Matrix3<f32>) -> Vec<(f32, f32)>>,
+    // TODO: make this return an iterator instead.
+    compute_registered_gradients:
+        Box<dyn Fn(&DMatrix<u8>, &Matrix3<f32>, &[f32]) -> Vec<(f32, f32)>>,
 }
 
 /// Simple enum type to indicate if we should continue to loop.
@@ -261,7 +275,6 @@ struct State {
     errors: DMatrix<f32>,            // e in paper
     lagrange_mult_rho: DMatrix<f32>, // y / rho in paper
     motion_vec: Vec<Vector6<f32>>,   // theta in paper
-    compute_registered_gradients: Box<dyn Fn(usize) -> DMatrix<(f32, f32)>>,
 }
 
 impl State {
@@ -276,7 +289,6 @@ impl State {
             errors,
             lagrange_mult_rho,
             motion_vec,
-            compute_registered_gradients,
         } = self;
         // Pre-scale lambda.
         let lambda = config.lambda / (imgs_registered.nrows() as f32).sqrt();
@@ -300,12 +312,16 @@ impl State {
         let residuals = &errors_temp - &*errors;
         for i in 0..obs.images.len() {
             // Compute residuals and motion step.
-            let gradients = compute_registered_gradients(i);
             let step_params = forwards_compositional_step(
                 (height, width),
                 obs.coordinates.iter().cloned(),
                 residuals.column(i).iter().cloned(),
-                gradients.iter().cloned(),
+                (obs.compute_registered_gradients)(
+                    &obs.images[i],
+                    &(projection_mat(&motion_vec[i])),
+                    imgs_registered.column(i).as_slice(),
+                )
+                .into_iter(),
             );
 
             // Save motion for this image.
@@ -376,7 +392,6 @@ impl State {
             errors,
             lagrange_mult_rho,
             motion_vec,
-            compute_registered_gradients,
         } = self;
         // Pre-scale lambda.
         let lambda = config.lambda / (imgs_registered.nrows() as f32).sqrt();
@@ -412,6 +427,7 @@ impl State {
                 (obs.compute_registered_gradients)(
                     &obs.images[i],
                     &(projection_mat(&motion_vec[i])),
+                    imgs_registered.column(i).as_slice(),
                 )
                 .into_iter(),
             );
@@ -492,15 +508,12 @@ fn extract_sparse<T, I: Iterator<Item = bool>>(
         .filter_map(|(b, v)| if b { Some(v) } else { None })
 }
 
-fn compute_registered_gradients_full(
-    shape: (usize, usize),
-    i: usize,
-    imgs_registered: &DMatrix<f32>,
-) -> DMatrix<(f32, f32)> {
+fn compute_registered_gradients_full(shape: (usize, usize), registered: &[f32]) -> Vec<(f32, f32)> {
     let (nrows, ncols) = shape;
-    let img_registered_i = DMatrix::from_columns(&[imgs_registered.column(i)]);
-    let img_registered_i_shaped = crate::utils::reshape(img_registered_i, nrows, ncols);
-    crate::gradients::centered_f32(&img_registered_i_shaped)
+    let img_registered_shaped = DMatrix::from_iterator(nrows, ncols, registered.iter().cloned());
+    crate::gradients::centered_f32(&img_registered_shaped)
+        .data
+        .into()
 }
 
 /// Compute the gradients of warped image.
