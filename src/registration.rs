@@ -5,6 +5,7 @@
 //! Registration algorithm for a sequence of slightly misaligned images.
 
 use nalgebra::{DMatrix, Matrix3, Matrix6, RealField, Vector3, Vector6};
+use std::rc::Rc;
 
 /// Configuration (parameters) of the registration algorithm.
 #[derive(Debug)]
@@ -148,16 +149,23 @@ pub fn gray_images(
                 continuation = loop_state.step(&step_config, &obs);
             }
         } else {
-            let sparse_coordinates: Vec<(usize, usize)> = extract_sparse(
-                lvl_sparse_pixels_vec.iter().cloned(),
-                (0..width)
-                    .map(|x| (0..height).map(move |y| (x, y)))
-                    .flatten(),
-            )
-            .collect();
-            let s2 = sparse_coordinates.clone();
+            let sparse_coordinates: Rc<Vec<(usize, usize)>> = Rc::new(
+                extract_sparse(
+                    lvl_sparse_pixels_vec.iter().cloned(),
+                    (0..width)
+                        .map(|x| (0..height).map(move |y| (x, y)))
+                        .flatten(),
+                )
+                .collect(),
+            );
+            let sparse_coordinates_clone = Rc::clone(&sparse_coordinates);
             let compute_gradients = move |img: &_, motion: &_| {
-                compute_registered_gradients_sparse(img, motion, s2.iter().cloned(), 1.0 / 255.0)
+                compute_registered_gradients_sparse(
+                    img,
+                    motion,
+                    sparse_coordinates_clone.iter().cloned(),
+                    1.0 / 255.0,
+                )
             };
             let b: Box<dyn for<'a, 'b> Fn(&'a DMatrix<u8>, &'b Matrix3<f32>) -> Vec<(f32, f32)>> =
                 Box::new(compute_gradients);
