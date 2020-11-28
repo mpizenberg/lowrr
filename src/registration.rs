@@ -108,18 +108,20 @@ pub fn gray_images(
             sparse_count, pixels_count, sparse_ratio
         );
         if sparse_ratio > 0.5 {
+            let dense_coordinates: Vec<(usize, usize)> = (0..width)
+                .map(|x| (0..height).map(move |y| (x, y)))
+                .flatten()
+                .collect();
             let obs = Obs {
                 image_size: (width, height),
                 images: lvl_imgs.as_slice(),
+                coordinates: &dense_coordinates,
             };
 
             // We also recompute the registered images before starting the algorithm loop.
             let mut imgs_registered = DMatrix::zeros(pixels_count, imgs_count);
-            let coordinates = (0..width)
-                .map(|x| (0..height).map(move |y| (x, y)))
-                .flatten();
             project_f32(
-                coordinates.clone(),
+                dense_coordinates.iter().cloned(),
                 &mut imgs_registered,
                 &lvl_imgs,
                 &motion_vec,
@@ -233,6 +235,7 @@ struct StepConfig {
 struct Obs<'a> {
     image_size: (usize, usize),
     images: &'a [DMatrix<u8>],
+    coordinates: &'a [(usize, usize)],
 }
 
 struct ObsSparse<'a> {
@@ -298,10 +301,9 @@ impl State {
         for i in 0..obs.images.len() {
             // Compute residuals and motion step.
             let gradients = compute_registered_gradients(i);
-            let coordinates = (0..width).map(|x| (0..height).map(move |y| (x, y)));
             let step_params = forwards_compositional_step(
                 (height, width),
-                coordinates.flatten(),
+                obs.coordinates.iter().cloned(),
                 residuals.column(i).iter().cloned(),
                 gradients.iter().cloned(),
             );
@@ -321,10 +323,12 @@ impl State {
         }
 
         // Update imgs_registered.
-        let coordinates = (0..width)
-            .map(|x| (0..height).map(move |y| (x, y)))
-            .flatten();
-        project_f32(coordinates, imgs_registered, &obs.images, &motion_vec);
+        project_f32(
+            obs.coordinates.iter().cloned(),
+            imgs_registered,
+            &obs.images,
+            &motion_vec,
+        );
 
         // y-update: dual ascent
         *lagrange_mult_rho += &*imgs_registered - &imgs_a + &*errors;
