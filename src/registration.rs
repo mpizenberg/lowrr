@@ -155,20 +155,18 @@ pub fn gray_images(
                     .flatten(),
             )
             .collect();
-            let compute_gradients = move |img, motion| {
-                compute_registered_gradients_sparse(
-                    img,
-                    motion,
-                    sparse_coordinates.iter().cloned(),
-                    1.0 / 255.0,
-                )
+            let s2 = sparse_coordinates.clone();
+            let compute_gradients = move |img: &_, motion: &_| {
+                compute_registered_gradients_sparse(img, motion, s2.iter().cloned(), 1.0 / 255.0)
             };
+            let b: Box<dyn for<'a, 'b> Fn(&'a DMatrix<u8>, &'b Matrix3<f32>) -> Vec<(f32, f32)>> =
+                Box::new(compute_gradients);
             let obs = ObsSparse {
                 image_size: (width, height),
                 images: lvl_imgs.as_slice(),
                 sparse_pixels: &lvl_sparse_pixels_vec,
                 sparse_coordinates: &sparse_coordinates,
-                compute_registered_gradients: Box::new(compute_gradients),
+                compute_registered_gradients: b,
             };
 
             // Updated state variables for the loops.
