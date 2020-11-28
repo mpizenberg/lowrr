@@ -171,7 +171,6 @@ pub fn gray_images(
             let obs = ObsSparse {
                 image_size: (width, height),
                 images: lvl_imgs.as_slice(),
-                sparse_pixels: &lvl_sparse_pixels_vec,
                 sparse_coordinates: &sparse_coordinates,
                 compute_registered_gradients: b,
             };
@@ -247,7 +246,6 @@ struct Obs<'a> {
 struct ObsSparse<'a> {
     image_size: (usize, usize),
     images: &'a [DMatrix<u8>],
-    sparse_pixels: &'a [bool],
     sparse_coordinates: &'a [(usize, usize)],
     compute_registered_gradients: Box<dyn Fn(&DMatrix<u8>, &Matrix3<f32>) -> Vec<(f32, f32)>>,
 }
