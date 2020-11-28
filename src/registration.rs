@@ -93,19 +93,6 @@ pub fn gray_images(
             motion[5] = 2.0 * motion[5];
         }
 
-        // We also recompute the registered images before starting the algorithm loop.
-        let pixels_count = height * width;
-        let mut imgs_registered = DMatrix::zeros(pixels_count, imgs_count);
-        let coordinates = (0..width)
-            .map(|x| (0..height).map(move |y| (x, y)))
-            .flatten();
-        project_f32(
-            coordinates.clone(),
-            &mut imgs_registered,
-            &lvl_imgs,
-            &motion_vec,
-        );
-
         // Observations.
         let lvl_sparse_pixels_vec: Vec<_> = lvl_sparse_pixels.iter().cloned().collect();
         let mut loop_state;
@@ -126,6 +113,18 @@ pub fn gray_images(
                 image_size: (width, height),
                 images: lvl_imgs.as_slice(),
             };
+
+            // We also recompute the registered images before starting the algorithm loop.
+            let mut imgs_registered = DMatrix::zeros(pixels_count, imgs_count);
+            let coordinates = (0..width)
+                .map(|x| (0..height).map(move |y| (x, y)))
+                .flatten();
+            project_f32(
+                coordinates.clone(),
+                &mut imgs_registered,
+                &lvl_imgs,
+                &motion_vec,
+            );
 
             // Updated state variables for the loops.
             loop_state = State {
@@ -176,6 +175,15 @@ pub fn gray_images(
                 sparse_coordinates: &sparse_coordinates,
                 compute_registered_gradients: b,
             };
+
+            // We also recompute the registered images before starting the algorithm loop.
+            let mut imgs_registered = DMatrix::zeros(sparse_count, imgs_count);
+            project_f32(
+                sparse_coordinates.iter().cloned(),
+                &mut imgs_registered,
+                &lvl_imgs,
+                &motion_vec,
+            );
 
             // Updated state variables for the loops.
             loop_state = State {
@@ -376,24 +384,13 @@ impl State {
             compute_registered_gradients,
         } = self;
         let sparse_count = errors.nrows();
-        let imgs_count = errors.ncols();
 
         // Update lambda.
         let lambda = config.lambda / (sparse_count as f32).sqrt();
 
-        // Extract sparse registered images.
-        let imgs_registered_sparse = DMatrix::from_iterator(
-            sparse_count,
-            imgs_count,
-            extract_sparse(
-                obs.sparse_pixels.iter().cloned(),
-                imgs_registered.iter().cloned(),
-            ),
-        );
-
         // A-update: low-rank approximation.
         let now = std::time::Instant::now();
-        let imgs_a_temp = &imgs_registered_sparse + &*errors + &*lagrange_mult_rho;
+        let imgs_a_temp = &*imgs_registered + &*errors + &*lagrange_mult_rho;
         let mut svd = imgs_a_temp.svd(true, true);
         for x in svd.singular_values.iter_mut() {
             *x = shrink(1.0 / config.rho, *x);
@@ -404,7 +401,7 @@ impl State {
         let now = std::time::Instant::now();
 
         // e-update: L1-regularized least-squares
-        let errors_temp = &imgs_a - &imgs_registered_sparse - &*lagrange_mult_rho;
+        let errors_temp = &imgs_a - &*imgs_registered - &*lagrange_mult_rho;
         if config.do_image_correction {
             *errors = errors_temp.map(|x| shrink(lambda / config.rho, x));
         }
@@ -443,21 +440,15 @@ impl State {
         let now = std::time::Instant::now();
 
         // Update imgs_registered.
-        let coordinates = (0..width)
-            .map(|x| (0..height).map(move |y| (x, y)))
-            .flatten();
-        project_f32(coordinates, imgs_registered, &obs.images, &motion_vec);
+        project_f32(
+            obs.sparse_coordinates.iter().cloned(),
+            imgs_registered,
+            &obs.images,
+            &motion_vec,
+        );
 
         // y-update: dual ascent
-        let imgs_registered_sparse = DMatrix::from_iterator(
-            sparse_count,
-            imgs_count,
-            extract_sparse(
-                obs.sparse_pixels.iter().cloned(),
-                imgs_registered.iter().cloned(),
-            ),
-        );
-        *lagrange_mult_rho += &imgs_registered_sparse - &imgs_a + &*errors;
+        *lagrange_mult_rho += &*imgs_registered - &imgs_a + &*errors;
         eprintln!("y-update took {:.3} s", now.elapsed().as_secs_f32());
 
         // Check convergence
@@ -465,7 +456,7 @@ impl State {
         if config.debug_trace {
             let nuclear_norm = singular_values.sum();
             let l1_norm = lambda * errors.map(|x| x.abs()).sum();
-            let r = &imgs_registered_sparse - &imgs_a + &*errors;
+            let r = &*imgs_registered - &imgs_a + &*errors;
             let augmented_lagrangian = nuclear_norm
                 + l1_norm
                 + config.rho * (lagrange_mult_rho.component_mul(&r)).sum()
