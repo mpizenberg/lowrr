@@ -283,9 +283,10 @@ impl State {
             motion_vec,
             compute_registered_gradients,
         } = self;
+        // Pre-scale lambda.
         let lambda = config.lambda / (imgs_registered.nrows() as f32).sqrt();
 
-        // A-update: low-rank approximation
+        // A-update: low-rank approximation.
         let imgs_a_temp = &*imgs_registered + &*errors + &*lagrange_mult_rho;
         let mut svd = imgs_a_temp.svd(true, true);
         for x in svd.singular_values.iter_mut() {
@@ -303,7 +304,7 @@ impl State {
         // theta-update: forwards compositional step of a Gauss-Newton approximation.
         let residuals = &errors_temp - &*errors;
         for i in 0..obs.images.len() {
-            // Compute residuals and motion step,
+            // Compute residuals and motion step.
             let gradients = compute_registered_gradients(i);
             let coordinates = (0..width).map(|x| (0..height).map(move |y| (x, y)));
             let step_params = forwards_compositional_step(
@@ -333,7 +334,7 @@ impl State {
             .flatten();
         project_f32(coordinates, imgs_registered, &obs.images, &motion_vec);
 
-        // w-update: dual ascent
+        // y-update: dual ascent
         *lagrange_mult_rho += &*imgs_registered - &imgs_a + &*errors;
 
         // Check convergence
@@ -381,10 +382,8 @@ impl State {
             motion_vec,
             compute_registered_gradients,
         } = self;
-        let sparse_count = errors.nrows();
-
-        // Update lambda.
-        let lambda = config.lambda / (sparse_count as f32).sqrt();
+        // Pre-scale lambda.
+        let lambda = config.lambda / (imgs_registered.nrows() as f32).sqrt();
 
         // A-update: low-rank approximation.
         let now = std::time::Instant::now();
