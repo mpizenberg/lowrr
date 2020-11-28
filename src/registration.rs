@@ -93,13 +93,12 @@ pub fn gray_images(
             motion[5] = 2.0 * motion[5];
         }
 
-        // Observations.
-        let lvl_sparse_pixels_vec: Vec<_> = lvl_sparse_pixels.iter().cloned().collect();
+        // Declare mutable loop state.
         let mut loop_state;
 
         // Sparse filter.
         let pixels_count = height * width;
-        let sparse_count: usize = lvl_sparse_pixels_vec
+        let sparse_count: usize = lvl_sparse_pixels
             .iter()
             .map(|x| if *x { 1 } else { 0 })
             .sum();
@@ -148,15 +147,8 @@ pub fn gray_images(
                 continuation = loop_state.step(&step_config, &obs);
             }
         } else {
-            let sparse_coordinates: Rc<Vec<(usize, usize)>> = Rc::new(
-                extract_sparse(
-                    lvl_sparse_pixels_vec.iter().cloned(),
-                    (0..width)
-                        .map(|x| (0..height).map(move |y| (x, y)))
-                        .flatten(),
-                )
-                .collect(),
-            );
+            let sparse_coordinates: Rc<Vec<(usize, usize)>> =
+                Rc::new(coordinates_from_mask(lvl_sparse_pixels));
             let sparse_coordinates_clone = Rc::clone(&sparse_coordinates);
             let compute_gradients = move |img: &_, motion: &_| {
                 compute_registered_gradients_sparse(
@@ -171,7 +163,7 @@ pub fn gray_images(
             let obs = ObsSparse {
                 image_size: (width, height),
                 images: lvl_imgs.as_slice(),
-                sparse_coordinates: &sparse_coordinates,
+                coordinates: &sparse_coordinates,
                 compute_registered_gradients: b,
             };
 
@@ -246,7 +238,7 @@ struct Obs<'a> {
 struct ObsSparse<'a> {
     image_size: (usize, usize),
     images: &'a [DMatrix<u8>],
-    sparse_coordinates: &'a [(usize, usize)],
+    coordinates: &'a [(usize, usize)],
     compute_registered_gradients: Box<dyn Fn(&DMatrix<u8>, &Matrix3<f32>) -> Vec<(f32, f32)>>,
 }
 
@@ -411,7 +403,7 @@ impl State {
             // Compute residuals and motion step.
             let step_params = forwards_compositional_step(
                 (height, width),
-                obs.sparse_coordinates.iter().cloned(),
+                obs.coordinates.iter().cloned(),
                 residuals.column(i).iter().cloned(),
                 (obs.compute_registered_gradients)(
                     &obs.images[i],
@@ -438,7 +430,7 @@ impl State {
 
         // Update imgs_registered.
         project_f32(
-            obs.sparse_coordinates.iter().cloned(),
+            obs.coordinates.iter().cloned(),
             imgs_registered,
             &obs.images,
             &motion_vec,
@@ -481,12 +473,17 @@ impl State {
     }
 }
 
-fn extract_sparse<T, I: Clone + Iterator<Item = bool>>(
+fn coordinates_from_mask(mask: &DMatrix<bool>) -> Vec<(usize, usize)> {
+    let (height, width) = mask.shape();
+    let coords = (0..width).map(|x| (0..height).map(move |y| (x, y)));
+    extract_sparse(mask.iter().cloned(), coords.flatten()).collect()
+}
+
+fn extract_sparse<T, I: Iterator<Item = bool>>(
     sparse_pixels: I,
     mat: impl Iterator<Item = T>,
 ) -> impl Iterator<Item = T> {
     sparse_pixels
-        .cycle()
         .zip(mat)
         .filter_map(|(b, v)| if b { Some(v) } else { None })
 }
