@@ -176,8 +176,8 @@ pub fn gray_images(
 
         // Update the motion vec before next level
         motion_vec = loop_state.motion_vec;
-        eprintln!("motion_vec:");
-        motion_vec.iter().for_each(|v| eprintln!("   {:?}", v.data));
+        // eprintln!("motion_vec:");
+        // motion_vec.iter().for_each(|v| eprintln!("   {:?}", v.data));
     } // End of levels
 
     // Return the final motion vector.
@@ -254,7 +254,6 @@ impl State {
         let lambda = config.lambda / (imgs_registered.nrows() as f32).sqrt();
 
         // A-update: low-rank approximation.
-        let now = std::time::Instant::now();
         let imgs_a_temp = &*imgs_registered + &*errors + &*lagrange_mult_rho;
         let mut svd = imgs_a_temp.svd(true, true);
         for x in svd.singular_values.iter_mut() {
@@ -262,16 +261,12 @@ impl State {
         }
         let singular_values = svd.singular_values.clone();
         let imgs_a = svd.recompose().unwrap();
-        eprintln!("A-update took {:.3} s", now.elapsed().as_secs_f32());
-        let now = std::time::Instant::now();
 
         // e-update: L1-regularized least-squares
         let errors_temp = &imgs_a - &*imgs_registered - &*lagrange_mult_rho;
         if config.do_image_correction {
             *errors = errors_temp.map(|x| shrink(lambda / config.rho, x));
         }
-        eprintln!("e-update took {:.3} s", now.elapsed().as_secs_f32());
-        let now = std::time::Instant::now();
 
         // theta-update: forwards compositional step of a Gauss-Newton approximation.
         let residuals = &errors_temp - &*errors;
@@ -302,8 +297,6 @@ impl State {
             *motion_params =
                 projection_params(&(inverse_motion_ref * projection_mat(&motion_params)));
         }
-        eprintln!("theta-update took {:.3} s", now.elapsed().as_secs_f32());
-        let now = std::time::Instant::now();
 
         // Update imgs_registered.
         project_f32(
@@ -315,7 +308,6 @@ impl State {
 
         // y-update: dual ascent
         *lagrange_mult_rho += &*imgs_registered - &imgs_a + &*errors;
-        eprintln!("y-update took {:.3} s", now.elapsed().as_secs_f32());
 
         // Check convergence
         let residual = norm(&(&imgs_a - &*old_imgs_a)) / 1e-12.max(norm(old_imgs_a));
