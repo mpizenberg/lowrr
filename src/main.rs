@@ -203,10 +203,15 @@ fn run(args: Args) -> Result<(), Box<dyn std::error::Error>> {
 
     // Use the algorithm corresponding to the type of data.
     match dataset {
-        Dataset::GrayImages(imgs) => {
+        Dataset::GrayImages(imgs) => unimplemented!(),
+        Dataset::RgbImages(imgs) => {
             let now = std::time::Instant::now();
+
+            // Convert RGB into gray
+            let gray_imgs: Vec<_> = imgs.iter().map(|im| im.map(|(_r, g, _b)| g)).collect();
+
             // Extract the cropped area from the images.
-            let cropped_imgs = crop_u8(&args.crop, &imgs);
+            let cropped_imgs = crop_u8(&args.crop, &gray_imgs);
 
             // Compute the motion of each image for registration.
             let (motion_vec_crop, cropped_imgs) =
@@ -214,14 +219,16 @@ fn run(args: Args) -> Result<(), Box<dyn std::error::Error>> {
             let motion_vec = inverse_crop(&args.crop, &motion_vec_crop);
             eprintln!("Registration took {:.1} s", now.elapsed().as_secs_f32());
 
-            // // Reproject (interpolation + extrapolation) images according to that motion.
-            // // Write the registered images to the output directory.
-            // let registered_imgs = registration::reproject_u8(&imgs, &motion_vec);
-            // drop(imgs);
-            // save_u8_imgs(&out_dir_path, &registered_imgs);
-            // drop(registered_imgs);
+            // Reproject (interpolation + extrapolation) images according to that motion.
+            // Write the registered images to the output directory.
+            eprintln!("Saving registered images");
+            let registered_imgs = registration::reproject_rgbu8(&imgs, &motion_vec);
+            drop(imgs);
+            save_rgbu8_imgs(&out_dir_path, &registered_imgs);
+            drop(registered_imgs);
 
             // Visualization of registered cropped images.
+            eprintln!("Saving registered cropped images");
             let registered_cropped_imgs =
                 registration::reproject_u8(&cropped_imgs, &motion_vec_crop);
             let cropped_aligned_dir = &out_dir_path.join("cropped_aligned");
@@ -229,6 +236,7 @@ fn run(args: Args) -> Result<(), Box<dyn std::error::Error>> {
             drop(registered_cropped_imgs);
 
             // Visualization of original cropped images.
+            eprintln!("Saving original cropped images");
             let cropped_dir = &out_dir_path.join("cropped");
             save_u8_imgs(&cropped_dir, &cropped_imgs);
             drop(cropped_imgs);
@@ -239,7 +247,6 @@ fn run(args: Args) -> Result<(), Box<dyn std::error::Error>> {
             }
             Ok(())
         }
-        Dataset::RgbImages { red, green, blue } => unimplemented!(),
         Dataset::RawImages(imgs) => unimplemented!(),
     }
 }
@@ -248,6 +255,15 @@ fn save_u8_imgs(dir: &Path, imgs: &[DMatrix<u8>]) {
     std::fs::create_dir_all(dir).expect(&format!("Could not create output dir: {:?}", dir));
     imgs.iter().enumerate().for_each(|(i, img)| {
         interop::image_from_matrix(img)
+            .save(dir.join(format!("{}.png", i)))
+            .expect("Error saving image");
+    });
+}
+
+fn save_rgbu8_imgs(dir: &Path, imgs: &[DMatrix<(u8, u8, u8)>]) {
+    std::fs::create_dir_all(dir).expect(&format!("Could not create output dir: {:?}", dir));
+    imgs.iter().enumerate().for_each(|(i, img)| {
+        interop::rgb_from_matrix(img)
             .save(dir.join(format!("{}.png", i)))
             .expect("Error saving image");
     });
@@ -275,11 +291,7 @@ fn inverse_crop(crop: &Crop, motion_vec_crop: &[Vector6<f32>]) -> Vec<Vector6<f3
 enum Dataset {
     RawImages(Vec<DMatrix<u16>>),
     GrayImages(Vec<DMatrix<u8>>),
-    RgbImages {
-        red: Vec<DMatrix<u8>>,
-        green: Vec<DMatrix<u8>>,
-        blue: Vec<DMatrix<u8>>,
-    },
+    RgbImages(Vec<DMatrix<(u8, u8, u8)>>),
 }
 
 fn crop_u8(crop: &Crop, imgs: &[DMatrix<u8>]) -> Vec<DMatrix<u8>> {
@@ -336,20 +348,20 @@ fn load_dataset<P: AsRef<Path>>(
         let img_count = images_types.len();
         eprintln!("Loading {} images ...", img_count);
         let pb = indicatif::ProgressBar::new(img_count as u64);
-        let images: Vec<DMatrix<u8>> = paths
+        let images: Vec<DMatrix<(u8, u8, u8)>> = paths
             .iter()
             .map(|path| {
                 let rgb_img = image::open(path).unwrap().into_rgb8();
-                // let rgb_mat = interop::matrix_from_rgb_image(rgb_img);
+                let rgb_mat = interop::matrix_from_rgb_image(rgb_img);
                 // let mono_mat = rgb_mat.map(|(_r, g, _b)| g);
-                let mono_mat = interop::green_mat_from_rgb_image(rgb_img);
+                // let mono_mat = interop::green_mat_from_rgb_image(rgb_img);
                 pb.inc(1);
-                mono_mat
+                rgb_mat
             })
             .collect();
         let (height, width) = images[0].shape();
         pb.finish();
-        Ok((Dataset::GrayImages(images), (width, height)))
+        Ok((Dataset::RgbImages(images), (width, height)))
     } else {
         panic!("There is a mix of image types")
     }

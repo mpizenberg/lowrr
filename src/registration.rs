@@ -486,6 +486,29 @@ pub fn reproject_u8(imgs: &[DMatrix<u8>], motion_vec: &[Vector6<f32>]) -> Vec<DM
     all_registered
 }
 
+/// Compute the projection of each pixel of the image.
+/// Outputs an RGB image (0-255).
+pub fn reproject_rgbu8(
+    imgs: &[DMatrix<(u8, u8, u8)>],
+    motion_vec: &[Vector6<f32>],
+) -> Vec<DMatrix<(u8, u8, u8)>> {
+    let (height, width) = imgs[0].shape();
+    let mut all_registered = Vec::new();
+    for (im, motion) in imgs.iter().zip(motion_vec.iter()) {
+        let motion_mat = projection_mat(motion);
+        let registered = DMatrix::from_fn(height, width, |i, j| {
+            let new_pos = motion_mat * Vector3::new(j as f32, i as f32, 1.0);
+            let (r, g, b) = crate::interpolation::linear_rgb(new_pos.x, new_pos.y, im);
+            let r = r.max(0.0).min(255.0) as u8;
+            let g = g.max(0.0).min(255.0) as u8;
+            let b = b.max(0.0).min(255.0) as u8;
+            (r, g, b)
+        });
+        all_registered.push(registered);
+    }
+    all_registered
+}
+
 /// Computes the sqrt of the sum of squared values.
 /// This is the L2 norm of the vectorized version of the matrix.
 fn norm(matrix: &DMatrix<f32>) -> f32 {

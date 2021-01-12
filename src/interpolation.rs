@@ -4,7 +4,48 @@
 
 //! Helper functions to interpolate / extrapolate warped images.
 
-use nalgebra::base::{DMatrix, Scalar};
+use nalgebra::{DMatrix, Scalar, Vector3};
+
+/// Simple linear interpolation of a pixel with floating point coordinates.
+/// Extrapolate if the point is outside of the image boundaries.
+#[allow(clippy::many_single_char_names)]
+#[allow(clippy::cast_possible_truncation)]
+#[allow(clippy::cast_sign_loss)]
+#[allow(clippy::cast_precision_loss)]
+pub fn linear_rgb<T>(x: f32, y: f32, image: &DMatrix<(T, T, T)>) -> (f32, f32, f32)
+where
+    T: Scalar + Copy + Into<f32>,
+{
+    let (height, width) = image.shape();
+    let u = x.floor();
+    let v = y.floor();
+    if u >= 0.0 && u < (width - 2) as f32 && v >= 0.0 && v < (height - 2) as f32 {
+        // Linear interpolation inside boundaries.
+        let u_0 = u as usize;
+        let v_0 = v as usize;
+        let u_1 = u_0 + 1;
+        let v_1 = v_0 + 1;
+        let a = x - u;
+        let b = y - v;
+        let p = image[(v_0, u_0)];
+        let vu_00 = Vector3::new(p.0.into(), p.1.into(), p.2.into());
+        let p = image[(v_1, u_0)];
+        let vu_10 = Vector3::new(p.0.into(), p.1.into(), p.2.into());
+        let p = image[(v_0, u_1)];
+        let vu_01 = Vector3::new(p.0.into(), p.1.into(), p.2.into());
+        let p = image[(v_1, u_1)];
+        let vu_11 = Vector3::new(p.0.into(), p.1.into(), p.2.into());
+        let p_interp = (1.0 - b) * (1.0 - a) * vu_00
+            + b * (1.0 - a) * vu_10
+            + (1.0 - b) * a * vu_01
+            + b * a * vu_11;
+        (p_interp.x, p_interp.y, p_interp.z)
+    } else {
+        // Nearest neighbour extrapolation outside boundaries.
+        let (r, g, b) = image[nearest_border(x, y, width, height)];
+        (r.into(), g.into(), b.into())
+    }
+}
 
 /// Simple linear interpolation of a pixel with floating point coordinates.
 /// Extrapolate if the point is outside of the image boundaries.
