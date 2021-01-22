@@ -203,7 +203,7 @@ fn run(args: Args) -> Result<(), Box<dyn std::error::Error>> {
 
     // Use the algorithm corresponding to the type of data.
     match dataset {
-        Dataset::GrayImages(imgs) => unimplemented!(),
+        Dataset::GrayImages(_) => unimplemented!(),
         Dataset::RgbImages(imgs) => {
             let now = std::time::Instant::now();
 
@@ -219,13 +219,13 @@ fn run(args: Args) -> Result<(), Box<dyn std::error::Error>> {
             let motion_vec = inverse_crop(&args.crop, &motion_vec_crop);
             eprintln!("Registration took {:.1} s", now.elapsed().as_secs_f32());
 
-            // Reproject (interpolation + extrapolation) images according to that motion.
-            // Write the registered images to the output directory.
-            eprintln!("Saving registered images");
-            let registered_imgs = registration::reproject_rgbu8(&imgs, &motion_vec);
-            drop(imgs);
-            save_rgbu8_imgs(&out_dir_path, &registered_imgs);
-            drop(registered_imgs);
+            // // Reproject (interpolation + extrapolation) images according to that motion.
+            // // Write the registered images to the output directory.
+            // eprintln!("Saving registered images");
+            // let registered_imgs = registration::reproject_rgbu8(&imgs, &motion_vec);
+            // drop(imgs);
+            // save_rgbu8_imgs(&out_dir_path, &registered_imgs);
+            // drop(registered_imgs);
 
             // Visualization of registered cropped images.
             eprintln!("Saving registered cropped images");
@@ -243,11 +243,11 @@ fn run(args: Args) -> Result<(), Box<dyn std::error::Error>> {
 
             // Write motion_vec to stdout.
             for v in motion_vec.iter() {
-                println!("{} {}", v.x, v.y)
+                println!("{}", v);
             }
             Ok(())
         }
-        Dataset::RawImages(imgs) => unimplemented!(),
+        Dataset::RawImages(_) => unimplemented!(),
     }
 }
 
