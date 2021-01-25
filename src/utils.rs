@@ -7,6 +7,7 @@
 use nalgebra::base::dimension::{Dim, Dynamic};
 use nalgebra::base::{Scalar, VecStorage};
 use nalgebra::{DMatrix, Matrix};
+use std::path::Path;
 
 /// Same as rgb2gray matlab function, but for u8.
 pub fn rgb_to_gray(red: &DMatrix<u8>, green: &DMatrix<u8>, blue: &DMatrix<u8>) -> DMatrix<u8> {
@@ -65,4 +66,24 @@ pub fn transpose<T: Clone>(v: Vec<Vec<T>>) -> Vec<Vec<T>> {
         }
     }
     v_transposed
+}
+
+pub fn save_u8_imgs<P: AsRef<Path>>(dir: P, imgs: &[DMatrix<u8>]) {
+    let dir = dir.as_ref();
+    std::fs::create_dir_all(dir).expect(&format!("Could not create output dir: {:?}", dir));
+    imgs.iter().enumerate().for_each(|(i, img)| {
+        crate::interop::image_from_matrix(img)
+            .save(dir.join(format!("{}.png", i)))
+            .expect("Error saving image");
+    });
+}
+
+pub fn save_rgbu8_imgs<P: AsRef<Path>>(dir: P, imgs: &[DMatrix<(u8, u8, u8)>]) {
+    let dir = dir.as_ref();
+    std::fs::create_dir_all(dir).expect(&format!("Could not create output dir: {:?}", dir));
+    imgs.iter().enumerate().for_each(|(i, img)| {
+        crate::interop::rgb_from_matrix(img)
+            .save(dir.join(format!("{}.png", i)))
+            .expect("Error saving image");
+    });
 }

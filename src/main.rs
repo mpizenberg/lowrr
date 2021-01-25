@@ -224,7 +224,7 @@ fn run(args: Args) -> Result<(), Box<dyn std::error::Error>> {
             // eprintln!("Saving registered images");
             // let registered_imgs = registration::reproject_rgbu8(&imgs, &motion_vec);
             // drop(imgs);
-            // save_rgbu8_imgs(&out_dir_path, &registered_imgs);
+            // lowrr::utils::save_rgbu8_imgs(&out_dir_path, &registered_imgs);
             // drop(registered_imgs);
 
             // Visualization of registered cropped images.
@@ -232,13 +232,13 @@ fn run(args: Args) -> Result<(), Box<dyn std::error::Error>> {
             let registered_cropped_imgs =
                 registration::reproject_u8(&cropped_imgs, &motion_vec_crop);
             let cropped_aligned_dir = &out_dir_path.join("cropped_aligned");
-            save_u8_imgs(&cropped_aligned_dir, &registered_cropped_imgs);
+            lowrr::utils::save_u8_imgs(&cropped_aligned_dir, &registered_cropped_imgs);
             drop(registered_cropped_imgs);
 
             // Visualization of original cropped images.
             eprintln!("Saving original cropped images");
             let cropped_dir = &out_dir_path.join("cropped");
-            save_u8_imgs(&cropped_dir, &cropped_imgs);
+            lowrr::utils::save_u8_imgs(&cropped_dir, &cropped_imgs);
             drop(cropped_imgs);
 
             // Write motion_vec to stdout.
@@ -249,24 +249,6 @@ fn run(args: Args) -> Result<(), Box<dyn std::error::Error>> {
         }
         Dataset::RawImages(_) => unimplemented!(),
     }
-}
-
-fn save_u8_imgs(dir: &Path, imgs: &[DMatrix<u8>]) {
-    std::fs::create_dir_all(dir).expect(&format!("Could not create output dir: {:?}", dir));
-    imgs.iter().enumerate().for_each(|(i, img)| {
-        interop::image_from_matrix(img)
-            .save(dir.join(format!("{}.png", i)))
-            .expect("Error saving image");
-    });
-}
-
-fn save_rgbu8_imgs(dir: &Path, imgs: &[DMatrix<(u8, u8, u8)>]) {
-    std::fs::create_dir_all(dir).expect(&format!("Could not create output dir: {:?}", dir));
-    imgs.iter().enumerate().for_each(|(i, img)| {
-        interop::rgb_from_matrix(img)
-            .save(dir.join(format!("{}.png", i)))
-            .expect("Error saving image");
-    });
 }
 
 fn inverse_crop(crop: &Crop, motion_vec_crop: &[Vector6<f32>]) -> Vec<Vector6<f32>> {

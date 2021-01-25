@@ -51,6 +51,19 @@ pub fn gray_images(
         multires_imgs.push(pyramid);
     }
 
+    // Save multires imgs.
+    crate::utils::save_u8_imgs("out/multires_imgs", &multires_imgs[0]);
+
+    // Save sparse pixels of first image.
+    let mut multires_sparse_viz = Vec::with_capacity(config.levels);
+    for (sparse_mask, img_mat) in multires_sparse_pixels[0]
+        .iter()
+        .zip(multires_imgs[0].iter().rev())
+    {
+        multires_sparse_viz.push(visualize_mask(sparse_mask, img_mat));
+    }
+    crate::utils::save_rgbu8_imgs("out/multires_sparse_img0", &multires_sparse_viz);
+
     // Transpose the `Vec<Levels<_>>` structure of multires images
     // into a `Levels<Vec<_>>` to have each level regrouped.
     let multires_imgs: Levels<Vec<_>> = crate::utils::transpose(multires_imgs);
@@ -61,6 +74,16 @@ pub fn gray_images(
         .iter()
         .map(|v| merge_sparse(v))
         .collect();
+
+    // Save merged sparse pixels of all images.
+    let mut multires_sparse_merged_viz = Vec::with_capacity(config.levels);
+    for (sparse_mask, img_mat) in multires_sparse_pixels
+        .iter()
+        .zip(multires_imgs.iter().rev().map(|v| &v[0]))
+    {
+        multires_sparse_merged_viz.push(visualize_mask(sparse_mask, img_mat));
+    }
+    crate::utils::save_rgbu8_imgs("out/multires_sparse_merged", &multires_sparse_merged_viz);
 
     // Initialize the motion vector.
     let mut motion_vec = vec![Vector6::zeros(); imgs_count];
@@ -341,6 +364,16 @@ impl State {
         // Returned value.
         continuation
     }
+}
+
+fn visualize_mask(mask: &DMatrix<bool>, img_mat: &DMatrix<u8>) -> DMatrix<(u8, u8, u8)> {
+    mask.zip_map(img_mat, |in_mask, gray| {
+        if in_mask {
+            (255, 0, 0)
+        } else {
+            (gray, gray, gray)
+        }
+    })
 }
 
 fn coordinates_from_mask(mask: &DMatrix<bool>) -> Vec<(usize, usize)> {
