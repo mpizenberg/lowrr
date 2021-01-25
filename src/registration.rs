@@ -46,7 +46,7 @@ pub fn gray_images(
             .iter()
             .map(crate::gradients::squared_norm_direct)
             .collect();
-        let sparse_pixels = crate::sparse::select(1000, &gradients);
+        let sparse_pixels = crate::sparse::select(50, &gradients);
         multires_sparse_pixels.push(sparse_pixels);
         multires_imgs.push(pyramid);
     }
@@ -67,23 +67,24 @@ pub fn gray_images(
     // Transpose the `Vec<Levels<_>>` structure of multires images
     // into a `Levels<Vec<_>>` to have each level regrouped.
     let multires_imgs: Levels<Vec<_>> = crate::utils::transpose(multires_imgs);
-    let multires_sparse_pixels: Levels<Vec<_>> = crate::utils::transpose(multires_sparse_pixels);
+    // let multires_sparse_pixels: Levels<Vec<_>> = crate::utils::transpose(multires_sparse_pixels);
 
-    // Merge sparse pixels by level.
-    let multires_sparse_pixels: Levels<_> = multires_sparse_pixels
-        .iter()
-        .map(|v| merge_sparse(v))
-        .collect();
+    // // Merge sparse pixels by level.
+    // let multires_sparse_pixels: Levels<_> = multires_sparse_pixels
+    //     .iter()
+    //     .map(|v| merge_sparse(v))
+    //     .collect();
+    let multires_sparse_pixels = multires_sparse_pixels[0].clone();
 
-    // Save merged sparse pixels of all images.
-    let mut multires_sparse_merged_viz = Vec::with_capacity(config.levels);
-    for (sparse_mask, img_mat) in multires_sparse_pixels
-        .iter()
-        .zip(multires_imgs.iter().rev().map(|v| &v[0]))
-    {
-        multires_sparse_merged_viz.push(visualize_mask(sparse_mask, img_mat));
-    }
-    crate::utils::save_rgbu8_imgs("out/multires_sparse_merged", &multires_sparse_merged_viz);
+    // // Save merged sparse pixels of all images.
+    // let mut multires_sparse_merged_viz = Vec::with_capacity(config.levels);
+    // for (sparse_mask, img_mat) in multires_sparse_pixels
+    //     .iter()
+    //     .zip(multires_imgs.iter().rev().map(|v| &v[0]))
+    // {
+    //     multires_sparse_merged_viz.push(visualize_mask(sparse_mask, img_mat));
+    // }
+    // crate::utils::save_rgbu8_imgs("out/multires_sparse_merged", &multires_sparse_merged_viz);
 
     // Initialize the motion vector.
     let mut motion_vec = vec![Vector6::zeros(); imgs_count];
