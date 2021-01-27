@@ -532,7 +532,7 @@ pub fn reproject_rgbu8(
         let motion_mat = projection_mat(motion);
         let registered = DMatrix::from_fn(height, width, |i, j| {
             let new_pos = motion_mat * Vector3::new(j as f32, i as f32, 1.0);
-            let (r, g, b) = crate::interpolation::linear_rgb(new_pos.x, new_pos.y, im);
+            let (r, g, b) = crate::interpolation::linear(new_pos.x, new_pos.y, im);
             let r = r.max(0.0).min(255.0) as u8;
             let g = g.max(0.0).min(255.0) as u8;
             let b = b.max(0.0).min(255.0) as u8;
