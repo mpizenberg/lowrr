@@ -229,15 +229,16 @@ fn run(args: Args) -> Result<(), Box<dyn std::error::Error>> {
 
             // Visualization of registered cropped images.
             eprintln!("Saving registered cropped images");
-            let registered_cropped_imgs = registration::reproject(&cropped_imgs, &motion_vec_crop);
+            let registered_cropped_imgs: Vec<DMatrix<u8>> =
+                registration::reproject(&cropped_imgs, &motion_vec_crop);
             let cropped_aligned_dir = &out_dir_path.join("cropped_aligned");
-            lowrr::utils::save_u8_imgs(&cropped_aligned_dir, &registered_cropped_imgs);
+            lowrr::utils::save_imgs(&cropped_aligned_dir, &registered_cropped_imgs);
             drop(registered_cropped_imgs);
 
             // Visualization of original cropped images.
             eprintln!("Saving original cropped images");
             let cropped_dir = &out_dir_path.join("cropped");
-            lowrr::utils::save_u8_imgs(&cropped_dir, &cropped_imgs);
+            lowrr::utils::save_imgs(&cropped_dir, &cropped_imgs);
             drop(cropped_imgs);
 
             // Write motion_vec to stdout.

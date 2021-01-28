@@ -55,7 +55,9 @@ pub fn gray_images(
     }
 
     // Save multires imgs.
-    crate::utils::save_u8_imgs("out/multires_imgs", &multires_imgs[0]);
+    crate::utils::save_imgs("out/multires_imgs", &multires_imgs[0]);
+
+    // TODO generic after here
 
     // Save sparse pixels of first image.
     let mut multires_sparse_viz = Vec::with_capacity(config.levels);

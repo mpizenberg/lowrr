@@ -4,6 +4,7 @@
 
 //! Helper module for functions that didn't fit anywhere else.
 
+use image::{EncodableLayout, Primitive};
 use nalgebra::base::dimension::{Dim, Dynamic};
 use nalgebra::base::{Scalar, VecStorage};
 use nalgebra::{DMatrix, Matrix};
@@ -68,7 +69,10 @@ pub fn transpose<T: Clone>(v: Vec<Vec<T>>) -> Vec<Vec<T>> {
     v_transposed
 }
 
-pub fn save_u8_imgs<P: AsRef<Path>>(dir: P, imgs: &[DMatrix<u8>]) {
+pub fn save_imgs<P: AsRef<Path>, T: Scalar + Primitive>(dir: P, imgs: &[DMatrix<T>])
+where
+    [T]: EncodableLayout,
+{
     let dir = dir.as_ref();
     std::fs::create_dir_all(dir).expect(&format!("Could not create output dir: {:?}", dir));
     imgs.iter().enumerate().for_each(|(i, img)| {

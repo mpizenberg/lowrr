@@ -13,9 +13,9 @@ use nalgebra::{DMatrix, Scalar};
 /// Performs a transposition to accomodate for the
 /// column major matrix into the row major image.
 #[allow(clippy::cast_possible_truncation)]
-pub fn image_from_matrix(mat: &DMatrix<u8>) -> GrayImage {
+pub fn image_from_matrix<T: Scalar + Primitive>(mat: &DMatrix<T>) -> ImageBuffer<Luma<T>, Vec<T>> {
     let (nb_rows, nb_cols) = mat.shape();
-    let mut img_buf = GrayImage::new(nb_cols as u32, nb_rows as u32);
+    let mut img_buf = ImageBuffer::new(nb_cols as u32, nb_rows as u32);
     for (x, y, pixel) in img_buf.enumerate_pixels_mut() {
         *pixel = Luma([mat[(y as usize, x as usize)]]);
     }
