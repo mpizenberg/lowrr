@@ -4,8 +4,11 @@
 
 //! Registration algorithm for a sequence of slightly misaligned images.
 
-use nalgebra::{DMatrix, Matrix3, Matrix6, RealField, Vector3, Vector6};
+use nalgebra::{DMatrix, Matrix3, Matrix6, RealField, Scalar, Vector3, Vector6};
+use std::ops::{Add, Mul};
 use std::rc::Rc;
+
+use crate::interpolation::CanLinearInterpolate;
 
 /// Configuration (parameters) of the registration algorithm.
 #[derive(Debug)]
@@ -541,6 +544,21 @@ pub fn reproject_rgbu8(
         all_registered.push(registered);
     }
     all_registered
+}
+
+pub fn warp<T, V, O>(img: &DMatrix<T>, motion_params: &Vector6<f32>) -> DMatrix<O>
+where
+    O: Scalar,
+    V: Add<Output = V>,
+    f32: Mul<V, Output = V>,
+    T: Scalar + Copy + CanLinearInterpolate<V, O>,
+{
+    let (nrows, ncols) = img.shape();
+    let motion_mat = projection_mat(motion_params);
+    DMatrix::from_fn(nrows, ncols, |i, j| {
+        let new_pos = motion_mat * Vector3::new(j as f32, i as f32, 1.0);
+        crate::interpolation::linear(new_pos.x, new_pos.y, img)
+    })
 }
 
 /// Computes the sqrt of the sum of squared values.

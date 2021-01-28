@@ -8,32 +8,48 @@ use nalgebra::{DMatrix, Scalar, Vector3};
 use std::ops::{Add, Mul};
 
 /// Trait for types that can be linearly interpolated with the `linear` function.
-pub trait LinearInterpolate<Float, Vector, Output>
+pub trait CanLinearInterpolate<Vector, Output>
 where
     Vector: Add<Output = Vector>,
-    Float: Mul<Vector, Output = Vector>,
+    f32: Mul<Vector, Output = Vector>,
 {
     fn to_vector(self) -> Vector;
     fn from_vector(v: Vector) -> Output;
 }
 
-/// Implement LinearInterpolate for u8 RGB.
-impl LinearInterpolate<f32, Vector3<f32>, (f32, f32, f32)> for (u8, u8, u8) {
-    fn to_vector(self) -> Vector3<f32> {
-        Vector3::new(self.0 as f32, self.1 as f32, self.2 as f32)
-    }
-    fn from_vector(v: Vector3<f32>) -> (f32, f32, f32) {
-        (v.x, v.y, v.z)
-    }
-}
-
-/// Implement LinearInterpolate for u8 gray.
-impl LinearInterpolate<f32, f32, f32> for u8 {
+/// Implement CanLinearInterpolate for u8
+impl CanLinearInterpolate<f32, f32> for u8 {
     fn to_vector(self) -> f32 {
         self as f32
     }
     fn from_vector(v: f32) -> f32 {
-        v
+        v.max(0.0).min(u8::MAX as f32)
+    }
+}
+
+/// Implement CanLinearInterpolate for u16
+impl CanLinearInterpolate<f32, f32> for u16 {
+    fn to_vector(self) -> f32 {
+        self as f32
+    }
+    fn from_vector(v: f32) -> f32 {
+        v.max(0.0).min(u16::MAX as f32)
+    }
+}
+
+/// Implement CanLinearInterpolate for (T,T,T) if T also implements it.
+impl<T: CanLinearInterpolate<f32, f32>> CanLinearInterpolate<Vector3<f32>, (f32, f32, f32)>
+    for (T, T, T)
+{
+    fn to_vector(self) -> Vector3<f32> {
+        Vector3::new(self.0.to_vector(), self.1.to_vector(), self.2.to_vector())
+    }
+    fn from_vector(v: Vector3<f32>) -> (f32, f32, f32) {
+        (
+            T::from_vector(v.x),
+            T::from_vector(v.y),
+            T::from_vector(v.z),
+        )
     }
 }
 
@@ -43,16 +59,12 @@ impl LinearInterpolate<f32, f32, f32> for u8 {
 #[allow(clippy::cast_possible_truncation)]
 #[allow(clippy::cast_sign_loss)]
 #[allow(clippy::cast_precision_loss)]
-pub fn linear<
+pub fn linear<V, O, T>(x: f32, y: f32, image: &DMatrix<T>) -> O
+where
     V: Add<Output = V>,
-    Float: From<f32> + Mul<V, Output = V>,
-    O,
-    T: Scalar + Copy + LinearInterpolate<Float, V, O>,
->(
-    x: f32,
-    y: f32,
-    image: &DMatrix<T>,
-) -> O {
+    f32: Mul<V, Output = V>,
+    T: Scalar + Copy + CanLinearInterpolate<V, O>,
+{
     let (height, width) = image.shape();
     let u = x.floor();
     let v = y.floor();
@@ -68,10 +80,10 @@ pub fn linear<
         let vu_10 = image[(v_1, u_0)].to_vector();
         let vu_01 = image[(v_0, u_1)].to_vector();
         let vu_11 = image[(v_1, u_1)].to_vector();
-        let interp = Float::from((1.0 - b) * (1.0 - a)) * vu_00
-            + Float::from(b * (1.0 - a)) * vu_10
-            + Float::from((1.0 - b) * a) * vu_01
-            + Float::from(b * a) * vu_11;
+        let interp = Mul::<f32>::mul(1.0 - b, 1.0 - a) * vu_00
+            + Mul::<f32>::mul(b, 1.0 - a) * vu_10
+            + Mul::<f32>::mul(1.0 - b, a) * vu_01
+            + Mul::<f32>::mul(b, a) * vu_11;
         T::from_vector(interp)
     } else {
         // Nearest neighbour extrapolation outside boundaries.
