@@ -5,6 +5,28 @@
 //! Helper functions for generation of multi-resolution data.
 
 use nalgebra::{DMatrix, Scalar};
+use std::ops::{Add, Div};
+
+pub trait Bigger: Copy {
+    type Big: Copy + Add<Output = Self::Big> + Div<Output = Self::Big> + From<u8> + From<Self>;
+    fn as_from(b: Self::Big) -> Self;
+}
+
+impl Bigger for u8 {
+    type Big = u16;
+    #[allow(clippy::cast_possible_truncation)]
+    fn as_from(b: Self::Big) -> Self {
+        b as Self
+    }
+}
+
+impl Bigger for u16 {
+    type Big = u32;
+    #[allow(clippy::cast_possible_truncation)]
+    fn as_from(b: Self::Big) -> Self {
+        b as Self
+    }
+}
 
 /// Recursively generate a pyramid of matrices where each following level
 /// is half the previous resolution, computed with the mean of each 2x2 block.
@@ -15,15 +37,17 @@ use nalgebra::{DMatrix, Scalar};
 /// PS: since we are using 2x2 blocs,
 /// border information is lost for odd resolutions.
 /// Some precision is also left to keep the pyramid data as `u8`.
-#[allow(clippy::cast_possible_truncation)]
-pub fn mean_pyramid(max_levels: usize, mat: DMatrix<u8>) -> Vec<DMatrix<u8>> {
+pub fn mean_pyramid<T: Scalar + Copy + Bigger>(
+    max_levels: usize,
+    mat: DMatrix<T>,
+) -> Vec<DMatrix<T>> {
     limited_sequence(max_levels, mat, |m| {
         halve(m, |a, b, c, d| {
-            let a = u16::from(a);
-            let b = u16::from(b);
-            let c = u16::from(c);
-            let d = u16::from(d);
-            ((a + b + c + d) / 4) as u8
+            let a = T::Big::from(a);
+            let b = T::Big::from(b);
+            let c = T::Big::from(c);
+            let d = T::Big::from(d);
+            T::as_from((a + b + c + d) / T::Big::from(4u8))
         })
     })
 }
