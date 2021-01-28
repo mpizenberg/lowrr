@@ -4,8 +4,8 @@
 
 //! Interoperability conversions between the image and matrix types.
 
-use image::{GrayImage, ImageBuffer, Luma, Rgb, RgbImage};
-use nalgebra::DMatrix;
+use image::{GrayImage, ImageBuffer, Luma, Primitive, Rgb, RgbImage};
+use nalgebra::{DMatrix, Scalar};
 
 /// Convert an `u8` matrix into a `GrayImage`.
 /// Inverse operation of `matrix_from_image`.
@@ -55,9 +55,11 @@ pub fn matrix_from_image(img: GrayImage) -> DMatrix<u8> {
     DMatrix::from_row_slice(height as usize, width as usize, &img.into_raw())
 }
 
-/// Convert a `RgbImage` into an `(u8, u8, u8)` matrix.
+/// Convert a RGB image into an `(T, T, T)` matrix.
 /// Inverse operation of `rgb_from_matrix`.
-pub fn matrix_from_rgb_image(img: RgbImage) -> DMatrix<(u8, u8, u8)> {
+pub fn matrix_from_rgb_image<T: Scalar + Primitive>(
+    img: ImageBuffer<Rgb<T>, Vec<T>>,
+) -> DMatrix<(T, T, T)> {
     let (width, height) = img.dimensions();
     // TODO: improve the suboptimal allocation in addition to transposition.
     DMatrix::from_iterator(
