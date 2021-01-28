@@ -372,12 +372,31 @@ impl State {
     }
 }
 
-fn visualize_mask(mask: &DMatrix<bool>, img_mat: &DMatrix<u8>) -> DMatrix<(u8, u8, u8)> {
-    mask.zip_map(img_mat, |in_mask, gray| {
+trait ToRgb8 {
+    fn to_rgb8(self) -> (u8, u8, u8);
+}
+
+impl ToRgb8 for u8 {
+    fn to_rgb8(self) -> (u8, u8, u8) {
+        (self, self, self)
+    }
+}
+
+impl ToRgb8 for u16 {
+    fn to_rgb8(self) -> (u8, u8, u8) {
+        (self as u8, self as u8, self as u8)
+    }
+}
+
+fn visualize_mask<T: Scalar + ToRgb8>(
+    mask: &DMatrix<bool>,
+    img_mat: &DMatrix<T>,
+) -> DMatrix<(u8, u8, u8)> {
+    mask.zip_map(img_mat, |in_mask, pixel| {
         if in_mask {
             (255, 0, 0)
         } else {
-            (gray, gray, gray)
+            pixel.to_rgb8()
         }
     })
 }
