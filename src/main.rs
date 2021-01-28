@@ -3,6 +3,7 @@ use lowrr::registration;
 mod unused;
 
 use glob::glob;
+use image::DynamicImage;
 use nalgebra::{DMatrix, Scalar, Vector6};
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
@@ -247,6 +248,7 @@ fn run(args: Args) -> Result<(), Box<dyn std::error::Error>> {
             }
             Ok(())
         }
+        Dataset::RgbImagesU16(_) => unimplemented!(),
         Dataset::RawImages(_) => unimplemented!(),
     }
 }
@@ -274,6 +276,7 @@ enum Dataset {
     RawImages(Vec<DMatrix<u16>>),
     GrayImages(Vec<DMatrix<u8>>),
     RgbImages(Vec<DMatrix<(u8, u8, u8)>>),
+    RgbImagesU16(Vec<DMatrix<(u16, u16, u16)>>),
 }
 
 fn crop<T: Scalar>(crop: &Crop, imgs: &[DMatrix<T>]) -> Vec<DMatrix<T>> {
@@ -330,20 +333,24 @@ fn load_dataset<P: AsRef<Path>>(
         let img_count = images_types.len();
         eprintln!("Loading {} images ...", img_count);
         let pb = indicatif::ProgressBar::new(img_count as u64);
-        let images: Vec<DMatrix<(u8, u8, u8)>> = paths
-            .iter()
-            .map(|path| {
-                let rgb_img = image::open(path).unwrap().into_rgb8();
-                let rgb_mat = interop::matrix_from_rgb_image(rgb_img);
-                // let mono_mat = rgb_mat.map(|(_r, g, _b)| g);
-                // let mono_mat = interop::green_mat_from_rgb_image(rgb_img);
+        // Open the first image to figure out the image type.
+        assert!(img_count > 0);
+        match image::open(&paths[0])? {
+            DynamicImage::ImageRgb8(rgb_img_0) => {
+                let mut imgs = Vec::with_capacity(img_count);
+                let img_mat = interop::matrix_from_rgb_image(rgb_img_0);
+                let (height, width) = img_mat.shape();
+                imgs.push(img_mat);
                 pb.inc(1);
-                rgb_mat
-            })
-            .collect();
-        let (height, width) = images[0].shape();
-        pb.finish();
-        Ok((Dataset::RgbImages(images), (width, height)))
+                for rgb_img in paths[1..].iter().map(|p| image::open(p).unwrap()) {
+                    imgs.push(interop::matrix_from_rgb_image(rgb_img.into_rgb8()));
+                    pb.inc(1);
+                }
+                pb.finish();
+                Ok((Dataset::RgbImages(imgs), (width, height)))
+            }
+            _ => Err("Unknow image type".into()),
+        }
     } else {
         panic!("There is a mix of image types")
     }
