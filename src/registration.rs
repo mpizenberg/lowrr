@@ -419,21 +419,21 @@ fn compute_registered_gradients_sparse(
             let x_right = x as f32 + 1.0;
             let new_left = motion * Vector3::new(x_left, y as f32, 1.0);
             let new_right = motion * Vector3::new(x_right, y as f32, 1.0);
-            let pixel_left = inv_max * crate::interpolation::linear(new_left.x, new_left.y, img);
-            let pixel_right = inv_max * crate::interpolation::linear(new_right.x, new_right.y, img);
+            let pixel_left: f32 = crate::interpolation::linear(new_left.x, new_left.y, img);
+            let pixel_right: f32 = crate::interpolation::linear(new_right.x, new_right.y, img);
 
             // Vertical gradient (gy).
             let y_top = y as f32 - 1.0;
             let y_bot = y as f32 + 1.0;
             let new_top = motion * Vector3::new(x as f32, y_top, 1.0);
             let new_bot = motion * Vector3::new(x as f32, y_bot, 1.0);
-            let pixel_top = inv_max * crate::interpolation::linear(new_top.x, new_top.y, img);
-            let pixel_bot = inv_max * crate::interpolation::linear(new_bot.x, new_bot.y, img);
+            let pixel_top: f32 = crate::interpolation::linear(new_top.x, new_top.y, img);
+            let pixel_bot: f32 = crate::interpolation::linear(new_bot.x, new_bot.y, img);
 
             // Gradient.
             (
-                0.5 * (pixel_right - pixel_left),
-                0.5 * (pixel_bot - pixel_top),
+                0.5 * inv_max * (pixel_right - pixel_left),
+                0.5 * inv_max * (pixel_bot - pixel_top),
             )
         })
         .collect()
@@ -500,48 +500,23 @@ fn project_f32(
         let mut registered_col = registered.column_mut(i);
         for ((x, y), pixel) in coordinates.clone().zip(registered_col.iter_mut()) {
             let new_pos = motion_mat * Vector3::new(x as f32, y as f32, 1.0);
-            *pixel = inv_max * crate::interpolation::linear(new_pos.x, new_pos.y, &imgs[i]);
+            let interp: f32 = crate::interpolation::linear(new_pos.x, new_pos.y, &imgs[i]);
+            *pixel = inv_max * interp;
         }
     }
 }
 
 /// Compute the projection of each pixel of the image.
-/// Outputs a grayscale image (0-255).
-pub fn reproject_u8(imgs: &[DMatrix<u8>], motion_vec: &[Vector6<f32>]) -> Vec<DMatrix<u8>> {
-    let (height, width) = imgs[0].shape();
+pub fn reproject<T, V, O>(imgs: &[DMatrix<T>], motion_vec: &[Vector6<f32>]) -> Vec<DMatrix<O>>
+where
+    O: Scalar,
+    V: Add<Output = V>,
+    f32: Mul<V, Output = V>,
+    T: Scalar + Copy + CanLinearInterpolate<V, O>,
+{
     let mut all_registered = Vec::new();
     for (im, motion) in imgs.iter().zip(motion_vec.iter()) {
-        let motion_mat = projection_mat(motion);
-        let registered = DMatrix::from_fn(height, width, |i, j| {
-            let new_pos = motion_mat * Vector3::new(j as f32, i as f32, 1.0);
-            crate::interpolation::linear(new_pos.x, new_pos.y, im)
-                .max(0.0)
-                .min(255.0) as u8
-        });
-        all_registered.push(registered);
-    }
-    all_registered
-}
-
-/// Compute the projection of each pixel of the image.
-/// Outputs an RGB image (0-255).
-pub fn reproject_rgbu8(
-    imgs: &[DMatrix<(u8, u8, u8)>],
-    motion_vec: &[Vector6<f32>],
-) -> Vec<DMatrix<(u8, u8, u8)>> {
-    let (height, width) = imgs[0].shape();
-    let mut all_registered = Vec::new();
-    for (im, motion) in imgs.iter().zip(motion_vec.iter()) {
-        let motion_mat = projection_mat(motion);
-        let registered = DMatrix::from_fn(height, width, |i, j| {
-            let new_pos = motion_mat * Vector3::new(j as f32, i as f32, 1.0);
-            let (r, g, b) = crate::interpolation::linear(new_pos.x, new_pos.y, im);
-            let r = r.max(0.0).min(255.0) as u8;
-            let g = g.max(0.0).min(255.0) as u8;
-            let b = b.max(0.0).min(255.0) as u8;
-            (r, g, b)
-        });
-        all_registered.push(registered);
+        all_registered.push(warp(im, motion));
     }
     all_registered
 }

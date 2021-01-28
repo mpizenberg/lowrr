@@ -222,15 +222,14 @@ fn run(args: Args) -> Result<(), Box<dyn std::error::Error>> {
             // // Reproject (interpolation + extrapolation) images according to that motion.
             // // Write the registered images to the output directory.
             // eprintln!("Saving registered images");
-            // let registered_imgs = registration::reproject_rgbu8(&imgs, &motion_vec);
+            // let registered_imgs = registration::reproject(&imgs, &motion_vec);
             // drop(imgs);
             // lowrr::utils::save_rgbu8_imgs(&out_dir_path, &registered_imgs);
             // drop(registered_imgs);
 
             // Visualization of registered cropped images.
             eprintln!("Saving registered cropped images");
-            let registered_cropped_imgs =
-                registration::reproject_u8(&cropped_imgs, &motion_vec_crop);
+            let registered_cropped_imgs = registration::reproject(&cropped_imgs, &motion_vec_crop);
             let cropped_aligned_dir = &out_dir_path.join("cropped_aligned");
             lowrr::utils::save_u8_imgs(&cropped_aligned_dir, &registered_cropped_imgs);
             drop(registered_cropped_imgs);

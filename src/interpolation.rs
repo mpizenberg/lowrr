@@ -17,7 +17,7 @@ where
     fn from_vector(v: Vector) -> Output;
 }
 
-/// Implement CanLinearInterpolate for u8
+/// Implement CanLinearInterpolate for u8 to f32
 impl CanLinearInterpolate<f32, f32> for u8 {
     fn to_vector(self) -> f32 {
         self as f32
@@ -27,7 +27,17 @@ impl CanLinearInterpolate<f32, f32> for u8 {
     }
 }
 
-/// Implement CanLinearInterpolate for u16
+/// Implement CanLinearInterpolate for u8 to u8
+impl CanLinearInterpolate<f32, u8> for u8 {
+    fn to_vector(self) -> f32 {
+        self as f32
+    }
+    fn from_vector(v: f32) -> u8 {
+        v.max(0.0).min(u8::MAX as f32) as u8
+    }
+}
+
+/// Implement CanLinearInterpolate for u16 to f32
 impl CanLinearInterpolate<f32, f32> for u16 {
     fn to_vector(self) -> f32 {
         self as f32
@@ -37,14 +47,24 @@ impl CanLinearInterpolate<f32, f32> for u16 {
     }
 }
 
+/// Implement CanLinearInterpolate for u16 to u16
+impl CanLinearInterpolate<f32, u16> for u16 {
+    fn to_vector(self) -> f32 {
+        self as f32
+    }
+    fn from_vector(v: f32) -> u16 {
+        v.max(0.0).min(u16::MAX as f32) as u16
+    }
+}
+
 /// Implement CanLinearInterpolate for (T,T,T) if T also implements it.
-impl<T: CanLinearInterpolate<f32, f32>> CanLinearInterpolate<Vector3<f32>, (f32, f32, f32)>
+impl<O, T: CanLinearInterpolate<f32, O>> CanLinearInterpolate<Vector3<f32>, (O, O, O)>
     for (T, T, T)
 {
     fn to_vector(self) -> Vector3<f32> {
         Vector3::new(self.0.to_vector(), self.1.to_vector(), self.2.to_vector())
     }
-    fn from_vector(v: Vector3<f32>) -> (f32, f32, f32) {
+    fn from_vector(v: Vector3<f32>) -> (O, O, O) {
         (
             T::from_vector(v.x),
             T::from_vector(v.y),
