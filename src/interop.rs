@@ -22,14 +22,16 @@ pub fn image_from_matrix(mat: &DMatrix<u8>) -> GrayImage {
     img_buf
 }
 
-/// Convert an `(u8,u8,8)` matrix into an `RgbImage`.
+/// Convert an `(T,T,T)` matrix into an Rgb image.
 ///
 /// Performs a transposition to accomodate for the
 /// column major matrix into the row major image.
 #[allow(clippy::cast_possible_truncation)]
-pub fn rgb_from_matrix(mat: &DMatrix<(u8, u8, u8)>) -> RgbImage {
+pub fn rgb_from_matrix<T: Scalar + Primitive>(
+    mat: &DMatrix<(T, T, T)>,
+) -> ImageBuffer<Rgb<T>, Vec<T>> {
     let (nb_rows, nb_cols) = mat.shape();
-    let mut img_buf = RgbImage::new(nb_cols as u32, nb_rows as u32);
+    let mut img_buf = ImageBuffer::new(nb_cols as u32, nb_rows as u32);
     for (x, y, pixel) in img_buf.enumerate_pixels_mut() {
         let (r, g, b) = mat[(y as usize, x as usize)];
         *pixel = Rgb([r, g, b]);
