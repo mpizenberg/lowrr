@@ -138,7 +138,7 @@ pub fn gray_images(
         let pixel_coordinates: Rc<Vec<(usize, usize)>>;
         let mut loop_state;
         let mut imgs_registered;
-        let obs: Obs;
+        let obs: Obs<u8>;
         let gradients_computation: Box<
             dyn for<'a, 'b, 'c> Fn(&'a DMatrix<u8>, &'b Matrix3<f32>, &'c [f32]) -> Vec<(f32, f32)>,
         >;
@@ -178,8 +178,6 @@ pub fn gray_images(
 
         // We also recompute the registered images before starting the algorithm loop.
         imgs_registered = DMatrix::zeros(actual_pixel_count, imgs_count);
-
-        // TODO generic after here
         project_f32(
             pixel_coordinates.iter().cloned(),
             &mut imgs_registered,
@@ -239,13 +237,13 @@ struct StepConfig {
 
 /// "Observations" contains the data provided outside the core of the algorithm.
 /// These are immutable references since we are not supposed to mutate them.
-struct Obs<'a> {
+struct Obs<'a, T: Scalar + Copy> {
     image_size: (usize, usize),
-    images: &'a [DMatrix<u8>],
+    images: &'a [DMatrix<T>],
     coordinates: &'a [(usize, usize)],
     // TODO: make this return an iterator instead.
     compute_registered_gradients:
-        Box<dyn Fn(&DMatrix<u8>, &Matrix3<f32>, &[f32]) -> Vec<(f32, f32)>>,
+        Box<dyn Fn(&DMatrix<T>, &Matrix3<f32>, &[f32]) -> Vec<(f32, f32)>>,
 }
 
 /// Simple enum type to indicate if we should continue to loop.
@@ -268,7 +266,11 @@ struct State {
 
 impl State {
     /// Core iteration step of the algorithm.
-    fn step(&mut self, config: &StepConfig, obs: &Obs) -> Continue {
+    fn step<T: Scalar + Copy + CanLinearInterpolate<f32, f32>>(
+        &mut self,
+        config: &StepConfig,
+        obs: &Obs<T>,
+    ) -> Continue {
         // Extract state variables to avoid prefixed notation later.
         let (width, height) = obs.image_size;
         let State {
