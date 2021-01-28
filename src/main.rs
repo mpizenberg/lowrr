@@ -215,7 +215,7 @@ fn run(args: Args) -> Result<(), Box<dyn std::error::Error>> {
 
             // Compute the motion of each image for registration.
             let (motion_vec_crop, cropped_imgs) =
-                registration::gray_images(args.config, cropped_imgs)?;
+                registration::gray_images(args.config, cropped_imgs, 50)?;
             let motion_vec = inverse_crop_motion(&args.crop, &motion_vec_crop);
             eprintln!("Registration took {:.1} s", now.elapsed().as_secs_f32());
 

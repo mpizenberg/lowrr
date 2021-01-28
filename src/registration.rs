@@ -4,6 +4,7 @@
 
 //! Registration algorithm for a sequence of slightly misaligned images.
 
+use image::{EncodableLayout, Primitive};
 use nalgebra::{DMatrix, Matrix3, Matrix6, RealField, Scalar, Vector3, Vector6};
 use std::ops::{Add, Mul};
 use std::rc::Rc;
@@ -33,10 +34,23 @@ type Levels<T> = Vec<T>;
 /// Internally, this uses a multi-resolution approach,
 /// where the motion vector computed at one resolution serves
 /// as initialization for the next one.
-pub fn gray_images(
+pub fn gray_images<T, B>(
     config: Config,
-    imgs: Vec<DMatrix<u8>>,
-) -> Result<(Vec<Vector6<f32>>, Vec<DMatrix<u8>>), Box<dyn std::error::Error>> {
+    imgs: Vec<DMatrix<T>>,
+    sparse_diff_threshold: B, // 50
+) -> Result<(Vec<Vector6<f32>>, Vec<DMatrix<T>>), Box<dyn std::error::Error>>
+where
+    B: Scalar + Copy + PartialOrd + Add<Output = B>, // for gradients
+    T: Copy
+        + Scalar
+        + Primitive
+        + ToRgb8
+        + crate::multires::Bigger
+        + crate::gradients::Bigger<B>
+        + CanLinearInterpolate<f32, f32>
+        + CanLinearInterpolate<f32, T>,
+    [T]: EncodableLayout,
+{
     // Get the number of images to align.
     let imgs_count = imgs.len();
 
@@ -44,12 +58,12 @@ pub fn gray_images(
     let mut multires_imgs: Vec<Levels<_>> = Vec::with_capacity(imgs_count);
     let mut multires_sparse_pixels: Vec<Levels<_>> = Vec::with_capacity(imgs_count);
     for im in imgs.into_iter() {
-        let pyramid = crate::multires::mean_pyramid(config.levels, im);
-        let gradients: Levels<_> = pyramid
+        let pyramid: Levels<DMatrix<T>> = crate::multires::mean_pyramid(config.levels, im);
+        let gradients: Levels<DMatrix<B>> = pyramid
             .iter()
             .map(crate::gradients::squared_norm_direct)
             .collect();
-        let sparse_pixels = crate::sparse::select(50, &gradients);
+        let sparse_pixels = crate::sparse::select(sparse_diff_threshold, gradients.as_slice());
         multires_sparse_pixels.push(sparse_pixels);
         multires_imgs.push(pyramid);
     }
@@ -58,14 +72,17 @@ pub fn gray_images(
     crate::utils::save_imgs("out/multires_imgs", &multires_imgs[0]);
 
     // Save sparse pixels of first image.
-    let mut multires_sparse_viz = Vec::with_capacity(config.levels);
+    let mut multires_sparse_viz: Levels<DMatrix<(u8, u8, u8)>> = Vec::with_capacity(config.levels);
     for (sparse_mask, img_mat) in multires_sparse_pixels[0]
         .iter()
         .zip(multires_imgs[0].iter().rev())
     {
         multires_sparse_viz.push(visualize_mask(sparse_mask, img_mat));
     }
-    crate::utils::save_rgb_imgs("out/multires_sparse_img0", &multires_sparse_viz);
+    crate::utils::save_rgb_imgs::<&str, u8>(
+        "out/multires_sparse_img0",
+        multires_sparse_viz.as_slice(),
+    );
 
     // Transpose the `Vec<Levels<_>>` structure of multires images
     // into a `Levels<Vec<_>>` to have each level regrouped.
@@ -138,9 +155,9 @@ pub fn gray_images(
         let pixel_coordinates: Rc<Vec<(usize, usize)>>;
         let mut loop_state;
         let mut imgs_registered;
-        let obs: Obs<u8>;
+        let obs: Obs<T>;
         let gradients_computation: Box<
-            dyn for<'a, 'b, 'c> Fn(&'a DMatrix<u8>, &'b Matrix3<f32>, &'c [f32]) -> Vec<(f32, f32)>,
+            dyn for<'a, 'b, 'c> Fn(&'a DMatrix<T>, &'b Matrix3<f32>, &'c [f32]) -> Vec<(f32, f32)>,
         >;
 
         if sparse_ratio > config.sparse_ratio_threshold {
@@ -373,7 +390,7 @@ impl State {
     }
 }
 
-trait ToRgb8 {
+pub trait ToRgb8 {
     fn to_rgb8(self) -> (u8, u8, u8);
 }
 
