@@ -4,7 +4,8 @@
 
 //! Helper function to compute gradients
 
-use nalgebra as na;
+use nalgebra::{self as na, DMatrix, Scalar};
+use std::ops::{Add, Div, Mul, Sub};
 
 /// Compute a centered gradient.
 ///
@@ -139,22 +140,48 @@ pub fn squared_norm(grad_x: &na::DMatrix<i16>, grad_y: &na::DMatrix<i16>) -> na:
     })
 }
 
+pub trait Bigger<B: Copy>: Copy {
+    type BigSigned: Copy
+        + Add<Output = Self::BigSigned>
+        + Sub<Output = Self::BigSigned>
+        + Mul<Output = Self::BigSigned>
+        + Div<Output = Self::BigSigned>
+        + From<u8>
+        + From<Self>;
+    fn as_from(b: Self::BigSigned) -> B;
+    fn zero() -> B;
+}
+
+impl Bigger<u16> for u8 {
+    type BigSigned = i32;
+    fn as_from(b: i32) -> u16 {
+        b as u16
+    }
+    fn zero() -> u16 {
+        0
+    }
+}
+
 /// Compute squared gradient norm directly from the image.
 #[allow(clippy::cast_possible_truncation)]
 #[allow(clippy::cast_sign_loss)]
-pub fn squared_norm_direct(im: &na::DMatrix<u8>) -> na::DMatrix<u16> {
+pub fn squared_norm_direct<T, U>(im: &na::DMatrix<T>) -> na::DMatrix<U>
+where
+    T: Scalar + Copy + Bigger<U>,
+    U: Scalar + Copy,
+{
     let (nb_rows, nb_cols) = im.shape();
     let top = im.slice((0, 1), (nb_rows - 2, nb_cols - 2));
     let bottom = im.slice((2, 1), (nb_rows - 2, nb_cols - 2));
     let left = im.slice((1, 0), (nb_rows - 2, nb_cols - 2));
     let right = im.slice((1, 2), (nb_rows - 2, nb_cols - 2));
-    let mut squared_norm_mat = na::DMatrix::zeros(nb_rows, nb_cols);
+    let mut squared_norm_mat = na::DMatrix::repeat(nb_rows, nb_cols, T::zero());
     let mut grad_inner = squared_norm_mat.slice_mut((1, 1), (nb_rows - 2, nb_cols - 2));
     for j in 0..nb_cols - 2 {
         for i in 0..nb_rows - 2 {
-            let gx = i32::from(right[(i, j)]) - i32::from(left[(i, j)]);
-            let gy = i32::from(bottom[(i, j)]) - i32::from(top[(i, j)]);
-            grad_inner[(i, j)] = ((gx * gx + gy * gy) / 4) as u16;
+            let gx = T::BigSigned::from(right[(i, j)]) - T::BigSigned::from(left[(i, j)]);
+            let gy = T::BigSigned::from(bottom[(i, j)]) - T::BigSigned::from(top[(i, j)]);
+            grad_inner[(i, j)] = T::as_from((gx * gx + gy * gy) / T::BigSigned::from(4));
         }
     }
     squared_norm_mat
