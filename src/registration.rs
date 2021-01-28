@@ -139,8 +139,6 @@ pub fn gray_images(
         let mut loop_state;
         let mut imgs_registered;
         let obs: Obs;
-
-        // TODO generic after here
         let gradients_computation: Box<
             dyn for<'a, 'b, 'c> Fn(&'a DMatrix<u8>, &'b Matrix3<f32>, &'c [f32]) -> Vec<(f32, f32)>,
         >;
@@ -180,6 +178,8 @@ pub fn gray_images(
 
         // We also recompute the registered images before starting the algorithm loop.
         imgs_registered = DMatrix::zeros(actual_pixel_count, imgs_count);
+
+        // TODO generic after here
         project_f32(
             pixel_coordinates.iter().cloned(),
             &mut imgs_registered,
@@ -512,10 +512,10 @@ pub fn projection_params(mat: &Matrix3<f32>) -> Vector6<f32> {
 /// the number of rows in registered.
 /// Otherwise it may silently compute a wrong projection.
 /// I don't know how to assert the number of items in the coordinates iterator.
-fn project_f32(
+fn project_f32<T: Scalar + Copy + CanLinearInterpolate<f32, f32>>(
     coordinates: impl Iterator<Item = (usize, usize)> + Clone,
     registered: &mut DMatrix<f32>,
-    imgs: &[DMatrix<u8>],
+    imgs: &[DMatrix<T>],
     motion_vec: &[Vector6<f32>],
 ) {
     for (i, motion) in motion_vec.iter().enumerate() {
@@ -523,6 +523,7 @@ fn project_f32(
         let mut registered_col = registered.column_mut(i);
         for ((x, y), pixel) in coordinates.clone().zip(registered_col.iter_mut()) {
             let new_pos = motion_mat * Vector3::new(x as f32, y as f32, 1.0);
+            // WARNING: beware that interpolating with a f32 output normalize values in [0,1].
             let interp: f32 = crate::interpolation::linear(new_pos.x, new_pos.y, &imgs[i]);
             *pixel = interp;
         }
