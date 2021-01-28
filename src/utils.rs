@@ -82,7 +82,10 @@ where
     });
 }
 
-pub fn save_rgbu8_imgs<P: AsRef<Path>>(dir: P, imgs: &[DMatrix<(u8, u8, u8)>]) {
+pub fn save_rgb_imgs<P: AsRef<Path>, T: Scalar + Primitive>(dir: P, imgs: &[DMatrix<(T, T, T)>])
+where
+    [T]: EncodableLayout,
+{
     let dir = dir.as_ref();
     std::fs::create_dir_all(dir).expect(&format!("Could not create output dir: {:?}", dir));
     imgs.iter().enumerate().for_each(|(i, img)| {
