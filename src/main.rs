@@ -3,7 +3,7 @@ use lowrr::registration;
 mod unused;
 
 use glob::glob;
-use nalgebra::{DMatrix, Vector6};
+use nalgebra::{DMatrix, Scalar, Vector6};
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
@@ -211,12 +211,12 @@ fn run(args: Args) -> Result<(), Box<dyn std::error::Error>> {
             let gray_imgs: Vec<_> = imgs.iter().map(|im| im.map(|(_r, g, _b)| g)).collect();
 
             // Extract the cropped area from the images.
-            let cropped_imgs = crop_u8(&args.crop, &gray_imgs);
+            let cropped_imgs = crop(&args.crop, &gray_imgs);
 
             // Compute the motion of each image for registration.
             let (motion_vec_crop, cropped_imgs) =
                 registration::gray_images(args.config, cropped_imgs)?;
-            let motion_vec = inverse_crop(&args.crop, &motion_vec_crop);
+            let motion_vec = inverse_crop_motion(&args.crop, &motion_vec_crop);
             eprintln!("Registration took {:.1} s", now.elapsed().as_secs_f32());
 
             // // Reproject (interpolation + extrapolation) images according to that motion.
@@ -250,7 +250,7 @@ fn run(args: Args) -> Result<(), Box<dyn std::error::Error>> {
     }
 }
 
-fn inverse_crop(crop: &Crop, motion_vec_crop: &[Vector6<f32>]) -> Vec<Vector6<f32>> {
+fn inverse_crop_motion(crop: &Crop, motion_vec_crop: &[Vector6<f32>]) -> Vec<Vector6<f32>> {
     match crop {
         Crop::NoCrop => motion_vec_crop.iter().cloned().collect(),
         Crop::Area(x1, y1, _, _) => {
@@ -275,7 +275,7 @@ enum Dataset {
     RgbImages(Vec<DMatrix<(u8, u8, u8)>>),
 }
 
-fn crop_u8(crop: &Crop, imgs: &[DMatrix<u8>]) -> Vec<DMatrix<u8>> {
+fn crop<T: Scalar>(crop: &Crop, imgs: &[DMatrix<T>]) -> Vec<DMatrix<T>> {
     imgs.iter()
         .map(|im| match crop {
             Crop::NoCrop => im.clone(),
