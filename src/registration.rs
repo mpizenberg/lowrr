@@ -67,8 +67,6 @@ pub fn gray_images(
     }
     crate::utils::save_rgb_imgs("out/multires_sparse_img0", &multires_sparse_viz);
 
-    // TODO generic after here
-
     // Transpose the `Vec<Levels<_>>` structure of multires images
     // into a `Levels<Vec<_>>` to have each level regrouped.
     let multires_imgs: Levels<Vec<_>> = crate::utils::transpose(multires_imgs);
@@ -141,6 +139,8 @@ pub fn gray_images(
         let mut loop_state;
         let mut imgs_registered;
         let obs: Obs;
+
+        // TODO generic after here
         let gradients_computation: Box<
             dyn for<'a, 'b, 'c> Fn(&'a DMatrix<u8>, &'b Matrix3<f32>, &'c [f32]) -> Vec<(f32, f32)>,
         >;
@@ -166,7 +166,6 @@ pub fn gray_images(
                     img,
                     motion,
                     pixel_coordinates_clone.iter().cloned(),
-                    1.0 / 255.0,
                 )
             };
             gradients_computation = Box::new(compute_gradients);
@@ -427,12 +426,14 @@ fn compute_registered_gradients_full(shape: (usize, usize), registered: &[f32]) 
 /// Compute the gradients of warped image.
 /// There are more efficient ways than to interpolate 4 points,
 /// but it would be to much trouble.
-fn compute_registered_gradients_sparse(
-    img: &DMatrix<u8>,
+fn compute_registered_gradients_sparse<T>(
+    img: &DMatrix<T>,
     motion: &Matrix3<f32>,
     coordinates: impl Iterator<Item = (usize, usize)>,
-    inv_max: f32, // 1.0 / 255.0
-) -> Vec<(f32, f32)> {
+) -> Vec<(f32, f32)>
+where
+    T: Scalar + Copy + CanLinearInterpolate<f32, f32>,
+{
     coordinates
         .map(|(x, y)| {
             // Horizontal gradient (gx).
@@ -440,6 +441,7 @@ fn compute_registered_gradients_sparse(
             let x_right = x as f32 + 1.0;
             let new_left = motion * Vector3::new(x_left, y as f32, 1.0);
             let new_right = motion * Vector3::new(x_right, y as f32, 1.0);
+            // WARNING: beware that interpolating with a f32 output normalize values in [0,1].
             let pixel_left: f32 = crate::interpolation::linear(new_left.x, new_left.y, img);
             let pixel_right: f32 = crate::interpolation::linear(new_right.x, new_right.y, img);
 
@@ -448,13 +450,14 @@ fn compute_registered_gradients_sparse(
             let y_bot = y as f32 + 1.0;
             let new_top = motion * Vector3::new(x as f32, y_top, 1.0);
             let new_bot = motion * Vector3::new(x as f32, y_bot, 1.0);
+            // WARNING: beware that interpolating with a f32 output normalize values in [0,1].
             let pixel_top: f32 = crate::interpolation::linear(new_top.x, new_top.y, img);
             let pixel_bot: f32 = crate::interpolation::linear(new_bot.x, new_bot.y, img);
 
             // Gradient.
             (
-                0.5 * inv_max * (pixel_right - pixel_left),
-                0.5 * inv_max * (pixel_bot - pixel_top),
+                0.5 * (pixel_right - pixel_left),
+                0.5 * (pixel_bot - pixel_top),
             )
         })
         .collect()
@@ -515,14 +518,13 @@ fn project_f32(
     imgs: &[DMatrix<u8>],
     motion_vec: &[Vector6<f32>],
 ) {
-    let inv_max = 1.0 / 255.0;
     for (i, motion) in motion_vec.iter().enumerate() {
         let motion_mat = projection_mat(motion);
         let mut registered_col = registered.column_mut(i);
         for ((x, y), pixel) in coordinates.clone().zip(registered_col.iter_mut()) {
             let new_pos = motion_mat * Vector3::new(x as f32, y as f32, 1.0);
             let interp: f32 = crate::interpolation::linear(new_pos.x, new_pos.y, &imgs[i]);
-            *pixel = inv_max * interp;
+            *pixel = interp;
         }
     }
 }

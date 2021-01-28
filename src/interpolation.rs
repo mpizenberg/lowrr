@@ -18,12 +18,13 @@ where
 }
 
 /// Implement CanLinearInterpolate for u8 to f32
+/// WARNING: beware that interpolating with a f32 output normalize values in [0,1].
 impl CanLinearInterpolate<f32, f32> for u8 {
     fn to_vector(self) -> f32 {
         self as f32
     }
     fn from_vector(v: f32) -> f32 {
-        v.max(0.0).min(u8::MAX as f32)
+        (v / 255.0).max(0.0).min(1.0)
     }
 }
 
@@ -38,12 +39,13 @@ impl CanLinearInterpolate<f32, u8> for u8 {
 }
 
 /// Implement CanLinearInterpolate for u16 to f32
+/// WARNING: beware that interpolating with a f32 output normalize values in [0,1].
 impl CanLinearInterpolate<f32, f32> for u16 {
     fn to_vector(self) -> f32 {
         self as f32
     }
     fn from_vector(v: f32) -> f32 {
-        v.max(0.0).min(u16::MAX as f32)
+        (v / u16::MAX as f32).max(0.0).min(1.0)
     }
 }
 
