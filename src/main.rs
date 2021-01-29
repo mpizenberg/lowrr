@@ -248,7 +248,48 @@ fn run(args: Args) -> Result<(), Box<dyn std::error::Error>> {
             }
             Ok(())
         }
-        Dataset::RgbImagesU16(_) => unimplemented!(),
+        Dataset::RgbImagesU16(imgs) => {
+            let now = std::time::Instant::now();
+
+            // Convert RGB into gray
+            let gray_imgs: Vec<_> = imgs.iter().map(|im| im.map(|(_r, g, _b)| g)).collect();
+
+            // Extract the cropped area from the images.
+            let cropped_imgs = crop(&args.crop, &gray_imgs);
+
+            // Visualization of original cropped images.
+            eprintln!("Saving original cropped images");
+            let cropped_dir = &out_dir_path.join("cropped");
+            lowrr::utils::save_imgs(&cropped_dir, &cropped_imgs);
+
+            // Compute the motion of each image for registration.
+            let (motion_vec_crop, cropped_imgs) =
+                registration::gray_images(args.config, cropped_imgs, 10 * 256)?;
+            let motion_vec = inverse_crop_motion(&args.crop, &motion_vec_crop);
+            eprintln!("Registration took {:.1} s", now.elapsed().as_secs_f32());
+
+            // // Reproject (interpolation + extrapolation) images according to that motion.
+            // // Write the registered images to the output directory.
+            // eprintln!("Saving registered images");
+            // let registered_imgs = registration::reproject(&imgs, &motion_vec);
+            // drop(imgs);
+            // lowrr::utils::save_rgbu8_imgs(&out_dir_path, &registered_imgs);
+            // drop(registered_imgs);
+
+            // Visualization of registered cropped images.
+            eprintln!("Saving registered cropped images");
+            let registered_cropped_imgs: Vec<DMatrix<u16>> =
+                registration::reproject(&cropped_imgs, &motion_vec_crop);
+            let cropped_aligned_dir = &out_dir_path.join("cropped_aligned");
+            lowrr::utils::save_imgs(&cropped_aligned_dir, &registered_cropped_imgs);
+            drop(registered_cropped_imgs);
+
+            // Write motion_vec to stdout.
+            for v in motion_vec.iter() {
+                println!("{}", v);
+            }
+            Ok(())
+        }
         Dataset::RawImages(_) => unimplemented!(),
     }
 }
@@ -348,6 +389,19 @@ fn load_dataset<P: AsRef<Path>>(
                 }
                 pb.finish();
                 Ok((Dataset::RgbImages(imgs), (width, height)))
+            }
+            DynamicImage::ImageRgb16(rgb_img_0) => {
+                let mut imgs = Vec::with_capacity(img_count);
+                let img_mat: DMatrix<(u16, u16, u16)> = interop::matrix_from_rgb_image(rgb_img_0);
+                let (height, width) = img_mat.shape();
+                imgs.push(img_mat);
+                pb.inc(1);
+                for rgb_img in paths[1..].iter().map(|p| image::open(p).unwrap()) {
+                    imgs.push(interop::matrix_from_rgb_image(rgb_img.into_rgb16()));
+                    pb.inc(1);
+                }
+                pb.finish();
+                Ok((Dataset::RgbImagesU16(imgs), (width, height)))
             }
             _ => Err("Unknow image type".into()),
         }

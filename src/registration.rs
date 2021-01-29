@@ -402,7 +402,7 @@ impl ToRgb8 for u8 {
 
 impl ToRgb8 for u16 {
     fn to_rgb8(self) -> (u8, u8, u8) {
-        (self as u8, self as u8, self as u8)
+        ((self / 256) as u8, (self / 256) as u8, (self / 256) as u8)
     }
 }
 

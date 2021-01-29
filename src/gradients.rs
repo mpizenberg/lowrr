@@ -154,10 +154,20 @@ pub trait Bigger<B: Copy>: Copy {
 
 impl Bigger<u16> for u8 {
     type BigSigned = i32;
-    fn as_from(b: i32) -> u16 {
+    fn as_from(b: Self::BigSigned) -> u16 {
         b as u16
     }
     fn zero() -> u16 {
+        0
+    }
+}
+
+impl Bigger<u32> for u16 {
+    type BigSigned = i64;
+    fn as_from(b: Self::BigSigned) -> u32 {
+        b as u32
+    }
+    fn zero() -> u32 {
         0
     }
 }
