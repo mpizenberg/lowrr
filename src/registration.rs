@@ -598,3 +598,49 @@ fn shrink<T: RealField>(alpha: T, x: T) -> T {
         (x + alpha).min(T::zero())
     }
 }
+
+// Only work for gray images for now.
+pub trait CanEqualize: Scalar + Copy + Mul + Into<f32> {
+    fn target_mean() -> f32;
+    fn from_as(f: f32) -> Self;
+}
+
+impl CanEqualize for u8 {
+    fn target_mean() -> f32 {
+        60.0
+    }
+    fn from_as(f: f32) -> Self {
+        f.max(0.0).min(255.0) as Self
+    }
+}
+impl CanEqualize for u16 {
+    fn target_mean() -> f32 {
+        60.0 * 256.0
+    }
+    fn from_as(f: f32) -> Self {
+        f.max(0.0).min(65535.0) as Self
+    }
+}
+
+/// Change the mean intensity of all images to be approximately the same.
+pub fn equalize_mean<T: CanEqualize>(imgs: &mut [DMatrix<T>]) {
+    // Compute mean intensities.
+    let sum_intensities: Vec<f32> = imgs
+        .iter()
+        .map(|im| im.iter().map(|x| (*x).into()).sum())
+        .collect();
+    let nb_pixels = imgs[0].len();
+    let mean_intensities: Vec<_> = sum_intensities
+        .iter()
+        .map(|x| x / nb_pixels as f32)
+        .collect();
+    // eprintln!("mean intensities {:?}", mean_intensities);
+
+    // Multiply all images such that the mean intensity is near the target.
+    for (im, mean) in imgs.iter_mut().zip(mean_intensities) {
+        let scale = (T::target_mean() / mean).max(1.0);
+        for pixel in im.iter_mut() {
+            *pixel = T::from_as(Mul::<f32>::mul(scale, (*pixel).into()));
+        }
+    }
+}
