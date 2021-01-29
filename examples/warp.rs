@@ -11,6 +11,7 @@ use std::str::FromStr;
 
 // Default values for some of the program arguments.
 const DEFAULT_OUT_DIR: &str = "out";
+const DEFAULT_FLOW: f64 = 0.05;
 
 /// Entry point of the program.
 fn main() {
@@ -32,9 +33,10 @@ USAGE: warp [FLAGS...] IMAGE_FILES...
 
 FLAGS:
     --help                 # Print this message and exit
+    --flow                 # Max random optical flow, in percent of image size (default: {})
     --out-dir dir/         # Output directory to save registered images (default: {})
 "#,
-        DEFAULT_OUT_DIR,
+        DEFAULT_OUT_DIR, DEFAULT_FLOW,
     )
 }
 
@@ -42,6 +44,7 @@ FLAGS:
 /// Type holding command line arguments.
 struct Args {
     help: bool,
+    flow: f64,
     out_dir: String,
     images_paths: Vec<PathBuf>,
 }
@@ -55,6 +58,9 @@ fn parse_args() -> Result<Args, Box<dyn std::error::Error>> {
     let out_dir = args
         .opt_value_from_str("--out-dir")?
         .unwrap_or(DEFAULT_OUT_DIR.into());
+    let flow = args
+        .opt_value_from_str("--flow")?
+        .unwrap_or(DEFAULT_FLOW.into());
 
     // Verify that images paths are correct.
     let free_args = args.free()?;
@@ -63,6 +69,7 @@ fn parse_args() -> Result<Args, Box<dyn std::error::Error>> {
     // Return Args struct.
     Ok(Args {
         help,
+        flow,
         out_dir,
         images_paths,
     })
@@ -125,7 +132,7 @@ fn run(args: Args) -> Result<(), Box<dyn std::error::Error>> {
         seed = r2;
         let min_size = width.min(height) as f64;
         // 5% of size translations max.
-        let translation_scale = 0.05 * min_size;
+        let translation_scale = args.flow * min_size;
         // Values seems to be in [0.0, 0.5[ so I multiply them by 2.
         let tx = (r1 as f64 / (u32::MAX as f64) * 2.0 - 0.5) * translation_scale;
         let ty = (r2 as f64 / (u32::MAX as f64) * 2.0 - 0.5) * translation_scale;
