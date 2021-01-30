@@ -607,7 +607,7 @@ pub trait CanEqualize: Scalar + Copy + Mul + Into<f32> {
 
 impl CanEqualize for u8 {
     fn target_mean() -> f32 {
-        60.0
+        40.0
     }
     fn from_as(f: f32) -> Self {
         f.max(0.0).min(255.0) as Self
@@ -615,7 +615,7 @@ impl CanEqualize for u8 {
 }
 impl CanEqualize for u16 {
     fn target_mean() -> f32 {
-        60.0 * 256.0
+        40.0 * 256.0
     }
     fn from_as(f: f32) -> Self {
         f.max(0.0).min(65535.0) as Self
