@@ -30,3 +30,21 @@ crop_areas = ...
 	; 180, 120, 450, 350 % pot2
 	; 200, 140, 410, 340 % reading
 	]
+
+% For each set of images:
+%  1. Generate a random translation of 1% and crop the defined crop area.
+%     This is a rust program "warp_crop" that we can call like this:
+%     system('warp_crop --flow 0.01 --out-dir generated path/to/images/0*.png');
+%     It will generate images in generated/cropped/.
+%     First image should be warped with identity to keep the same reference frame.
+%     Save the warp transformation of every image, in the frame of the cropped area,
+%     in a file called generated/warp-gt.txt.
+%  2. Run the low rank registration (rust) algorithm on those images:
+%     system('lowrr --no-img-write --out aligned/warp-lowrr.txt generated/cropped/*.png');
+%     If that crashed, save the attempt as failed for all images.
+%  3. Run another matlab algorithm, to align all cropped images with the first one.
+%     Save every failed alignement as such.
+%     Otherwise save all transformations in aligned/warp-[algo].txt
+%     Try to be consistent with the format with the output of lowrr.
+%  4. For every pixel, compare the true and estimated optical flow induced by each method.
+%     We can use the rmse of the optical flow error as an evaluation measure.
