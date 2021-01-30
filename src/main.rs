@@ -11,12 +11,12 @@ use std::str::FromStr;
 // Default values for some of the program arguments.
 const DEFAULT_OUT_DIR: &str = "out";
 const DEFAULT_CROP: Crop = Crop::NoCrop;
-const DEFAULT_LEVELS: usize = 4;
+const DEFAULT_LEVELS: usize = 1;
 const DEFAULT_LAMBDA: f32 = 1.5;
 const DEFAULT_RHO: f32 = 0.1;
 const DEFAULT_THRESHOLD: f32 = 1e-3;
 const DEFAULT_SPARSE_RATIO_THRESHOLD: f32 = 0.5;
-const DEFAULT_MAX_ITERATIONS: usize = 20;
+const DEFAULT_MAX_ITERATIONS: usize = 40;
 const DEFAULT_IMAGE_MAX: f32 = 255.0;
 
 /// Entry point of the program.
