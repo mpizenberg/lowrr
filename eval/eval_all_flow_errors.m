@@ -36,18 +36,18 @@ nb_random = 20;
 % Output directory for all computed flow errors.
 output_dir = 'out';
 
-% for seq_id = 1:length(diligent_sequences)
-for seq_id = 8:8
+for seq_id = 1:length(diligent_sequences)
 	name = diligent_sequences{seq_id};
+	disp(['Sequence: ' name]);
 	crop = crop_areas(seq_id, :);
 	nrows = crop(3) - crop(1);
 	ncols = crop(4) - crop(2);
 
 	% Initialize flow error for each algorithm.
-	flow_error_tform = zero(96, nb_random);
-	flow_error_corr = zero(96, nb_random);
-	flow_error_surf = zero(96, nb_random);
-	flow_error_lowrr = zero(96, nb_random);
+	flow_error_tform = zeros(96, nb_random);
+	flow_error_corr = zeros(96, nb_random);
+	flow_error_surf = zeros(96, nb_random);
+	flow_error_lowrr = zeros(96, nb_random);
 
 	% Initialize failures for each algorithm.
 	failures_tform = false(96, nb_random);
@@ -59,7 +59,7 @@ for seq_id = 8:8
 	[~,~] = mkdir([ output_dir '/' name ]);
 
 	% for rand_id = 1:nb_random
-	for rand_id = 3:3
+	for rand_id = 3:nb_random
 		% disp(['  random iteration: ' int2str(rand_id)]);
 		this_out_dir = [ output_dir '/' name '/rand_' sprintf('%02d',rand_id) ];
 		[~,~] = mkdir(this_out_dir);
@@ -93,13 +93,29 @@ for seq_id = 8:8
 	end
 	
 	% Visualize flow errors.
-	flow_error_lowrr(failures_lowrr) = 0;
-	img_flow_error_lowrr = ind2rgb(flow_error_lowrr);
-	% red = img_flow_error_lowrr(:,:,1);
-	% red(failures_lowrr) = 255;
-	imagesc(flow_error_lowrr);
-	% imagesc(flow_error_tform);
-	% imagesc(flow_error_corr);
-	% imagesc(flow_error_surf);
+	flow_error_lowrr(failures_lowrr) = 16;
+	flow_error_tform(failures_tform) = 16;
+	flow_error_corr(failures_corr) = 16;
+	flow_error_surf(failures_surf) = 16;
+	
+	[~,~] = mkdir([ output_dir '/' name ]);
+
+	imagesc(flow_error_lowrr, [0,16]);
+	colorbar;
+	saveas(gcf,[ output_dir '/' name '/mean_flow_error_lowrr.png']);
+
+	imagesc(flow_error_tform, [0,16]);
+	colorbar;
+	saveas(gcf,[ output_dir '/' name '/mean_flow_error_tform.png']);
+
+	imagesc(flow_error_corr, [0,16]);
+	colorbar;
+	saveas(gcf,[ output_dir '/' name '/mean_flow_error_corr.png']);
+
+	imagesc(flow_error_surf, [0,16]);
+	colorbar;
+	saveas(gcf,[ output_dir '/' name '/mean_flow_error_surf.png']);
+
+	close all;
 
 end
