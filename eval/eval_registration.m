@@ -50,7 +50,7 @@ crop_areas = ...
 %     We can use the rmse of the optical flow error as an evaluation measure.
 
 % Number of random generation for every sequence.
-nb_random = 1;
+nb_random = 2;
 
 % DiLiGenT dataset location.
 diligent_dir = '~/Downloads/DiLiGenT/pmsData';
@@ -59,7 +59,7 @@ diligent_dir = '~/Downloads/DiLiGenT/pmsData';
 output_dir = 'out';
 [~,~] = mkdir(output_dir);
 
-for seq_id = length(diligent_sequences):length(diligent_sequences)
+for seq_id = 1:length(diligent_sequences)
 	name = diligent_sequences{seq_id};
 	crop = crop_areas(seq_id, :);
 	crop_params = [ int2str(crop(1)) ',' int2str(crop(2)) ',' int2str(crop(3)) ',' int2str(crop(4)) ];
