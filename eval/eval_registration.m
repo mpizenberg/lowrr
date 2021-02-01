@@ -48,3 +48,41 @@ crop_areas = ...
 %     Try to be consistent with the format with the output of lowrr.
 %  4. For every pixel, compare the true and estimated optical flow induced by each method.
 %     We can use the rmse of the optical flow error as an evaluation measure.
+
+% Number of random generation for every sequence.
+nb_random = 1;
+
+% DiLiGenT dataset location.
+diligent_dir = '~/Downloads/DiLiGenT/pmsData';
+
+% Output directory for all computed warps.
+output_dir = 'out';
+[~,~] = mkdir(output_dir);
+
+for seq_id = 1:length(diligent_sequences)
+	name = diligent_sequences{seq_id};
+	crop = crop_areas(seq_id, :);
+	crop_params = [ int2str(crop(1)) ',' int2str(crop(2)) ',' int2str(crop(3)) ',' int2str(crop(4)) ];
+
+	% Path to the images dataset.
+	img_dir = [ diligent_dir '/' name 'PNG' ];
+
+	% Create directory for outputs.
+	[~,~] = mkdir([ output_dir '/' name ]);
+
+	% Start randomizing warps.
+	for rand_id = 1:nb_random
+		this_out_dir = [ output_dir '/' name '/rand_' sprintf('%02d',rand_id) ];
+		[~,~] = rmdir(this_out_dir, 's');
+		[~,~] = mkdir(this_out_dir);
+
+		% Generate random warps and warp-gt.txt inside directory <output_dir>/cropped/.
+		[~,~] = rmdir([ output_dir '/cropped' ], 's');
+		system(['warp_crop --crop ' crop_params ' --out-dir ' output_dir ' '  img_dir '/0*.png']);
+		[~,~] = copyfile([output_dir '/cropped/warp-gt.txt'], this_out_dir);
+		pause;
+
+		% Run low rank registration on those images.
+		system(['lowrr_eval --no-img-write --out ' this_out_dir '/warp-lowrr.txt' output_dir '/cropped/*.png']);
+	end
+end
