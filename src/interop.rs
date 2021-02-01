@@ -50,9 +50,10 @@ pub fn image_from_matrix_transposed(mat: &DMatrix<u8>) -> ImageBuffer<Luma<u8>, 
         .expect("Buffer not large enough")
 }
 
-/// Convert a `GrayImage` into an `u8` matrix.
+/// Convert a gray image into a matrix.
 /// Inverse operation of `image_from_matrix`.
-pub fn matrix_from_image(img: GrayImage) -> DMatrix<u8> {
+pub fn matrix_from_image<T: Scalar + Primitive>(img: ImageBuffer<Luma<T>, Vec<T>>) -> DMatrix<T> {
+    // pub fn matrix_from_image(img: GrayImage) -> DMatrix<u8> {
     let (width, height) = img.dimensions();
     DMatrix::from_row_slice(height as usize, width as usize, &img.into_raw())
 }

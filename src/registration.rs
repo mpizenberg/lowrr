@@ -69,7 +69,7 @@ where
     }
 
     // Save multires imgs.
-    crate::utils::save_imgs("out/multires_imgs", &multires_imgs[0]);
+    // crate::utils::save_imgs("out/multires_imgs", &multires_imgs[0]);
 
     // Save sparse pixels of first image.
     let mut multires_sparse_viz: Levels<DMatrix<(u8, u8, u8)>> = Vec::with_capacity(config.levels);
@@ -79,10 +79,10 @@ where
     {
         multires_sparse_viz.push(visualize_mask(sparse_mask, img_mat));
     }
-    crate::utils::save_rgb_imgs::<&str, u8>(
-        "out/multires_sparse_img0",
-        multires_sparse_viz.as_slice(),
-    );
+    // crate::utils::save_rgb_imgs::<&str, u8>(
+    //     "out/multires_sparse_img0",
+    //     multires_sparse_viz.as_slice(),
+    // );
 
     // Transpose the `Vec<Levels<_>>` structure of multires images
     // into a `Levels<Vec<_>>` to have each level regrouped.
