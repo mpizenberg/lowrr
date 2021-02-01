@@ -2,8 +2,6 @@ function warps = register_tform(folder)
 
 im_files = dir([folder '/*.png']);
 
-im_files = dir('data/*.png');
-
 folder = im_files(1).folder;
 im_ref_file = [folder '/' im_files(1).name];
 im_ref = imread(im_ref_file);
