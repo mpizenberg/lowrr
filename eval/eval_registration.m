@@ -63,6 +63,7 @@ for seq_id = length(diligent_sequences):length(diligent_sequences)
 	name = diligent_sequences{seq_id};
 	crop = crop_areas(seq_id, :);
 	crop_params = [ int2str(crop(1)) ',' int2str(crop(2)) ',' int2str(crop(3)) ',' int2str(crop(4)) ];
+	disp(['Processing ' name]);
 
 	% Path to the images dataset.
 	img_dir = [ diligent_dir '/' name 'PNG' ];
@@ -72,6 +73,7 @@ for seq_id = length(diligent_sequences):length(diligent_sequences)
 
 	% Start randomizing warps.
 	for rand_id = 1:nb_random
+		disp(['  random iteration: ' int2str(rand_id)]);
 		this_out_dir = [ output_dir '/' name '/rand_' sprintf('%02d',rand_id) ];
 		[~,~] = rmdir(this_out_dir, 's');
 		[~,~] = mkdir(this_out_dir);
@@ -82,20 +84,26 @@ for seq_id = length(diligent_sequences):length(diligent_sequences)
 		[~,~] = copyfile([output_dir '/cropped/warp-gt.txt'], this_out_dir);
 
 		% Run low rank registration on those images.
-		% display('Running low rank registration');
-		% system(['lowrr_eval ' output_dir '/cropped/*.png > ' this_out_dir '/warp-lowrr.txt 2> /dev/null']);
+		display('    Running low rank registration');
+		system(['lowrr_eval ' output_dir '/cropped/*.png > ' this_out_dir '/warp-lowrr.txt 2> /dev/null']);
 
 		% Run matlab intensity image registration on those images.
 		warning ('off','all');
-		display('Running matlab imregtform');
+		display('    Running matlab imregtform');
 		warps = register_tform([output_dir '/cropped']);
 		writematrix(warps, [this_out_dir '/warp-tform.txt']);
 
 		% Run matlab image registration based on phase correlation on those images.
 		warning ('off','all');
-		display('Running matlab imregcorr');
+		display('    Running matlab imregcorr');
 		warps = register_corr([output_dir '/cropped']);
 		writematrix(warps, [this_out_dir '/warp-corr.txt']);
+
+		% Run matlab image registration based on SURF feature matching.
+		warning ('off','all');
+		display('    Running matlab SURF registration');
+		warps = register_surf([output_dir '/cropped']);
+		writematrix(warps, [this_out_dir '/warp-surf.txt']);
 
 	end
 end

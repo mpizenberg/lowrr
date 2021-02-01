@@ -227,7 +227,10 @@ fn run(args: Args) -> Result<(), Box<dyn std::error::Error>> {
             // drop(registered_cropped_imgs);
 
             // Write motion_vec to stdout.
-            for v in motion_vec.iter() {
+            // This is the inverse of the motion to keep the same as matlab warps.
+            for motion in motion_vec.iter() {
+                let motion_mat = registration::projection_mat(&motion);
+                let v = registration::projection_params(&motion_mat.try_inverse().unwrap());
                 println!(
                     "{}, {}, {}, {}, {}, {}",
                     1.0 + v[0],
