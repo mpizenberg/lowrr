@@ -59,7 +59,7 @@ diligent_dir = '~/Downloads/DiLiGenT/pmsData';
 output_dir = 'out';
 [~,~] = mkdir(output_dir);
 
-for seq_id = 1:length(diligent_sequences)
+for seq_id = length(diligent_sequences):length(diligent_sequences)
 	name = diligent_sequences{seq_id};
 	crop = crop_areas(seq_id, :);
 	crop_params = [ int2str(crop(1)) ',' int2str(crop(2)) ',' int2str(crop(3)) ',' int2str(crop(4)) ];
@@ -83,6 +83,8 @@ for seq_id = 1:length(diligent_sequences)
 		pause;
 
 		% Run low rank registration on those images.
-		system(['lowrr_eval --no-img-write --out ' this_out_dir '/warp-lowrr.txt' output_dir '/cropped/*.png']);
+		display('Running low rank registration');
+		system(['lowrr_eval ' output_dir '/cropped/*.png > ' this_out_dir '/warp-lowrr.txt 2> /dev/null']);
+		pause;
 	end
 end
