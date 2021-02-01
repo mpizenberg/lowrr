@@ -80,11 +80,22 @@ for seq_id = length(diligent_sequences):length(diligent_sequences)
 		[~,~] = rmdir([ output_dir '/cropped' ], 's');
 		system(['warp_crop --crop ' crop_params ' --out-dir ' output_dir ' '  img_dir '/0*.png']);
 		[~,~] = copyfile([output_dir '/cropped/warp-gt.txt'], this_out_dir);
-		pause;
 
 		% Run low rank registration on those images.
-		display('Running low rank registration');
-		system(['lowrr_eval ' output_dir '/cropped/*.png > ' this_out_dir '/warp-lowrr.txt 2> /dev/null']);
-		pause;
+		% display('Running low rank registration');
+		% system(['lowrr_eval ' output_dir '/cropped/*.png > ' this_out_dir '/warp-lowrr.txt 2> /dev/null']);
+
+		% Run matlab intensity image registration on those images.
+		warning ('off','all');
+		display('Running matlab imregtform');
+		warps = register_tform([output_dir '/cropped']);
+		writematrix(warps, [this_out_dir '/warp-tform.txt']);
+
+		% Run matlab image registration based on phase correlation on those images.
+		warning ('off','all');
+		display('Running matlab imregcorr');
+		warps = register_corr([output_dir '/cropped']);
+		writematrix(warps, [this_out_dir '/warp-corr.txt']);
+
 	end
 end

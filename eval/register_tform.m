@@ -8,14 +8,14 @@ im_files = dir([folder '/*.png']);
 folder = im_files(1).folder;
 im_ref_file = [folder '/' im_files(1).name];
 im_ref = imread(im_ref_file);
-imwrite(im_ref, ['out/', im_files(1).name]);
+% imwrite(im_ref, ['out/', im_files(1).name]);
 
 nb_files = length(im_files);
 warps = repmat([1 0 0 1 0 0], nb_files, 1);
 for i = 2:nb_files
 	name = im_files(i).name;
 	im_mov_file = [folder '/' name];
-	disp(im_mov_file);
+	% disp(im_mov_file);
 	im_mov = imread(im_mov_file);
 
 	% Compute registration
