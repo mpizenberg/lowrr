@@ -16,7 +16,7 @@ ptsOriginal  = detectSURFFeatures(im_ref, 'MetricThreshold', 100);
 [featuresOriginal,  validPtsOriginal]  = extractFeatures(im_ref,  ptsOriginal);
 
 nb_files = length(im_files);
-for i = 2:2
+for i = 2:nb_files
 	name = im_files(i).name;
 	im_mov_file = [folder '/' name];
 	disp(im_mov_file);
@@ -34,7 +34,11 @@ for i = 2:2
 	matchedDistorted = validPtsDistorted(indexPairs(:,2));
 
 	% Estimate transformation.
-	[warp, inlierIdx] = estimateGeometricTransform(matchedDistorted, matchedOriginal, 'affine');
+	try
+		[warp, inlierIdx] = estimateGeometricTransform(matchedDistorted, matchedOriginal, 'affine');
+	catch
+		warp = affine2d(eye(3));
+	end
 	% inlierOriginal  = matchedOriginal(inlierIdx, :);
 	% inlierDistorted = matchedDistorted(inlierIdx, :);
 
