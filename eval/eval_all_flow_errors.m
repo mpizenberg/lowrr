@@ -48,6 +48,12 @@ mean_all_flow_errors_corr = zeros(length(diligent_sequences), 1);
 mean_all_flow_errors_surf = zeros(length(diligent_sequences), 1);
 mean_all_flow_errors_lowrr = zeros(length(diligent_sequences), 1);
 
+% Initialize median flow errors for each algorithm.
+median_all_flow_errors_tform = zeros(length(diligent_sequences), 1);
+median_all_flow_errors_corr = zeros(length(diligent_sequences), 1);
+median_all_flow_errors_surf = zeros(length(diligent_sequences), 1);
+median_all_flow_errors_lowrr = zeros(length(diligent_sequences), 1);
+
 for seq_id = 1:length(diligent_sequences)
 	name = diligent_sequences{seq_id};
 	disp(['Sequence: ' name]);
@@ -139,6 +145,11 @@ for seq_id = 1:length(diligent_sequences)
 	mean_all_flow_errors_corr(seq_id) = mean(flow_error_corr(~failures_corr));
 	mean_all_flow_errors_surf(seq_id) = mean(flow_error_surf(~failures_surf));
 
+	median_all_flow_errors_lowrr(seq_id) = median(flow_error_lowrr(:));
+	median_all_flow_errors_tform(seq_id) = median(flow_error_tform(:));
+	median_all_flow_errors_corr(seq_id) = median(flow_error_corr(:));
+	median_all_flow_errors_surf(seq_id) = median(flow_error_surf(:));
+
 end % for
 
 % Display success rate.
@@ -159,4 +170,14 @@ set(h, {'DisplayName'}, {'lowrr', 'tform', 'corr', 'surf'}');
 legend();
 title('Mean flow error of successfully registered images on each sequence');
 ylabel('Mean flow error');
+set(gca, 'XTick', 1:10, 'XTickLabel', diligent_sequences);
+
+% Display median flow errors.
+close all;
+figure;
+h = bar([median_all_flow_errors_lowrr, median_all_flow_errors_tform, median_all_flow_errors_corr,  median_all_flow_errors_surf]);
+set(h, {'DisplayName'}, {'lowrr', 'tform', 'corr', 'surf'}');
+legend();
+title('Median flow error of all registered images on each sequence');
+ylabel('Median flow error');
 set(gca, 'XTick', 1:10, 'XTickLabel', diligent_sequences);
