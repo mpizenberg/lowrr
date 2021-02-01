@@ -36,6 +36,18 @@ nb_random = 20;
 % Output directory for all computed flow errors.
 output_dir = 'out';
 
+% Initialize failures for each algorithm.
+success_rate_tform = zeros(length(diligent_sequences), 1);
+success_rate_corr = zeros(length(diligent_sequences), 1);
+success_rate_surf = zeros(length(diligent_sequences), 1);
+success_rate_lowrr = zeros(length(diligent_sequences), 1);
+
+% Initialize mean flow errors for each algorithm.
+mean_all_flow_errors_tform = zeros(length(diligent_sequences), 1);
+mean_all_flow_errors_corr = zeros(length(diligent_sequences), 1);
+mean_all_flow_errors_surf = zeros(length(diligent_sequences), 1);
+mean_all_flow_errors_lowrr = zeros(length(diligent_sequences), 1);
+
 for seq_id = 1:length(diligent_sequences)
 	name = diligent_sequences{seq_id};
 	disp(['Sequence: ' name]);
@@ -92,30 +104,59 @@ for seq_id = 1:length(diligent_sequences)
 		failures_surf(:, rand_id) = failures;
 	end
 	
-	% Visualize flow errors.
-	flow_error_lowrr(failures_lowrr) = 16;
-	flow_error_tform(failures_tform) = 16;
-	flow_error_corr(failures_corr) = 16;
-	flow_error_surf(failures_surf) = 16;
-	
-	[~,~] = mkdir([ output_dir '/' name ]);
+	% % Visualize flow errors.
+	% flow_error_lowrr(failures_lowrr) = 16;
+	% flow_error_tform(failures_tform) = 16;
+	% flow_error_corr(failures_corr) = 16;
+	% flow_error_surf(failures_surf) = 16;
+	%
+	% imagesc(flow_error_lowrr, [0,16]);
+	% colorbar;
+	% saveas(gcf,[ output_dir '/' name '/mean_flow_error_lowrr.png']);
+    %
+	% imagesc(flow_error_tform, [0,16]);
+	% colorbar;
+	% saveas(gcf,[ output_dir '/' name '/mean_flow_error_tform.png']);
+    %
+	% imagesc(flow_error_corr, [0,16]);
+	% colorbar;
+	% saveas(gcf,[ output_dir '/' name '/mean_flow_error_corr.png']);
+    %
+	% imagesc(flow_error_surf, [0,16]);
+	% colorbar;
+	% saveas(gcf,[ output_dir '/' name '/mean_flow_error_surf.png']);
+    %
+	% close all;
 
-	imagesc(flow_error_lowrr, [0,16]);
-	colorbar;
-	saveas(gcf,[ output_dir '/' name '/mean_flow_error_lowrr.png']);
+	% Compute failures rates and mean all flow errors.
+	success_rate_lowrr(seq_id) = sum(~failures_lowrr(:)) / numel(failures_lowrr);
+	success_rate_tform(seq_id) = sum(~failures_tform(:)) / numel(failures_tform);
+	success_rate_corr(seq_id) = sum(~failures_corr(:)) / numel(failures_corr);
+	success_rate_surf(seq_id) = sum(~failures_surf(:)) / numel(failures_surf);
 
-	imagesc(flow_error_tform, [0,16]);
-	colorbar;
-	saveas(gcf,[ output_dir '/' name '/mean_flow_error_tform.png']);
+	mean_all_flow_errors_lowrr(seq_id) = mean(flow_error_lowrr(~failures_lowrr));
+	mean_all_flow_errors_tform(seq_id) = mean(flow_error_tform(~failures_tform));
+	mean_all_flow_errors_corr(seq_id) = mean(flow_error_corr(~failures_corr));
+	mean_all_flow_errors_surf(seq_id) = mean(flow_error_surf(~failures_surf));
 
-	imagesc(flow_error_corr, [0,16]);
-	colorbar;
-	saveas(gcf,[ output_dir '/' name '/mean_flow_error_corr.png']);
+end % for
 
-	imagesc(flow_error_surf, [0,16]);
-	colorbar;
-	saveas(gcf,[ output_dir '/' name '/mean_flow_error_surf.png']);
+% Display success rate.
+close all;
+figure;
+h = bar([success_rate_lowrr, success_rate_tform, success_rate_corr, success_rate_surf]);
+set(h, {'DisplayName'}, {'lowrr', 'tform', 'corr', 'surf'}');
+legend();
+title('Success rate of the 4 alignment algorithms on each sequence');
+ylabel('Success rate');
+set(gca, 'XTick', 1:10, 'XTickLabel', diligent_sequences);
 
-	close all;
-
-end
+% Display mean flow errors.
+close all;
+figure;
+h = bar([mean_all_flow_errors_lowrr, mean_all_flow_errors_tform, mean_all_flow_errors_corr,  mean_all_flow_errors_surf]);
+set(h, {'DisplayName'}, {'lowrr', 'tform', 'corr', 'surf'}');
+legend();
+title('Mean flow error of successfully registered images on each sequence');
+ylabel('Mean flow error');
+set(gca, 'XTick', 1:10, 'XTickLabel', diligent_sequences);
