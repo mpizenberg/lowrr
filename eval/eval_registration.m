@@ -59,7 +59,8 @@ diligent_dir = '~/Downloads/DiLiGenT/pmsData';
 output_dir = 'out';
 [~,~] = mkdir(output_dir);
 
-for seq_id = 1:length(diligent_sequences)
+% for seq_id = 4:length(diligent_sequences)
+for seq_id = 1:3
 	name = diligent_sequences{seq_id};
 	crop = crop_areas(seq_id, :);
 	crop_params = [ int2str(crop(1)) ',' int2str(crop(2)) ',' int2str(crop(3)) ',' int2str(crop(4)) ];
