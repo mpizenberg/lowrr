@@ -31,7 +31,7 @@ crop_areas = ...
 	]
 
 % Number of random generation for every sequence.
-nb_random = 20;
+nb_random = 40;
 
 % Output directory for all computed flow errors.
 output_dir = 'out';
@@ -54,7 +54,8 @@ median_all_flow_errors_corr = zeros(length(diligent_sequences), 1);
 median_all_flow_errors_surf = zeros(length(diligent_sequences), 1);
 median_all_flow_errors_lowrr = zeros(length(diligent_sequences), 1);
 
-for seq_id = 1:length(diligent_sequences)
+% for seq_id = 1:length(diligent_sequences)
+for seq_id = 7:7
 	name = diligent_sequences{seq_id};
 	disp(['Sequence: ' name]);
 	crop = crop_areas(seq_id, :);
@@ -76,8 +77,7 @@ for seq_id = 1:length(diligent_sequences)
 	% Create directory for outputs.
 	[~,~] = mkdir([ output_dir '/' name ]);
 
-	% for rand_id = 1:nb_random
-	for rand_id = 3:nb_random
+	for rand_id = 1:nb_random
 		% disp(['  random iteration: ' int2str(rand_id)]);
 		this_out_dir = [ output_dir '/' name '/rand_' sprintf('%02d',rand_id) ];
 		[~,~] = mkdir(this_out_dir);
@@ -103,81 +103,93 @@ for seq_id = 1:length(diligent_sequences)
 		flow_error_corr(:, rand_id) = mean_flow_errors;
 		failures_corr(:, rand_id) = failures;
 
-		% Evaluate flow error for surf.
-		warps_surf = readmatrix([this_out_dir '/warp-surf.txt']);
-		[mean_flow_errors, failures] = eval_flow_error(warps_gt, warps_surf, nrows, ncols);
-		flow_error_surf(:, rand_id) = mean_flow_errors;
-		failures_surf(:, rand_id) = failures;
+		% % Evaluate flow error for surf.
+		% warps_surf = readmatrix([this_out_dir '/warp-surf.txt']);
+		% [mean_flow_errors, failures] = eval_flow_error(warps_gt, warps_surf, nrows, ncols);
+		% flow_error_surf(:, rand_id) = mean_flow_errors;
+		% failures_surf(:, rand_id) = failures;
 	end
 	
-	% % Visualize flow errors.
-	% flow_error_lowrr(failures_lowrr) = 16;
-	% flow_error_tform(failures_tform) = 16;
-	% flow_error_corr(failures_corr) = 16;
-	% flow_error_surf(failures_surf) = 16;
-	%
-	% imagesc(flow_error_lowrr, [0,16]);
-	% colorbar;
-	% saveas(gcf,[ output_dir '/' name '/mean_flow_error_lowrr.png']);
-    %
-	% imagesc(flow_error_tform, [0,16]);
-	% colorbar;
-	% saveas(gcf,[ output_dir '/' name '/mean_flow_error_tform.png']);
-    %
-	% imagesc(flow_error_corr, [0,16]);
-	% colorbar;
-	% saveas(gcf,[ output_dir '/' name '/mean_flow_error_corr.png']);
-    %
-	% imagesc(flow_error_surf, [0,16]);
+	% Visualize flow errors.
+	flow_error_lowrr(failures_lowrr) = 10;
+	flow_error_tform(failures_tform) = 10;
+	flow_error_corr(failures_corr) = 10;
+	flow_error_surf(failures_surf) = 10;
+
+	imagesc(flow_error_lowrr, [0,10]);
+	colorbar;
+	% title('Mean flow error (in pixels) of every warp estimation with lowrr (lower is better)');
+	ylabel('Image index $$i$$','Interpreter','Latex','Fontsize',16)
+	xlabel('Random warp sampling','Interpreter','Latex','Fontsize',16);
+	set(gcf, 'Position', [100, 100, 400, 300]);
+	saveas(gcf,[ output_dir '/' name '/mean_flow_error_lowrr.png']);
+
+	imagesc(flow_error_tform, [0,10]);
+	colorbar;
+	% title('Mean flow error (in pixels) of every warp estimation with imregtform (lower is better)');
+	ylabel('Image index $$i$$','Interpreter','Latex','Fontsize',16)
+	xlabel('Random warp sampling','Interpreter','Latex','Fontsize',16);
+	set(gcf, 'Position', [100, 100, 400, 300]);
+	saveas(gcf,[ output_dir '/' name '/mean_flow_error_tform.png']);
+
+	imagesc(flow_error_corr, [0,10]);
+	colorbar;
+	% title('Mean flow error (in pixels) of every warp estimation with imregcorr (lower is better)');
+	ylabel('Image index $$i$$','Interpreter','Latex','Fontsize',16)
+	xlabel('Random warp sampling','Interpreter','Latex','Fontsize',16);
+	set(gcf, 'Position', [100, 100, 400, 300]);
+	saveas(gcf,[ output_dir '/' name '/mean_flow_error_corr.png']);
+
+	% imagesc(flow_error_surf, [0,10]);
 	% colorbar;
 	% saveas(gcf,[ output_dir '/' name '/mean_flow_error_surf.png']);
+
+	close all;
+
+	% % Compute failures rates and mean all flow errors.
+	% success_rate_lowrr(seq_id) = sum(~failures_lowrr(:)) / numel(failures_lowrr);
+	% success_rate_tform(seq_id) = sum(~failures_tform(:)) / numel(failures_tform);
+	% success_rate_corr(seq_id) = sum(~failures_corr(:)) / numel(failures_corr);
+	% success_rate_surf(seq_id) = sum(~failures_surf(:)) / numel(failures_surf);
     %
-	% close all;
-
-	% Compute failures rates and mean all flow errors.
-	success_rate_lowrr(seq_id) = sum(~failures_lowrr(:)) / numel(failures_lowrr);
-	success_rate_tform(seq_id) = sum(~failures_tform(:)) / numel(failures_tform);
-	success_rate_corr(seq_id) = sum(~failures_corr(:)) / numel(failures_corr);
-	success_rate_surf(seq_id) = sum(~failures_surf(:)) / numel(failures_surf);
-
-	mean_all_flow_errors_lowrr(seq_id) = mean(flow_error_lowrr(~failures_lowrr));
-	mean_all_flow_errors_tform(seq_id) = mean(flow_error_tform(~failures_tform));
-	mean_all_flow_errors_corr(seq_id) = mean(flow_error_corr(~failures_corr));
-	mean_all_flow_errors_surf(seq_id) = mean(flow_error_surf(~failures_surf));
-
-	median_all_flow_errors_lowrr(seq_id) = median(flow_error_lowrr(:));
-	median_all_flow_errors_tform(seq_id) = median(flow_error_tform(:));
-	median_all_flow_errors_corr(seq_id) = median(flow_error_corr(:));
-	median_all_flow_errors_surf(seq_id) = median(flow_error_surf(:));
+	% mean_all_flow_errors_lowrr(seq_id) = mean(flow_error_lowrr(~failures_lowrr));
+	% mean_all_flow_errors_tform(seq_id) = mean(flow_error_tform(~failures_tform));
+	% mean_all_flow_errors_corr(seq_id) = mean(flow_error_corr(~failures_corr));
+	% mean_all_flow_errors_surf(seq_id) = mean(flow_error_surf(~failures_surf));
+    %
+	% median_all_flow_errors_lowrr(seq_id) = median(flow_error_lowrr(:));
+	% median_all_flow_errors_tform(seq_id) = median(flow_error_tform(:));
+	% median_all_flow_errors_corr(seq_id) = median(flow_error_corr(:));
+	% median_all_flow_errors_surf(seq_id) = median(flow_error_surf(:));
 
 end % for
 
-% Display success rate.
-close all;
-figure;
-h = bar([success_rate_lowrr, success_rate_tform, success_rate_corr, success_rate_surf]);
-set(h, {'DisplayName'}, {'lowrr', 'tform', 'corr', 'surf'}');
-legend();
-title('Success rate of the 4 alignment algorithms on each sequence');
-ylabel('Success rate');
-set(gca, 'XTick', 1:10, 'XTickLabel', diligent_sequences);
-
-% Display mean flow errors.
-close all;
-figure;
-h = bar([mean_all_flow_errors_lowrr, mean_all_flow_errors_tform, mean_all_flow_errors_corr,  mean_all_flow_errors_surf]);
-set(h, {'DisplayName'}, {'lowrr', 'tform', 'corr', 'surf'}');
-legend();
-title('Mean flow error of successfully registered images on each sequence');
-ylabel('Mean flow error');
-set(gca, 'XTick', 1:10, 'XTickLabel', diligent_sequences);
-
-% Display median flow errors.
-close all;
-figure;
-h = bar([median_all_flow_errors_lowrr, median_all_flow_errors_tform, median_all_flow_errors_corr,  median_all_flow_errors_surf]);
-set(h, {'DisplayName'}, {'lowrr', 'tform', 'corr', 'surf'}');
-legend();
-title('Median flow error of all registered images on each sequence');
-ylabel('Median flow error');
-set(gca, 'XTick', 1:10, 'XTickLabel', diligent_sequences);
+% % Display success rate.
+% close all;
+% figure;
+% h = bar([success_rate_lowrr, success_rate_tform, success_rate_corr, success_rate_surf]);
+% set(h, {'DisplayName'}, {'lowrr', 'tform', 'corr', 'surf'}');
+% legend();
+% title('Success rate of the 4 alignment algorithms on each sequence');
+% ylabel('Success rate');
+% set(gca, 'XTick', 1:10, 'XTickLabel', diligent_sequences);
+%
+% % Display mean flow errors.
+% close all;
+% figure;
+% h = bar([mean_all_flow_errors_lowrr, mean_all_flow_errors_tform, mean_all_flow_errors_corr,  mean_all_flow_errors_surf]);
+% set(h, {'DisplayName'}, {'lowrr', 'tform', 'corr', 'surf'}');
+% legend();
+% title('Mean flow error of successfully registered images on each sequence');
+% ylabel('Mean flow error');
+% set(gca, 'XTick', 1:10, 'XTickLabel', diligent_sequences);
+%
+% % Display median flow errors.
+% close all;
+% figure;
+% h = bar([median_all_flow_errors_lowrr(2:end), median_all_flow_errors_tform(2:end), median_all_flow_errors_corr(2:end)]);
+% set(h, {'DisplayName'}, {'lowrr', 'tform', 'corr'}');
+% legend();
+% title('Median flow error of all registered images on each sequence');
+% ylabel('Median flow error');
+% set(gca, 'XTick', 1:9, 'XTickLabel', diligent_sequences(2:end));
