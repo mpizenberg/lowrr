@@ -4,13 +4,13 @@
 
 //! Interoperability conversions between the image and matrix types.
 
-use image::{GrayImage, ImageBuffer, Luma, Primitive, Rgb, RgbImage};
+use image::{ImageBuffer, Luma, Primitive, Rgb};
 use nalgebra::{DMatrix, Scalar};
 
-/// Convert an `u8` matrix into a `GrayImage`.
+/// Convert a matrix into a gray level image.
 /// Inverse operation of `matrix_from_image`.
 ///
-/// Performs a transposition to accomodate for the
+/// This performs a transposition to accomodate for the
 /// column major matrix into the row major image.
 #[allow(clippy::cast_possible_truncation)]
 pub fn image_from_matrix<T: Scalar + Primitive>(mat: &DMatrix<T>) -> ImageBuffer<Luma<T>, Vec<T>> {
@@ -22,9 +22,10 @@ pub fn image_from_matrix<T: Scalar + Primitive>(mat: &DMatrix<T>) -> ImageBuffer
     img_buf
 }
 
-/// Convert an `(T,T,T)` matrix into an Rgb image.
+/// Convert a `(T,T,T)` RGB matrix into an RGB image.
+/// Inverse operation of matrix_from_rgb_image.
 ///
-/// Performs a transposition to accomodate for the
+/// This performs a transposition to accomodate for the
 /// column major matrix into the row major image.
 #[allow(clippy::cast_possible_truncation)]
 pub fn rgb_from_matrix<T: Scalar + Primitive>(
@@ -53,12 +54,11 @@ pub fn image_from_matrix_transposed(mat: &DMatrix<u8>) -> ImageBuffer<Luma<u8>, 
 /// Convert a gray image into a matrix.
 /// Inverse operation of `image_from_matrix`.
 pub fn matrix_from_image<T: Scalar + Primitive>(img: ImageBuffer<Luma<T>, Vec<T>>) -> DMatrix<T> {
-    // pub fn matrix_from_image(img: GrayImage) -> DMatrix<u8> {
     let (width, height) = img.dimensions();
     DMatrix::from_row_slice(height as usize, width as usize, &img.into_raw())
 }
 
-/// Convert a RGB image into an `(T, T, T)` matrix.
+/// Convert an RGB image into a `(T, T, T)` RGB matrix.
 /// Inverse operation of `rgb_from_matrix`.
 pub fn matrix_from_rgb_image<T: Scalar + Primitive>(
     img: ImageBuffer<Rgb<T>, Vec<T>>,
