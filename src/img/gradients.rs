@@ -4,7 +4,7 @@
 
 //! Helper function to compute gradients
 
-use nalgebra::{self as na, DMatrix, Scalar};
+use nalgebra::{DMatrix, Scalar};
 use std::ops::{Add, Div, Mul, Sub};
 
 /// Compute a centered gradient.
@@ -13,15 +13,15 @@ use std::ops::{Add, Div, Mul, Sub};
 ///
 /// Gradients of pixels at the border of the image are set to 0.
 #[allow(clippy::similar_names)]
-pub fn centered(img: &na::DMatrix<u8>) -> (na::DMatrix<i16>, na::DMatrix<i16>) {
+pub fn centered(img: &DMatrix<u8>) -> (DMatrix<i16>, DMatrix<i16>) {
     // TODO: might be better to return DMatrix<(i16,i16)>?
     let (nb_rows, nb_cols) = img.shape();
     let top = img.slice((0, 1), (nb_rows - 2, nb_cols - 2));
     let bottom = img.slice((2, 1), (nb_rows - 2, nb_cols - 2));
     let left = img.slice((1, 0), (nb_rows - 2, nb_cols - 2));
     let right = img.slice((1, 2), (nb_rows - 2, nb_cols - 2));
-    let mut grad_x = na::DMatrix::zeros(nb_rows, nb_cols);
-    let mut grad_y = na::DMatrix::zeros(nb_rows, nb_cols);
+    let mut grad_x = DMatrix::zeros(nb_rows, nb_cols);
+    let mut grad_y = DMatrix::zeros(nb_rows, nb_cols);
     let mut grad_x_inner = grad_x.slice_mut((1, 1), (nb_rows - 2, nb_cols - 2));
     let mut grad_y_inner = grad_y.slice_mut((1, 1), (nb_rows - 2, nb_cols - 2));
     for j in 0..nb_cols - 2 {
@@ -39,14 +39,14 @@ pub fn centered(img: &na::DMatrix<u8>) -> (na::DMatrix<i16>, na::DMatrix<i16>) {
 ///
 /// Gradients of pixels at the border of the image are set to 0.
 #[allow(clippy::similar_names)]
-pub fn centered_f32(img: &na::DMatrix<f32>) -> na::DMatrix<(f32, f32)> {
+pub fn centered_f32(img: &DMatrix<f32>) -> DMatrix<(f32, f32)> {
     // TODO: might be better to return DMatrix<(i16,i16)>?
     let (nb_rows, nb_cols) = img.shape();
     let top = img.slice((0, 1), (nb_rows - 2, nb_cols - 2));
     let bottom = img.slice((2, 1), (nb_rows - 2, nb_cols - 2));
     let left = img.slice((1, 0), (nb_rows - 2, nb_cols - 2));
     let right = img.slice((1, 2), (nb_rows - 2, nb_cols - 2));
-    let mut grad = na::DMatrix::repeat(nb_rows, nb_cols, (0.0, 0.0));
+    let mut grad = DMatrix::repeat(nb_rows, nb_cols, (0.0, 0.0));
     let mut grad_inner = grad.slice_mut((1, 1), (nb_rows - 2, nb_cols - 2));
     for j in 0..nb_cols - 2 {
         for i in 0..nb_rows - 2 {
@@ -64,7 +64,7 @@ pub fn centered_f32(img: &na::DMatrix<f32>) -> na::DMatrix<(f32, f32)> {
 ///
 /// Gradients of pixels at the border of the image are set to 0.
 #[allow(clippy::similar_names)]
-pub fn centered_4(img: &na::DMatrix<u8>) -> (na::DMatrix<i16>, na::DMatrix<i16>) {
+pub fn centered_4(img: &DMatrix<u8>) -> (DMatrix<i16>, DMatrix<i16>) {
     let (nb_rows, nb_cols) = img.shape();
     let img_i16 = img.map(|x| x as i16);
 
@@ -78,8 +78,8 @@ pub fn centered_4(img: &na::DMatrix<u8>) -> (na::DMatrix<i16>, na::DMatrix<i16>)
     let bottom_1 = img_i16.slice((2, 2), (nb_rows - 4, nb_cols - 4));
     let bottom_2 = img_i16.slice((3, 2), (nb_rows - 4, nb_cols - 4));
 
-    let mut grad_x = na::DMatrix::zeros(nb_rows, nb_cols);
-    let mut grad_y = na::DMatrix::zeros(nb_rows, nb_cols);
+    let mut grad_x = DMatrix::zeros(nb_rows, nb_cols);
+    let mut grad_y = DMatrix::zeros(nb_rows, nb_cols);
     let mut grad_x_inner = grad_x.slice_mut((2, 2), (nb_rows - 4, nb_cols - 4));
     let mut grad_y_inner = grad_y.slice_mut((2, 2), (nb_rows - 4, nb_cols - 4));
 
@@ -100,7 +100,7 @@ pub fn centered_4(img: &na::DMatrix<u8>) -> (na::DMatrix<i16>, na::DMatrix<i16>)
 ///
 /// Gradients of pixels at the border of the image are set to 0.
 #[allow(clippy::similar_names)]
-pub fn centered_4_f32(img: &na::DMatrix<f32>) -> (na::DMatrix<f32>, na::DMatrix<f32>) {
+pub fn centered_4_f32(img: &DMatrix<f32>) -> (DMatrix<f32>, DMatrix<f32>) {
     let (nb_rows, nb_cols) = img.shape();
 
     let left_2 = img.slice((2, 0), (nb_rows - 4, nb_cols - 4));
@@ -113,8 +113,8 @@ pub fn centered_4_f32(img: &na::DMatrix<f32>) -> (na::DMatrix<f32>, na::DMatrix<
     let bottom_1 = img.slice((3, 2), (nb_rows - 4, nb_cols - 4));
     let bottom_2 = img.slice((4, 2), (nb_rows - 4, nb_cols - 4));
 
-    let mut grad_x = na::DMatrix::zeros(nb_rows, nb_cols);
-    let mut grad_y = na::DMatrix::zeros(nb_rows, nb_cols);
+    let mut grad_x = DMatrix::zeros(nb_rows, nb_cols);
+    let mut grad_y = DMatrix::zeros(nb_rows, nb_cols);
     let mut grad_x_inner = grad_x.slice_mut((2, 2), (nb_rows - 4, nb_cols - 4));
     let mut grad_y_inner = grad_y.slice_mut((2, 2), (nb_rows - 4, nb_cols - 4));
 
@@ -132,7 +132,7 @@ pub fn centered_4_f32(img: &na::DMatrix<f32>) -> (na::DMatrix<f32>, na::DMatrix<
 /// Compute squared gradient norm from x and y gradient matrices.
 #[allow(clippy::cast_possible_truncation)]
 #[allow(clippy::cast_sign_loss)]
-pub fn squared_norm(grad_x: &na::DMatrix<i16>, grad_y: &na::DMatrix<i16>) -> na::DMatrix<u16> {
+pub fn squared_norm(grad_x: &DMatrix<i16>, grad_y: &DMatrix<i16>) -> DMatrix<u16> {
     grad_x.zip_map(grad_y, |gx, gy| {
         let gx = i32::from(gx);
         let gy = i32::from(gy);
@@ -175,7 +175,7 @@ impl Bigger<u32> for u16 {
 /// Compute squared gradient norm directly from the image.
 #[allow(clippy::cast_possible_truncation)]
 #[allow(clippy::cast_sign_loss)]
-pub fn squared_norm_direct<T, U>(im: &na::DMatrix<T>) -> na::DMatrix<U>
+pub fn squared_norm_direct<T, U>(im: &DMatrix<T>) -> DMatrix<U>
 where
     T: Scalar + Copy + Bigger<U>,
     U: Scalar + Copy,
@@ -185,7 +185,7 @@ where
     let bottom = im.slice((2, 1), (nb_rows - 2, nb_cols - 2));
     let left = im.slice((1, 0), (nb_rows - 2, nb_cols - 2));
     let right = im.slice((1, 2), (nb_rows - 2, nb_cols - 2));
-    let mut squared_norm_mat = na::DMatrix::repeat(nb_rows, nb_cols, T::zero());
+    let mut squared_norm_mat = DMatrix::repeat(nb_rows, nb_cols, T::zero());
     let mut grad_inner = squared_norm_mat.slice_mut((1, 1), (nb_rows - 2, nb_cols - 2));
     for j in 0..nb_cols - 2 {
         for i in 0..nb_rows - 2 {

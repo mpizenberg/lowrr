@@ -121,7 +121,7 @@ pub fn gradients_squared_norm(multires_mat: &[DMatrix<u8>]) -> Vec<DMatrix<u16>>
         .iter()
         .take(nb_levels - 1)
         .map(|mat| {
-            halve(mat, crate::gradients::bloc_squared_norm)
+            halve(mat, crate::img::gradients::bloc_squared_norm)
                 .expect("There is an issue in gradients_squared_norm")
         })
         .collect()
@@ -140,8 +140,10 @@ pub fn gradients_xy(multires_mat: &[DMatrix<u8>]) -> Vec<(DMatrix<i16>, DMatrix<
         .take(nb_levels - 1)
         .map(|mat| {
             (
-                halve(mat, crate::gradients::bloc_x).expect("There is an issue in gradients_xy x."),
-                halve(mat, crate::gradients::bloc_y).expect("There is an issue in gradients_xy y."),
+                halve(mat, crate::img::gradients::bloc_x)
+                    .expect("There is an issue in gradients_xy x."),
+                halve(mat, crate::img::gradients::bloc_y)
+                    .expect("There is an issue in gradients_xy y."),
             )
         })
         .collect()

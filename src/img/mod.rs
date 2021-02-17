@@ -8,3 +8,4 @@
 //! The underlying data is almost always considered to be a 2D nalgebra matrix.
 
 pub mod filter;
+pub mod gradients;

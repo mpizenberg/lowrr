@@ -46,7 +46,7 @@ where
         + Primitive
         + ToRgb8
         + crate::multires::Bigger
-        + crate::gradients::Bigger<B>
+        + crate::img::gradients::Bigger<B>
         + CanLinearInterpolate<f32, f32>
         + CanLinearInterpolate<f32, T>,
     [T]: EncodableLayout,
@@ -61,7 +61,7 @@ where
         let pyramid: Levels<DMatrix<T>> = crate::multires::mean_pyramid(config.levels, im);
         let gradients: Levels<DMatrix<B>> = pyramid
             .iter()
-            .map(crate::gradients::squared_norm_direct)
+            .map(crate::img::gradients::squared_norm_direct)
             .collect();
         let sparse_pixels = crate::sparse::select(sparse_diff_threshold, gradients.as_slice());
         multires_sparse_pixels.push(sparse_pixels);
@@ -437,7 +437,7 @@ fn extract_sparse<T, I: Iterator<Item = bool>>(
 fn compute_registered_gradients_full(shape: (usize, usize), registered: &[f32]) -> Vec<(f32, f32)> {
     let (nrows, ncols) = shape;
     let img_registered_shaped = DMatrix::from_iterator(nrows, ncols, registered.iter().cloned());
-    crate::gradients::centered_f32(&img_registered_shaped)
+    crate::img::gradients::centered_f32(&img_registered_shaped)
         .data
         .into()
 }
