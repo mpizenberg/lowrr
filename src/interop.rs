@@ -31,6 +31,7 @@ pub fn image_from_matrix<T: Scalar + Primitive>(mat: &DMatrix<T>) -> ImageBuffer
 pub fn rgb_from_matrix<T: Scalar + Primitive>(
     mat: &DMatrix<(T, T, T)>,
 ) -> ImageBuffer<Rgb<T>, Vec<T>> {
+    // TODO: improve the suboptimal allocation in addition to transposition.
     let (nb_rows, nb_cols) = mat.shape();
     let mut img_buf = ImageBuffer::new(nb_cols as u32, nb_rows as u32);
     for (x, y, pixel) in img_buf.enumerate_pixels_mut() {
@@ -38,17 +39,6 @@ pub fn rgb_from_matrix<T: Scalar + Primitive>(
         *pixel = Rgb([r, g, b]);
     }
     img_buf
-}
-
-/// Create a gray image with a borrowed reference to the matrix buffer.
-///
-/// Very performant since no copy is performed,
-/// but produces a transposed image due to differences in row/column major.
-#[allow(clippy::cast_possible_truncation)]
-pub fn image_from_matrix_transposed(mat: &DMatrix<u8>) -> ImageBuffer<Luma<u8>, &[u8]> {
-    let (nb_rows, nb_cols) = mat.shape();
-    ImageBuffer::from_raw(nb_rows as u32, nb_cols as u32, mat.as_slice())
-        .expect("Buffer not large enough")
 }
 
 /// Convert a gray image into a matrix.
@@ -63,8 +53,8 @@ pub fn matrix_from_image<T: Scalar + Primitive>(img: ImageBuffer<Luma<T>, Vec<T>
 pub fn matrix_from_rgb_image<T: Scalar + Primitive>(
     img: ImageBuffer<Rgb<T>, Vec<T>>,
 ) -> DMatrix<(T, T, T)> {
-    let (width, height) = img.dimensions();
     // TODO: improve the suboptimal allocation in addition to transposition.
+    let (width, height) = img.dimensions();
     DMatrix::from_iterator(
         width as usize,
         height as usize,
