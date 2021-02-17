@@ -72,19 +72,3 @@ pub fn matrix_from_rgb_image<T: Scalar + Primitive>(
     )
     .transpose()
 }
-
-/// Convert a `RgbImage` into an `u8` matrix with green channel.
-pub fn green_mat_from_rgb_image(img: RgbImage) -> DMatrix<u8> {
-    let (width, height) = img.dimensions();
-
-    // DMatrix::from_fn(height as usize, width as usize, |i, j| {
-    //     img.get_pixel(j as u32, i as u32)[1]
-    // })
-
-    let mut mat = DMatrix::zeros(height as usize, width as usize);
-    img.enumerate_pixels()
-        .for_each(|(x, y, p)| *mat.get_mut((y as usize, x as usize)).unwrap() = p[1]);
-    mat
-
-    // DMatrix::from_iterator(height as usize, width as usize, img.pixels().map(|p| p[1]))
-}
