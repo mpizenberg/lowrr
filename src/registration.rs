@@ -45,7 +45,7 @@ where
         + Scalar
         + Primitive
         + ToRgb8
-        + crate::multires::Bigger
+        + crate::img::multires::Bigger
         + crate::img::gradients::Bigger<B>
         + CanLinearInterpolate<f32, f32>
         + CanLinearInterpolate<f32, T>,
@@ -58,7 +58,7 @@ where
     let mut multires_imgs: Vec<Levels<_>> = Vec::with_capacity(imgs_count);
     let mut multires_sparse_pixels: Vec<Levels<_>> = Vec::with_capacity(imgs_count);
     for im in imgs.into_iter() {
-        let pyramid: Levels<DMatrix<T>> = crate::multires::mean_pyramid(config.levels, im);
+        let pyramid: Levels<DMatrix<T>> = crate::img::multires::mean_pyramid(config.levels, im);
         let gradients: Levels<DMatrix<B>> = pyramid
             .iter()
             .map(crate::img::gradients::squared_norm_direct)
