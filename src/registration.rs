@@ -25,16 +25,15 @@ pub struct Config {
     pub trace: bool,
 }
 
-/// Type alias just to visually differenciate Vec<Vec<_>>
-/// when it is Vec<Levels<_>> or Levels<Vec<_>>.
+/// Type alias just to semantically differenciate Vec<Levels<_>> and Levels<Vec<_>>.
 type Levels<T> = Vec<T>;
 
-/// Registration of single channel images.
+/// Affine registration of single channel images.
 ///
 /// Internally, this uses a multi-resolution approach,
 /// where the motion vector computed at one resolution serves
 /// as initialization for the next one.
-pub fn gray_images<T, B>(
+pub fn gray_affine<T, B>(
     config: Config,
     imgs: Vec<DMatrix<T>>,
     sparse_diff_threshold: B, // 50
@@ -230,18 +229,6 @@ where
     Ok((motion_vec, imgs))
 }
 
-fn merge_sparse(matrices: &[DMatrix<bool>]) -> DMatrix<bool> {
-    assert!(!matrices.is_empty());
-    let (nrows, ncols) = matrices[0].shape();
-    let mut merged = DMatrix::repeat(nrows, ncols, false);
-    for mat in matrices.iter() {
-        for (b_merged, b) in merged.iter_mut().zip(mat) {
-            *b_merged |= b;
-        }
-    }
-    merged
-}
-
 /// Configuration parameters for the core loop of the algorithm.
 struct StepConfig {
     do_image_correction: bool,
@@ -422,16 +409,13 @@ fn visualize_mask<T: Scalar + ToRgb8>(
 fn coordinates_from_mask(mask: &DMatrix<bool>) -> Vec<(usize, usize)> {
     let (height, width) = mask.shape();
     let coords = (0..width).map(|x| (0..height).map(move |y| (x, y)));
-    extract_sparse(mask.iter().cloned(), coords.flatten()).collect()
+    crate::sparse::extract(mask.iter().cloned(), coords.flatten()).collect()
 }
 
-fn extract_sparse<T, I: Iterator<Item = bool>>(
-    sparse_pixels: I,
-    mat: impl Iterator<Item = T>,
-) -> impl Iterator<Item = T> {
-    sparse_pixels
-        .zip(mat)
-        .filter_map(|(b, v)| if b { Some(v) } else { None })
+fn coordinates_from_mask_iter(mask: &DMatrix<bool>) -> impl Iterator<Item = (usize, usize)> + '_ {
+    let (height, width) = mask.shape();
+    let coords = (0..width).map(move |x| (0..height).map(move |y| (x, y)));
+    crate::sparse::extract(mask.iter().cloned(), coords.flatten())
 }
 
 fn compute_registered_gradients_full(shape: (usize, usize), registered: &[f32]) -> Vec<(f32, f32)> {

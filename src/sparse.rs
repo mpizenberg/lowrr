@@ -87,3 +87,33 @@ where
     }
     result
 }
+
+// Utilitary functions on sparse matrices ######################################
+
+/// Merge multiple sparse matrices into one combining all sparsely selected pixels.
+///
+/// Will crash if there is no matrix or they don't all have the same size.
+pub fn merge(matrices: &[DMatrix<bool>]) -> DMatrix<bool> {
+    assert!(!matrices.is_empty(), "The list of matrices is empty");
+    let mut merged = matrices[0].clone();
+    for mat in matrices.iter().skip(1) {
+        assert!(
+            mat.shape() == merged.shape(),
+            "Matrices do not all have the same size"
+        );
+        for (b_merged, b) in merged.iter_mut().zip(mat) {
+            *b_merged |= b;
+        }
+    }
+    merged
+}
+
+/// Extract sparsely selected data from an iterator.
+pub fn extract<T, Sparse: Iterator<Item = bool>>(
+    sparse_pixels: Sparse,
+    mat: impl Iterator<Item = T>,
+) -> impl Iterator<Item = T> {
+    sparse_pixels
+        .zip(mat)
+        .filter_map(|(b, v)| if b { Some(v) } else { None })
+}
