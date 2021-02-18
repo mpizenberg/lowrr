@@ -10,7 +10,6 @@
 
 pub mod img;
 pub mod interop;
-pub mod interpolation;
 pub mod multires;
 pub mod optimizer;
 pub mod registration;

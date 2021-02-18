@@ -9,7 +9,7 @@ use nalgebra::{DMatrix, Matrix3, Matrix6, RealField, Scalar, Vector3, Vector6};
 use std::ops::{Add, Mul};
 use std::rc::Rc;
 
-use crate::interpolation::CanLinearInterpolate;
+use crate::img::interpolation::CanLinearInterpolate;
 
 /// Configuration (parameters) of the registration algorithm.
 #[derive(Debug)]
@@ -461,8 +461,8 @@ where
             let new_left = motion * Vector3::new(x_left, y as f32, 1.0);
             let new_right = motion * Vector3::new(x_right, y as f32, 1.0);
             // WARNING: beware that interpolating with a f32 output normalize values in [0,1].
-            let pixel_left: f32 = crate::interpolation::linear(new_left.x, new_left.y, img);
-            let pixel_right: f32 = crate::interpolation::linear(new_right.x, new_right.y, img);
+            let pixel_left: f32 = crate::img::interpolation::linear(new_left.x, new_left.y, img);
+            let pixel_right: f32 = crate::img::interpolation::linear(new_right.x, new_right.y, img);
 
             // Vertical gradient (gy).
             let y_top = y as f32 - 1.0;
@@ -470,8 +470,8 @@ where
             let new_top = motion * Vector3::new(x as f32, y_top, 1.0);
             let new_bot = motion * Vector3::new(x as f32, y_bot, 1.0);
             // WARNING: beware that interpolating with a f32 output normalize values in [0,1].
-            let pixel_top: f32 = crate::interpolation::linear(new_top.x, new_top.y, img);
-            let pixel_bot: f32 = crate::interpolation::linear(new_bot.x, new_bot.y, img);
+            let pixel_top: f32 = crate::img::interpolation::linear(new_top.x, new_top.y, img);
+            let pixel_bot: f32 = crate::img::interpolation::linear(new_bot.x, new_bot.y, img);
 
             // Gradient.
             (
@@ -543,7 +543,7 @@ fn project_f32<T: Scalar + Copy + CanLinearInterpolate<f32, f32>>(
         for ((x, y), pixel) in coordinates.clone().zip(registered_col.iter_mut()) {
             let new_pos = motion_mat * Vector3::new(x as f32, y as f32, 1.0);
             // WARNING: beware that interpolating with a f32 output normalize values in [0,1].
-            let interp: f32 = crate::interpolation::linear(new_pos.x, new_pos.y, &imgs[i]);
+            let interp: f32 = crate::img::interpolation::linear(new_pos.x, new_pos.y, &imgs[i]);
             *pixel = interp;
         }
     }
@@ -575,7 +575,7 @@ where
     let motion_mat = projection_mat(motion_params);
     DMatrix::from_fn(nrows, ncols, |i, j| {
         let new_pos = motion_mat * Vector3::new(j as f32, i as f32, 1.0);
-        crate::interpolation::linear(new_pos.x, new_pos.y, img)
+        crate::img::interpolation::linear(new_pos.x, new_pos.y, img)
     })
 }
 

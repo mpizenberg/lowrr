@@ -9,3 +9,4 @@
 
 pub mod filter;
 pub mod gradients;
+pub mod interpolation;
