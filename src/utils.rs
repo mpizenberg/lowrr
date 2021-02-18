@@ -69,6 +69,7 @@ pub fn transpose<T: Clone>(v: Vec<Vec<T>>) -> Vec<Vec<T>> {
     v_transposed
 }
 
+/// Save a bunch of gray images into the given directory.
 pub fn save_imgs<P: AsRef<Path>, T: Scalar + Primitive>(dir: P, imgs: &[DMatrix<T>])
 where
     [T]: EncodableLayout,
@@ -82,6 +83,7 @@ where
     });
 }
 
+/// Save a bunch of RGB images into the given directory.
 pub fn save_rgb_imgs<P: AsRef<Path>, T: Scalar + Primitive>(dir: P, imgs: &[DMatrix<(T, T, T)>])
 where
     [T]: EncodableLayout,
