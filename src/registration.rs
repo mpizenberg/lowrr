@@ -300,7 +300,8 @@ impl State {
                     &obs.images[i],
                     &(projection_mat(&motion_vec[i])),
                     obs.coordinates.iter().cloned(),
-                ),
+                )
+                .collect(),
             };
 
             // Compute residuals and motion step.
@@ -419,41 +420,39 @@ fn compute_registered_gradients_full(shape: (usize, usize), registered: &[f32]) 
 /// Compute the gradients of warped image.
 /// There are more efficient ways than to interpolate 4 points,
 /// but it would be to much trouble.
-fn compute_registered_gradients_sparse<T>(
-    img: &DMatrix<T>,
-    motion: &Matrix3<f32>,
-    coordinates: impl Iterator<Item = (usize, usize)>,
-) -> Vec<(f32, f32)>
+fn compute_registered_gradients_sparse<'a, T>(
+    img: &'a DMatrix<T>,
+    motion: &'a Matrix3<f32>,
+    coordinates: impl Iterator<Item = (usize, usize)> + 'a,
+) -> impl Iterator<Item = (f32, f32)> + 'a
 where
     T: Scalar + Copy + CanLinearInterpolate<f32, f32>,
 {
-    coordinates
-        .map(|(x, y)| {
-            // Horizontal gradient (gx).
-            let x_left = x as f32 - 1.0;
-            let x_right = x as f32 + 1.0;
-            let new_left = motion * Vector3::new(x_left, y as f32, 1.0);
-            let new_right = motion * Vector3::new(x_right, y as f32, 1.0);
-            // WARNING: beware that interpolating with a f32 output normalize values in [0,1].
-            let pixel_left: f32 = crate::img::interpolation::linear(new_left.x, new_left.y, img);
-            let pixel_right: f32 = crate::img::interpolation::linear(new_right.x, new_right.y, img);
+    coordinates.map(move |(x, y)| {
+        // Horizontal gradient (gx).
+        let x_left = x as f32 - 1.0;
+        let x_right = x as f32 + 1.0;
+        let new_left = motion * Vector3::new(x_left, y as f32, 1.0);
+        let new_right = motion * Vector3::new(x_right, y as f32, 1.0);
+        // WARNING: beware that interpolating with a f32 output normalize values in [0,1].
+        let pixel_left: f32 = crate::img::interpolation::linear(new_left.x, new_left.y, img);
+        let pixel_right: f32 = crate::img::interpolation::linear(new_right.x, new_right.y, img);
 
-            // Vertical gradient (gy).
-            let y_top = y as f32 - 1.0;
-            let y_bot = y as f32 + 1.0;
-            let new_top = motion * Vector3::new(x as f32, y_top, 1.0);
-            let new_bot = motion * Vector3::new(x as f32, y_bot, 1.0);
-            // WARNING: beware that interpolating with a f32 output normalize values in [0,1].
-            let pixel_top: f32 = crate::img::interpolation::linear(new_top.x, new_top.y, img);
-            let pixel_bot: f32 = crate::img::interpolation::linear(new_bot.x, new_bot.y, img);
+        // Vertical gradient (gy).
+        let y_top = y as f32 - 1.0;
+        let y_bot = y as f32 + 1.0;
+        let new_top = motion * Vector3::new(x as f32, y_top, 1.0);
+        let new_bot = motion * Vector3::new(x as f32, y_bot, 1.0);
+        // WARNING: beware that interpolating with a f32 output normalize values in [0,1].
+        let pixel_top: f32 = crate::img::interpolation::linear(new_top.x, new_top.y, img);
+        let pixel_bot: f32 = crate::img::interpolation::linear(new_bot.x, new_bot.y, img);
 
-            // Gradient.
-            (
-                0.5 * (pixel_right - pixel_left),
-                0.5 * (pixel_bot - pixel_top),
-            )
-        })
-        .collect()
+        // Gradient.
+        (
+            0.5 * (pixel_right - pixel_left),
+            0.5 * (pixel_bot - pixel_top),
+        )
+    })
 }
 
 fn forwards_compositional_step(
