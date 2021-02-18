@@ -43,7 +43,7 @@ where
     T: Copy
         + Scalar
         + Primitive
-        + ToRgb8
+        + crate::img::viz::ToRgb8
         + crate::img::multires::Bigger
         + crate::img::gradients::Bigger<B>
         + CanLinearInterpolate<f32, f32>
@@ -76,7 +76,7 @@ where
         .iter()
         .zip(multires_imgs[0].iter().rev())
     {
-        multires_sparse_viz.push(visualize_mask(sparse_mask, img_mat));
+        multires_sparse_viz.push(crate::img::viz::mask_overlay(sparse_mask, img_mat));
     }
     // crate::utils::save_rgb_imgs::<&str, u8>(
     //     "out/multires_sparse_img0",
@@ -368,35 +368,6 @@ impl State {
         // Returned value.
         continuation
     }
-}
-
-pub trait ToRgb8 {
-    fn to_rgb8(self) -> (u8, u8, u8);
-}
-
-impl ToRgb8 for u8 {
-    fn to_rgb8(self) -> (u8, u8, u8) {
-        (self, self, self)
-    }
-}
-
-impl ToRgb8 for u16 {
-    fn to_rgb8(self) -> (u8, u8, u8) {
-        ((self / 256) as u8, (self / 256) as u8, (self / 256) as u8)
-    }
-}
-
-fn visualize_mask<T: Scalar + ToRgb8>(
-    mask: &DMatrix<bool>,
-    img_mat: &DMatrix<T>,
-) -> DMatrix<(u8, u8, u8)> {
-    mask.zip_map(img_mat, |in_mask, pixel| {
-        if in_mask {
-            (255, 0, 0)
-        } else {
-            pixel.to_rgb8()
-        }
-    })
 }
 
 fn coordinates_from_mask(mask: &DMatrix<bool>) -> Vec<(usize, usize)> {
