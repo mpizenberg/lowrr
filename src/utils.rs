@@ -125,29 +125,41 @@ pub fn coords_row_major(shape: (usize, usize)) -> impl Iterator<Item = (usize, u
 
 /// Only work for gray images for now.
 pub trait CanEqualize: Scalar + Copy + Mul + Into<f32> {
-    fn target_mean() -> f32;
+    /// Convert the target, set as a float in [0,1], into an equivalent value for current type.
+    fn target_mean(target: f32) -> f32;
+    /// Convert the scaled f32 value back into the current type.
     fn from_as(f: f32) -> Self;
 }
 
 impl CanEqualize for u8 {
-    fn target_mean() -> f32 {
-        40.0
+    fn target_mean(target: f32) -> f32 {
+        u8::MAX as f32 * target
     }
     fn from_as(f: f32) -> Self {
         f.max(0.0).min(255.0) as Self
     }
 }
+
 impl CanEqualize for u16 {
-    fn target_mean() -> f32 {
-        40.0 * 256.0
+    fn target_mean(target: f32) -> f32 {
+        u16::MAX as f32 * target
     }
     fn from_as(f: f32) -> Self {
         f.max(0.0).min(65535.0) as Self
     }
 }
 
+impl CanEqualize for f32 {
+    fn target_mean(target: f32) -> f32 {
+        target
+    }
+    fn from_as(f: f32) -> Self {
+        f
+    }
+}
+
 /// Change the mean intensity of all images to be approximately the same.
-pub fn equalize_mean<T: CanEqualize>(imgs: &mut [DMatrix<T>]) {
+pub fn equalize_mean<T: CanEqualize>(target: f32, imgs: &mut [DMatrix<T>]) {
     // Compute mean intensities.
     let sum_intensities: Vec<f32> = imgs
         .iter()
@@ -162,7 +174,7 @@ pub fn equalize_mean<T: CanEqualize>(imgs: &mut [DMatrix<T>]) {
 
     // Multiply all images such that the mean intensity is near the target.
     for (im, mean) in imgs.iter_mut().zip(mean_intensities) {
-        let scale = (T::target_mean() / mean).max(1.0);
+        let scale = (T::target_mean(target) / mean).max(1.0);
         for pixel in im.iter_mut() {
             *pixel = T::from_as(Mul::<f32>::mul(scale, (*pixel).into()));
         }
