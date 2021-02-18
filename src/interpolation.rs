@@ -8,6 +8,12 @@ use nalgebra::{DMatrix, Scalar, Vector3};
 use std::ops::{Add, Mul};
 
 /// Trait for types that can be linearly interpolated with the `linear` function.
+///
+/// The `Vector` generic type refers to the intermediate type used during interpolations.
+/// It usually is the `f32` scalar or a vector of `f32` values.
+///
+/// The `Output` type is the final type obtained after interpolation.
+/// It is obtained via conversion from the interpolated vector.
 pub trait CanLinearInterpolate<Vector, Output>
 where
     Vector: Add<Output = Vector>,
@@ -17,8 +23,8 @@ where
     fn from_vector(v: Vector) -> Output;
 }
 
-/// Implement CanLinearInterpolate for u8 to f32
-/// WARNING: beware that interpolating with a f32 output normalize values in [0,1].
+/// Implement CanLinearInterpolate for u8 with f32 outputs.
+/// WARNING: beware that interpolating with a f32 output normalizes values from [0-255] to [0.0, 1.0].
 impl CanLinearInterpolate<f32, f32> for u8 {
     fn to_vector(self) -> f32 {
         self as f32
@@ -28,18 +34,18 @@ impl CanLinearInterpolate<f32, f32> for u8 {
     }
 }
 
-/// Implement CanLinearInterpolate for u8 to u8
+/// Implement CanLinearInterpolate for u8.
 impl CanLinearInterpolate<f32, u8> for u8 {
     fn to_vector(self) -> f32 {
         self as f32
     }
     fn from_vector(v: f32) -> u8 {
-        v.max(0.0).min(u8::MAX as f32) as u8
+        v.max(0.0).min(u8::MAX as f32).round() as u8
     }
 }
 
-/// Implement CanLinearInterpolate for u16 to f32
-/// WARNING: beware that interpolating with a f32 output normalize values in [0,1].
+/// Implement CanLinearInterpolate for u16 with f32 outputs.
+/// WARNING: beware that interpolating with a f32 output normalizes values from [0-65535] to [0.0, 1.0].
 impl CanLinearInterpolate<f32, f32> for u16 {
     fn to_vector(self) -> f32 {
         self as f32
@@ -49,13 +55,13 @@ impl CanLinearInterpolate<f32, f32> for u16 {
     }
 }
 
-/// Implement CanLinearInterpolate for u16 to u16
+/// Implement CanLinearInterpolate for u16.
 impl CanLinearInterpolate<f32, u16> for u16 {
     fn to_vector(self) -> f32 {
         self as f32
     }
     fn from_vector(v: f32) -> u16 {
-        v.max(0.0).min(u16::MAX as f32) as u16
+        v.max(0.0).min(u16::MAX as f32).round() as u16
     }
 }
 
@@ -76,7 +82,7 @@ impl<O, T: CanLinearInterpolate<f32, O>> CanLinearInterpolate<Vector3<f32>, (O, 
 }
 
 /// Simple linear interpolation of a pixel with floating point coordinates.
-/// Extrapolate if the point is outside of the image boundaries.
+/// Extrapolate with the nearest border if the point is outside of the image boundaries.
 #[allow(clippy::many_single_char_names)]
 #[allow(clippy::cast_possible_truncation)]
 #[allow(clippy::cast_sign_loss)]
