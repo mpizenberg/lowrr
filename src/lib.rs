@@ -11,5 +11,4 @@
 pub mod img;
 pub mod interop;
 pub mod optimizer;
-pub mod sparse;
 pub mod utils;

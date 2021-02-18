@@ -62,7 +62,7 @@ where
             .iter()
             .map(crate::img::gradients::squared_norm_direct)
             .collect();
-        let sparse_pixels = crate::sparse::select(sparse_diff_threshold, gradients.as_slice());
+        let sparse_pixels = crate::img::sparse::select(sparse_diff_threshold, gradients.as_slice());
         multires_sparse_pixels.push(sparse_pixels);
         multires_imgs.push(pyramid);
     }

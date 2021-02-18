@@ -104,7 +104,7 @@ where
 
 /// Retrieve the coordinates of selected pixels in a binary mask.
 pub fn coordinates_from_mask(mask: &DMatrix<bool>) -> Vec<(usize, usize)> {
-    crate::sparse::extract(mask.iter().cloned(), coords_col_major(mask.shape())).collect()
+    crate::img::sparse::extract(mask.iter().cloned(), coords_col_major(mask.shape())).collect()
 }
 
 /// An iterator over all coordinates of a matrix in column major.

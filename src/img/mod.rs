@@ -12,4 +12,5 @@ pub mod gradients;
 pub mod interpolation;
 pub mod multires;
 pub mod registration;
+pub mod sparse;
 pub mod viz;
