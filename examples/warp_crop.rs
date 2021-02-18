@@ -1,5 +1,5 @@
+use lowrr::img::registration;
 use lowrr::interop;
-use lowrr::registration;
 
 use glob::glob;
 use image::io::Reader as ImageReader;
@@ -201,7 +201,7 @@ fn run(args: Args) -> Result<(), Box<dyn std::error::Error>> {
 
                 // Equalize mean intensities of cropped area.
                 let mut temp = vec![cropped_img];
-                registration::equalize_mean(temp.as_mut_slice());
+                lowrr::utils::equalize_mean(0.15, temp.as_mut_slice());
                 let cropped_img = temp.pop().unwrap();
 
                 // Save the image to disk.
