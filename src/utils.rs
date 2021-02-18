@@ -8,6 +8,7 @@ use image::{EncodableLayout, Primitive};
 use nalgebra::base::dimension::{Dim, Dynamic};
 use nalgebra::base::{Scalar, VecStorage};
 use nalgebra::{DMatrix, Matrix};
+use std::ops::Mul;
 use std::path::Path;
 
 /// Same as rgb2gray matlab function, but for u8.
@@ -69,6 +70,8 @@ pub fn transpose<T: Clone>(v: Vec<Vec<T>>) -> Vec<Vec<T>> {
     v_transposed
 }
 
+// Helper functions to save images to disk.
+
 /// Save a bunch of gray images into the given directory.
 pub fn save_imgs<P: AsRef<Path>, T: Scalar + Primitive>(dir: P, imgs: &[DMatrix<T>])
 where
@@ -97,6 +100,8 @@ where
     });
 }
 
+// Helper functions to play with coordinates iterators.
+
 /// Retrieve the coordinates of selected pixels in a binary mask.
 pub fn coordinates_from_mask(mask: &DMatrix<bool>) -> Vec<(usize, usize)> {
     crate::sparse::extract(mask.iter().cloned(), coords_col_major(mask.shape())).collect()
@@ -114,4 +119,52 @@ pub fn coords_row_major(shape: (usize, usize)) -> impl Iterator<Item = (usize, u
     let (height, width) = shape;
     let coords = (0..height).map(move |y| (0..width).map(move |x| (x, y)));
     coords.flatten()
+}
+
+// Helper functions to equalize the mean intensity of a collection of images.
+
+/// Only work for gray images for now.
+pub trait CanEqualize: Scalar + Copy + Mul + Into<f32> {
+    fn target_mean() -> f32;
+    fn from_as(f: f32) -> Self;
+}
+
+impl CanEqualize for u8 {
+    fn target_mean() -> f32 {
+        40.0
+    }
+    fn from_as(f: f32) -> Self {
+        f.max(0.0).min(255.0) as Self
+    }
+}
+impl CanEqualize for u16 {
+    fn target_mean() -> f32 {
+        40.0 * 256.0
+    }
+    fn from_as(f: f32) -> Self {
+        f.max(0.0).min(65535.0) as Self
+    }
+}
+
+/// Change the mean intensity of all images to be approximately the same.
+pub fn equalize_mean<T: CanEqualize>(imgs: &mut [DMatrix<T>]) {
+    // Compute mean intensities.
+    let sum_intensities: Vec<f32> = imgs
+        .iter()
+        .map(|im| im.iter().map(|x| (*x).into()).sum())
+        .collect();
+    let nb_pixels = imgs[0].len();
+    let mean_intensities: Vec<_> = sum_intensities
+        .iter()
+        .map(|x| x / nb_pixels as f32)
+        .collect();
+    // eprintln!("mean intensities {:?}", mean_intensities);
+
+    // Multiply all images such that the mean intensity is near the target.
+    for (im, mean) in imgs.iter_mut().zip(mean_intensities) {
+        let scale = (T::target_mean() / mean).max(1.0);
+        for pixel in im.iter_mut() {
+            *pixel = T::from_as(Mul::<f32>::mul(scale, (*pixel).into()));
+        }
+    }
 }

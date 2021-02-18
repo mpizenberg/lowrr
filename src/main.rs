@@ -215,7 +215,7 @@ fn run(args: Args) -> Result<(), Box<dyn std::error::Error>> {
             let mut cropped_imgs = crop(&args.crop, &gray_imgs);
 
             // Equalize mean intensities of cropped area.
-            registration::equalize_mean(&mut cropped_imgs);
+            lowrr::utils::equalize_mean(&mut cropped_imgs);
 
             // Compute the motion of each image for registration.
             let (motion_vec_crop, cropped_imgs) =
@@ -261,7 +261,7 @@ fn run(args: Args) -> Result<(), Box<dyn std::error::Error>> {
             let mut cropped_imgs = crop(&args.crop, &gray_imgs);
 
             // Equalize mean intensities of cropped area.
-            registration::equalize_mean(&mut cropped_imgs);
+            lowrr::utils::equalize_mean(&mut cropped_imgs);
 
             // Visualization of original cropped images.
             eprintln!("Saving original cropped images");
