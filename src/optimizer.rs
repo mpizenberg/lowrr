@@ -53,23 +53,29 @@ where
         nb_iter: usize,
         eval_state: EvalState,
     ) -> (Self, Continue);
+}
 
-    /// Iteratively solve your optimization problem,
-    /// with the provided functions by the trait implementation.
-    /// Return the final state and the number of iterations.
-    /// May return an error if a step computation failed.
-    fn iterative_solve(obs: &Observations, initial_model: Model) -> Result<(Self, usize), Error> {
-        let mut state = Self::init(obs, initial_model);
-        let mut nb_iter = 0;
-        loop {
-            nb_iter += 1;
-            let new_model = state.step()?;
-            let eval_state = state.eval(obs, new_model);
-            let (kept_state, continuation) = state.stop_criterion(obs, nb_iter, eval_state);
-            state = kept_state;
-            if let Continue::Stop = continuation {
-                return Ok((state, nb_iter));
-            }
+/// Iteratively solve your optimization problem,
+/// with the provided functions by the trait implementation.
+/// Return the final state and the number of iterations.
+/// May return an error if a step computation failed.
+pub fn iterative_solve<T, Observations, EvalState, Model, Error>(
+    obs: &Observations,
+    initial_model: Model,
+) -> Result<(T, usize), Error>
+where
+    T: Iterative<Observations, EvalState, Model, Error>,
+{
+    let mut state = T::init(obs, initial_model);
+    let mut nb_iter = 0;
+    loop {
+        nb_iter += 1;
+        let new_model = state.step()?;
+        let eval_state = state.eval(obs, new_model);
+        let (kept_state, continuation) = state.stop_criterion(obs, nb_iter, eval_state);
+        state = kept_state;
+        if let Continue::Stop = continuation {
+            return Ok((state, nb_iter));
         }
     }
 }
