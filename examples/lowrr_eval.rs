@@ -1,5 +1,5 @@
+use lowrr::img::registration;
 use lowrr::interop;
-use lowrr::registration;
 
 use glob::glob;
 use image::DynamicImage;
