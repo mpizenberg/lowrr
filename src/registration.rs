@@ -516,6 +516,7 @@ fn norm(matrix: &DMatrix<f32>) -> f32 {
     norm_sqr(matrix).sqrt() as f32
 }
 
+/// Computes the sum of squared values of a matrix.
 fn norm_sqr(matrix: &DMatrix<f32>) -> f64 {
     matrix.iter().map(|&x| (x as f64).powi(2)).sum()
 }
