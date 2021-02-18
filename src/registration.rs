@@ -491,11 +491,8 @@ where
     f32: Mul<V, Output = V>,
     T: Scalar + Copy + CanLinearInterpolate<V, O>,
 {
-    let mut all_registered = Vec::new();
-    for (im, motion) in imgs.iter().zip(motion_vec.iter()) {
-        all_registered.push(warp(im, motion));
-    }
-    all_registered
+    let warp_pair = |(im, motion)| warp(im, motion);
+    imgs.iter().zip(motion_vec).map(warp_pair).collect()
 }
 
 pub fn warp<T, V, O>(img: &DMatrix<T>, motion_params: &Vector6<f32>) -> DMatrix<O>
