@@ -149,47 +149,28 @@ where
             sparse_count, pixels_count, sparse_ratio
         );
 
-        // Declare mutable loop state.
+        // Choose sparsity.
+        let sparsity: Sparsity;
         let actual_pixel_count: usize;
         let pixel_coordinates: Rc<Vec<(usize, usize)>>;
-        let mut loop_state;
-        let mut imgs_registered;
-        let obs: Obs<T>;
-        let gradients_computation: Box<
-            dyn for<'a, 'b, 'c> Fn(&'a DMatrix<T>, &'b Matrix3<f32>, &'c [f32]) -> Vec<(f32, f32)>,
-        >;
-
         if sparse_ratio > config.sparse_ratio_threshold {
+            sparsity = Sparsity::Full;
             actual_pixel_count = pixels_count;
-            pixel_coordinates = Rc::new(
-                (0..width)
-                    .map(|x| (0..height).map(move |y| (x, y)))
-                    .flatten()
-                    .collect(),
-            );
-            let compute_gradients = move |_: &_, _: &_, registered: &_| {
-                compute_registered_gradients_full((height, width), registered)
-            };
-            gradients_computation = Box::new(compute_gradients);
+            pixel_coordinates = Rc::new(coords_col_major((height, width)).collect());
         } else {
+            sparsity = Sparsity::Sparse;
             actual_pixel_count = sparse_count;
             pixel_coordinates = Rc::new(coordinates_from_mask(lvl_sparse_pixels));
-            let pixel_coordinates_clone = Rc::clone(&pixel_coordinates);
-            let compute_gradients = move |img: &_, motion: &_, _: &_| {
-                compute_registered_gradients_sparse(
-                    img,
-                    motion,
-                    pixel_coordinates_clone.iter().cloned(),
-                )
-            };
-            gradients_computation = Box::new(compute_gradients);
         }
 
-        obs = Obs {
+        // Declare mutable loop state.
+        let mut loop_state;
+        let mut imgs_registered;
+        let obs = Obs {
             image_size: (width, height),
             images: lvl_imgs.as_slice(),
-            coordinates: &pixel_coordinates,
-            compute_registered_gradients: gradients_computation,
+            sparsity,
+            coordinates: pixel_coordinates.as_slice(),
         };
 
         // We also recompute the registered images before starting the algorithm loop.
@@ -244,10 +225,13 @@ struct StepConfig {
 struct Obs<'a, T: Scalar + Copy> {
     image_size: (usize, usize),
     images: &'a [DMatrix<T>],
+    sparsity: Sparsity,
     coordinates: &'a [(usize, usize)],
-    // TODO: make this return an iterator instead.
-    compute_registered_gradients:
-        Box<dyn Fn(&DMatrix<T>, &Matrix3<f32>, &[f32]) -> Vec<(f32, f32)>>,
+}
+
+enum Sparsity {
+    Full,
+    Sparse,
 }
 
 /// Simple enum type to indicate if we should continue to loop.
@@ -306,17 +290,25 @@ impl State {
         // theta-update: forwards compositional step of a Gauss-Newton approximation.
         let residuals = &errors_temp - &*errors;
         for i in 0..obs.images.len() {
+            // Compute gradients for the registered image.
+            let gradients = match &obs.sparsity {
+                Sparsity::Full => compute_registered_gradients_full(
+                    (height, width),
+                    imgs_registered.column(i).as_slice(),
+                ),
+                Sparsity::Sparse => compute_registered_gradients_sparse(
+                    &obs.images[i],
+                    &(projection_mat(&motion_vec[i])),
+                    obs.coordinates.iter().cloned(),
+                ),
+            };
+
             // Compute residuals and motion step.
             let step_params = forwards_compositional_step(
                 (height, width),
                 obs.coordinates.iter().cloned(),
                 residuals.column(i).iter().cloned(),
-                (obs.compute_registered_gradients)(
-                    &obs.images[i],
-                    &(projection_mat(&motion_vec[i])),
-                    imgs_registered.column(i).as_slice(),
-                )
-                .into_iter(),
+                gradients.into_iter(),
             );
 
             // Save motion for this image.
@@ -407,15 +399,13 @@ fn visualize_mask<T: Scalar + ToRgb8>(
 }
 
 fn coordinates_from_mask(mask: &DMatrix<bool>) -> Vec<(usize, usize)> {
-    let (height, width) = mask.shape();
-    let coords = (0..width).map(|x| (0..height).map(move |y| (x, y)));
-    crate::sparse::extract(mask.iter().cloned(), coords.flatten()).collect()
+    crate::sparse::extract(mask.iter().cloned(), coords_col_major(mask.shape())).collect()
 }
 
-fn coordinates_from_mask_iter(mask: &DMatrix<bool>) -> impl Iterator<Item = (usize, usize)> + '_ {
-    let (height, width) = mask.shape();
+fn coords_col_major(shape: (usize, usize)) -> impl Iterator<Item = (usize, usize)> {
+    let (height, width) = shape;
     let coords = (0..width).map(move |x| (0..height).map(move |y| (x, y)));
-    crate::sparse::extract(mask.iter().cloned(), coords.flatten())
+    coords.flatten()
 }
 
 fn compute_registered_gradients_full(shape: (usize, usize), registered: &[f32]) -> Vec<(f32, f32)> {
