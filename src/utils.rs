@@ -96,3 +96,22 @@ where
             .expect("Error saving image");
     });
 }
+
+/// Retrieve the coordinates of selected pixels in a binary mask.
+pub fn coordinates_from_mask(mask: &DMatrix<bool>) -> Vec<(usize, usize)> {
+    crate::sparse::extract(mask.iter().cloned(), coords_col_major(mask.shape())).collect()
+}
+
+/// An iterator over all coordinates of a matrix in column major.
+pub fn coords_col_major(shape: (usize, usize)) -> impl Iterator<Item = (usize, usize)> {
+    let (height, width) = shape;
+    let coords = (0..width).map(move |x| (0..height).map(move |y| (x, y)));
+    coords.flatten()
+}
+
+/// An iterator over all coordinates of a matrix in row major.
+pub fn coords_row_major(shape: (usize, usize)) -> impl Iterator<Item = (usize, usize)> {
+    let (height, width) = shape;
+    let coords = (0..height).map(move |y| (0..width).map(move |x| (x, y)));
+    coords.flatten()
+}
