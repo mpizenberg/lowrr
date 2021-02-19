@@ -1,15 +1,14 @@
+use lowrr::img::crop::{crop, recover_original_motion, Crop};
 use lowrr::img::registration;
 use lowrr::interop;
 
 use glob::glob;
 use image::DynamicImage;
-use nalgebra::{DMatrix, Scalar, Vector6};
+use nalgebra::DMatrix;
 use std::path::{Path, PathBuf};
-use std::str::FromStr;
 
 // Default values for some of the program arguments.
 const DEFAULT_OUT_DIR: &str = "out";
-const DEFAULT_CROP: Crop = Crop::NoCrop;
 const DEFAULT_LEVELS: usize = 1;
 const DEFAULT_LAMBDA: f32 = 1.5;
 const DEFAULT_RHO: f32 = 0.1;
@@ -77,7 +76,7 @@ struct Args {
     version: bool,
     out_dir: String,
     images_paths: Vec<PathBuf>,
-    crop: Crop,
+    crop: Option<Crop>,
 }
 
 /// Function parsing the command line arguments and returning an Args object or an error.
@@ -89,7 +88,7 @@ fn parse_args() -> Result<Args, Box<dyn std::error::Error>> {
     let version = args.contains(["-v", "--version"]);
     let do_image_correction = !args.contains("--no-image-correction");
     let trace = args.contains("--trace");
-    let crop = args.opt_value_from_str("--crop")?.unwrap_or(DEFAULT_CROP);
+    let crop = args.opt_value_from_str("--crop")?;
     let lambda = args
         .opt_value_from_str("--lambda")?
         .unwrap_or(DEFAULT_LAMBDA);
@@ -154,29 +153,6 @@ fn paths_from_glob(p: &str) -> Result<Vec<PathBuf>, Box<dyn std::error::Error>> 
     Ok(paths.into_iter().filter_map(|x| x.ok()).collect())
 }
 
-#[derive(Debug)]
-enum Crop {
-    NoCrop,
-    Area(usize, usize, usize, usize),
-}
-
-impl FromStr for Crop {
-    type Err = std::num::ParseIntError;
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let parts: Vec<_> = s.splitn(4, ',').collect();
-        if parts.len() != 4 {
-            panic!(
-                "--crop argument must be of the shape x1,y1,x2,y2 with no space between elements"
-            );
-        }
-        let x1 = parts[0].parse()?;
-        let y1 = parts[1].parse()?;
-        let x2 = parts[2].parse()?;
-        let y2 = parts[3].parse()?;
-        Ok(Crop::Area(x1, y1, x2, y2))
-    }
-}
-
 /// Start actual program with command line arguments successfully parsed.
 fn run(args: Args) -> Result<(), Box<dyn std::error::Error>> {
     // Check if the --help or --version flags are present.
@@ -210,12 +186,18 @@ fn run(args: Args) -> Result<(), Box<dyn std::error::Error>> {
             let now = std::time::Instant::now();
 
             // Extract the cropped area from the images.
-            let cropped_imgs = crop(&args.crop, &gray_imgs);
+            let cropped_imgs: Vec<_> = match &args.crop {
+                None => gray_imgs,
+                Some(frame) => gray_imgs.iter().map(|im| crop(frame, im)).collect(),
+            };
 
             // Compute the motion of each image for registration.
             let (motion_vec_crop, cropped_imgs) =
                 registration::gray_affine(args.config, cropped_imgs, 10 * 256)?;
-            let motion_vec = inverse_crop_motion(&args.crop, &motion_vec_crop);
+            let motion_vec = match &args.crop {
+                None => motion_vec_crop.clone(),
+                Some(frame) => recover_original_motion(frame, &motion_vec_crop),
+            };
             eprintln!("Registration took {:.1} s", now.elapsed().as_secs_f32());
 
             // // Visualization of registered cropped images.
@@ -229,8 +211,8 @@ fn run(args: Args) -> Result<(), Box<dyn std::error::Error>> {
             // Write motion_vec to stdout.
             // This is the inverse of the motion to keep the same as matlab warps.
             for motion in motion_vec.iter() {
-                let motion_mat = registration::projection_mat(&motion);
-                let v = registration::projection_params(&motion_mat.try_inverse().unwrap());
+                let motion_mat = lowrr::affine2d::projection_mat(&motion);
+                let v = lowrr::affine2d::projection_params(&motion_mat.try_inverse().unwrap());
                 println!(
                     "{}, {}, {}, {}, {}, {}",
                     1.0 + v[0],
@@ -247,51 +229,12 @@ fn run(args: Args) -> Result<(), Box<dyn std::error::Error>> {
     }
 }
 
-fn inverse_crop_motion(crop: &Crop, motion_vec_crop: &[Vector6<f32>]) -> Vec<Vector6<f32>> {
-    match crop {
-        Crop::NoCrop => motion_vec_crop.iter().cloned().collect(),
-        Crop::Area(x1, y1, _, _) => {
-            let translation = registration::projection_mat(&Vector6::new(
-                0.0, 0.0, 0.0, 0.0, *x1 as f32, *y1 as f32,
-            ));
-            let translation_inv = translation.try_inverse().unwrap();
-            motion_vec_crop
-                .iter()
-                .map(|m| {
-                    let motion = registration::projection_mat(m);
-                    registration::projection_params(&(translation * motion * translation_inv))
-                })
-                .collect()
-        }
-    }
-}
-
 enum Dataset {
     RawImages(Vec<DMatrix<u16>>),
     GrayImages(Vec<DMatrix<u8>>),
     GrayImagesU16(Vec<DMatrix<u16>>),
     RgbImages(Vec<DMatrix<(u8, u8, u8)>>),
     RgbImagesU16(Vec<DMatrix<(u16, u16, u16)>>),
-}
-
-fn crop<T: Scalar>(crop: &Crop, imgs: &[DMatrix<T>]) -> Vec<DMatrix<T>> {
-    imgs.iter()
-        .map(|im| match crop {
-            Crop::NoCrop => im.clone(),
-            Crop::Area(x1, y1, x2, y2) => {
-                let (height, width) = im.shape();
-                assert!(x1 < &width, "Error: x1 >= image width");
-                assert!(x2 < &width, "Error: x2 >= image width");
-                assert!(y1 < &height, "Error: y1 >= image height");
-                assert!(y2 < &height, "Error: y2 >= image height");
-                assert!(x1 <= x2, "Error: x2 must be greater than x1");
-                assert!(y1 <= y2, "Error: y2 must be greater than y1");
-                let nrows = y2 - y1;
-                let ncols = x2 - x1;
-                im.slice((*y1, *x1), (nrows, ncols)).into_owned()
-            }
-        })
-        .collect()
 }
 
 /// Load all images into memory.

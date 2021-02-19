@@ -8,6 +8,7 @@
 
 // #![warn(missing_docs)]
 
+pub mod affine2d;
 pub mod img;
 pub mod interop;
 pub mod optimizer;

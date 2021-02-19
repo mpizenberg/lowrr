@@ -1,17 +1,16 @@
+use lowrr::img::crop::{crop, Crop};
 use lowrr::img::registration;
 use lowrr::interop;
 
 use glob::glob;
 use image::io::Reader as ImageReader;
 use image::{DynamicImage, GenericImageView};
-use nalgebra::{DMatrix, Scalar, Vector6};
+use nalgebra::{DMatrix, Vector6};
 use std::io::prelude::*;
 use std::path::PathBuf;
-use std::str::FromStr;
 
 // Default values for some of the program arguments.
 const DEFAULT_OUT_DIR: &str = "generated";
-const DEFAULT_CROP: Crop = Crop::NoCrop;
 const DEFAULT_FLOW: f64 = 0.01;
 
 /// Entry point of the program.
@@ -53,7 +52,7 @@ struct Args {
     flow: f64,
     out_dir: String,
     images_paths: Vec<PathBuf>,
-    crop: Crop,
+    crop: Option<Crop>,
 }
 
 /// Function parsing the command line arguments and returning an Args object or an error.
@@ -68,7 +67,7 @@ fn parse_args() -> Result<Args, Box<dyn std::error::Error>> {
     let flow = args
         .opt_value_from_str("--flow")?
         .unwrap_or(DEFAULT_FLOW.into());
-    let crop = args.opt_value_from_str("--crop")?.unwrap_or(DEFAULT_CROP);
+    let crop = args.opt_value_from_str("--crop")?;
 
     // Verify that images paths are correct.
     let free_args = args.free()?;
@@ -101,29 +100,6 @@ fn absolute_file_paths(args: &[String]) -> Result<Vec<PathBuf>, Box<dyn std::err
 fn paths_from_glob(p: &str) -> Result<Vec<PathBuf>, Box<dyn std::error::Error>> {
     let paths = glob(p)?;
     Ok(paths.into_iter().filter_map(|x| x.ok()).collect())
-}
-
-#[derive(Debug)]
-enum Crop {
-    NoCrop,
-    Area(usize, usize, usize, usize),
-}
-
-impl FromStr for Crop {
-    type Err = std::num::ParseIntError;
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let parts: Vec<_> = s.splitn(4, ',').collect();
-        if parts.len() != 4 {
-            panic!(
-                "--crop argument must be of the shape x1,y1,x2,y2 with no space between elements"
-            );
-        }
-        let x1 = parts[0].parse()?;
-        let y1 = parts[1].parse()?;
-        let x2 = parts[2].parse()?;
-        let y2 = parts[3].parse()?;
-        Ok(Crop::Area(x1, y1, x2, y2))
-    }
 }
 
 /// Start actual program with command line arguments successfully parsed.
@@ -194,7 +170,10 @@ fn run(args: Args) -> Result<(), Box<dyn std::error::Error>> {
                 let warp_img_mat: DMatrix<(u16, u16, u16)> = registration::warp(&img_mat, &motion);
 
                 // Crop it to the provided area.
-                let cropped_img = crop(&args.crop, &warp_img_mat);
+                let cropped_img = match &args.crop {
+                    None => warp_img_mat,
+                    Some(frame) => crop(frame, &warp_img_mat),
+                };
 
                 // Only keep one channel (green).
                 let cropped_img = cropped_img.map(|(_r, g, _b)| g);
@@ -214,22 +193,4 @@ fn run(args: Args) -> Result<(), Box<dyn std::error::Error>> {
     }
     pb.finish();
     Ok(())
-}
-
-fn crop<T: Scalar>(crop: &Crop, im: &DMatrix<T>) -> DMatrix<T> {
-    match crop {
-        Crop::NoCrop => im.clone(),
-        Crop::Area(x1, y1, x2, y2) => {
-            let (height, width) = im.shape();
-            assert!(x1 < &width, "Error: x1 >= image width");
-            assert!(x2 < &width, "Error: x2 >= image width");
-            assert!(y1 < &height, "Error: y1 >= image height");
-            assert!(y2 < &height, "Error: y2 >= image height");
-            assert!(x1 <= x2, "Error: x2 must be greater than x1");
-            assert!(y1 <= y2, "Error: y2 must be greater than y1");
-            let nrows = y2 - y1;
-            let ncols = x2 - x1;
-            im.slice((*y1, *x1), (nrows, ncols)).into_owned()
-        }
-    }
 }
