@@ -1,10 +1,10 @@
 use lowrr::img::crop::{crop, recover_original_motion, Crop};
 use lowrr::img::registration;
-use lowrr::interop;
+use lowrr::interop::IntoDMatrix;
 
 use glob::glob;
 use image::DynamicImage;
-use nalgebra::DMatrix;
+use nalgebra::{DMatrix, Scalar};
 use std::path::{Path, PathBuf};
 
 // Default values for some of the program arguments.
@@ -325,36 +325,17 @@ fn load_dataset<P: AsRef<Path>>(
     } else if images_types.iter().all(|&t| t == "raw") {
         unimplemented!("imread raw")
     } else if images_types.iter().all(|&t| t == "image") {
-        let img_count = images_types.len();
-        eprintln!("Loading {} images ...", img_count);
-        let pb = indicatif::ProgressBar::new(img_count as u64);
+        assert!(!images_types.is_empty(), "No image found");
         // Open the first image to figure out the image type.
-        assert!(img_count > 0);
         match image::open(&paths[0])? {
             DynamicImage::ImageRgb8(rgb_img_0) => {
-                let mut imgs = Vec::with_capacity(img_count);
-                let img_mat = interop::matrix_from_rgb_image(rgb_img_0);
-                let (height, width) = img_mat.shape();
-                imgs.push(img_mat);
-                pb.inc(1);
-                for rgb_img in paths[1..].iter().map(|p| image::open(p).unwrap()) {
-                    imgs.push(interop::matrix_from_rgb_image(rgb_img.into_rgb8()));
-                    pb.inc(1);
-                }
-                pb.finish();
+                let (imgs, (height, width)) =
+                    load_all(DynamicImage::ImageRgb8(rgb_img_0), &paths[1..]);
                 Ok((Dataset::RgbImages(imgs), (width, height)))
             }
             DynamicImage::ImageRgb16(rgb_img_0) => {
-                let mut imgs = Vec::with_capacity(img_count);
-                let img_mat: DMatrix<(u16, u16, u16)> = interop::matrix_from_rgb_image(rgb_img_0);
-                let (height, width) = img_mat.shape();
-                imgs.push(img_mat);
-                pb.inc(1);
-                for rgb_img in paths[1..].iter().map(|p| image::open(p).unwrap()) {
-                    imgs.push(interop::matrix_from_rgb_image(rgb_img.into_rgb16()));
-                    pb.inc(1);
-                }
-                pb.finish();
+                let (imgs, (height, width)) =
+                    load_all(DynamicImage::ImageRgb16(rgb_img_0), &paths[1..]);
                 Ok((Dataset::RgbImagesU16(imgs), (width, height)))
             }
             _ => Err("Unknow image type".into()),
@@ -362,4 +343,27 @@ fn load_dataset<P: AsRef<Path>>(
     } else {
         panic!("There is a mix of image types")
     }
+}
+
+fn load_all<P: AsRef<Path>, Pixel, T: Scalar>(
+    first_img: DynamicImage,
+    other_paths: &[P],
+) -> (Vec<DMatrix<T>>, (usize, usize))
+where
+    DynamicImage: IntoDMatrix<Pixel, T>,
+{
+    let img_count = 1 + other_paths.len();
+    eprintln!("Loading {} images ...", img_count);
+    let pb = indicatif::ProgressBar::new(img_count as u64);
+    let mut imgs = Vec::with_capacity(img_count);
+    let img_mat = first_img.into_dmatrix();
+    let shape = img_mat.shape();
+    imgs.push(img_mat);
+    pb.inc(1);
+    for rgb_img in other_paths.iter().map(|p| image::open(p).unwrap()) {
+        imgs.push(rgb_img.into_dmatrix());
+        pb.inc(1);
+    }
+    pb.finish();
+    (imgs, shape)
 }

@@ -4,7 +4,7 @@
 
 //! Interoperability conversions between the image and matrix types.
 
-use image::{ImageBuffer, Luma, Primitive, Rgb};
+use image::{DynamicImage, ImageBuffer, Luma, Primitive, Rgb};
 use nalgebra::{DMatrix, Scalar};
 
 /// Convert a matrix into a gray level image.
@@ -61,4 +61,36 @@ pub fn matrix_from_rgb_image<T: Scalar + Primitive>(
         img.as_raw().chunks_exact(3).map(|s| (s[0], s[1], s[2])),
     )
     .transpose()
+}
+
+pub trait IntoDMatrix<P, T: Scalar> {
+    fn into_dmatrix(self) -> DMatrix<T>;
+}
+
+impl IntoDMatrix<Luma<u8>, u8> for DynamicImage {
+    fn into_dmatrix(self) -> DMatrix<u8> {
+        assert!(self.as_luma8().is_some(), "This isn't a Luma<u8> image.");
+        matrix_from_image(self.into_luma8())
+    }
+}
+
+impl IntoDMatrix<Luma<u16>, u16> for DynamicImage {
+    fn into_dmatrix(self) -> DMatrix<u16> {
+        assert!(self.as_luma16().is_some(), "This isn't a Luma<u16> image.");
+        matrix_from_image(self.into_luma16())
+    }
+}
+
+impl IntoDMatrix<Rgb<u8>, (u8, u8, u8)> for DynamicImage {
+    fn into_dmatrix(self) -> DMatrix<(u8, u8, u8)> {
+        assert!(self.as_rgb8().is_some(), "This isn't a Rgb<u8> image.");
+        matrix_from_rgb_image(self.into_rgb8())
+    }
+}
+
+impl IntoDMatrix<Rgb<u16>, (u16, u16, u16)> for DynamicImage {
+    fn into_dmatrix(self) -> DMatrix<(u16, u16, u16)> {
+        assert!(self.as_rgb16().is_some(), "This isn't a Rgb<u16> image.");
+        matrix_from_rgb_image(self.into_rgb16())
+    }
 }
