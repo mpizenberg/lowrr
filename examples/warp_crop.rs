@@ -1,6 +1,6 @@
 use lowrr::img::crop::{crop, Crop};
 use lowrr::img::registration;
-use lowrr::interop;
+use lowrr::interop::{self, IntoDMatrix, IntoImage};
 
 use glob::glob;
 use image::io::Reader as ImageReader;
@@ -162,33 +162,32 @@ fn run(args: Args) -> Result<(), Box<dyn std::error::Error>> {
             .as_bytes(),
         )?;
 
-        match dyn_img {
-            DynamicImage::ImageRgb16(img) => {
-                let img_mat = interop::matrix_from_rgb_image(img);
+        // TODO: change the u16 to something generic here!
+        let img_mat: DMatrix<(u16, u16, u16)> = dyn_img.clone().into_dmatrix();
 
-                // Warp the image.
-                let warp_img_mat: DMatrix<(u16, u16, u16)> = registration::warp(&img_mat, &motion);
+        // Warp the image.
+        // TODO: change the u16 to something generic here!
+        let warp_img_mat: DMatrix<(u16, u16, u16)> = registration::warp(&img_mat, &motion);
 
-                // Crop it to the provided area.
-                let cropped_img = match &args.crop {
-                    None => warp_img_mat,
-                    Some(frame) => crop(frame, &warp_img_mat),
-                };
+        // Crop it to the provided area.
+        // TODO: we could do the warping and cropping all at once for perf improvements.
+        let cropped_img = match &args.crop {
+            None => warp_img_mat,
+            Some(frame) => crop(frame, &warp_img_mat),
+        };
 
-                // Only keep one channel (green).
-                let cropped_img = cropped_img.map(|(_r, g, _b)| g);
+        // Only keep one channel (green).
+        let cropped_img = cropped_img.map(|(_r, g, _b)| g);
 
-                // Equalize mean intensities of cropped area.
-                let mut temp = vec![cropped_img];
-                lowrr::utils::equalize_mean(0.15, temp.as_mut_slice());
-                let cropped_img = temp.pop().unwrap();
+        // Equalize mean intensities of cropped area.
+        let mut temp = vec![cropped_img];
+        lowrr::utils::equalize_mean(0.15, temp.as_mut_slice());
+        let cropped_img = temp.pop().unwrap();
 
-                // Save the image to disk.
-                let warp_img = interop::image_from_matrix(&cropped_img);
-                warp_img.save(warp_dir.join(format!("{:02}.png", id)))?;
-            }
-            _ => todo!(),
-        }
+        // Save the image to disk.
+        let warp_img = cropped_img.into_image();
+        warp_img.save(warp_dir.join(format!("{:02}.png", id)))?;
+
         pb.inc(1);
     }
     pb.finish();

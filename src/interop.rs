@@ -7,6 +7,9 @@
 use image::{DynamicImage, ImageBuffer, Luma, Primitive, Rgb};
 use nalgebra::{DMatrix, Scalar};
 
+// Convert an Image into a DMatrix ---------------------------------------------
+// -----------------------------------------------------------------------------
+
 /// Convert a matrix into a gray level image.
 /// Inverse operation of `matrix_from_image`.
 ///
@@ -40,6 +43,37 @@ pub fn rgb_from_matrix<T: Scalar + Primitive>(
     }
     img_buf
 }
+
+pub trait IntoImage {
+    fn into_image(&self) -> DynamicImage;
+}
+
+impl IntoImage for DMatrix<u8> {
+    fn into_image(&self) -> DynamicImage {
+        DynamicImage::ImageLuma8(image_from_matrix(self))
+    }
+}
+
+impl IntoImage for DMatrix<u16> {
+    fn into_image(&self) -> DynamicImage {
+        DynamicImage::ImageLuma16(image_from_matrix(self))
+    }
+}
+
+impl IntoImage for DMatrix<(u8, u8, u8)> {
+    fn into_image(&self) -> DynamicImage {
+        DynamicImage::ImageRgb8(rgb_from_matrix(self))
+    }
+}
+
+impl IntoImage for DMatrix<(u16, u16, u16)> {
+    fn into_image(&self) -> DynamicImage {
+        DynamicImage::ImageRgb16(rgb_from_matrix(self))
+    }
+}
+
+// Convert a DMatrix into an Image ---------------------------------------------
+// -----------------------------------------------------------------------------
 
 /// Convert a gray image into a matrix.
 /// Inverse operation of `image_from_matrix`.

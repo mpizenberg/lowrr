@@ -325,7 +325,6 @@ fn load_dataset<P: AsRef<Path>>(
     } else if images_types.iter().all(|&t| t == "raw") {
         unimplemented!("imread raw")
     } else if images_types.iter().all(|&t| t == "image") {
-        assert!(!images_types.is_empty(), "No image found");
         // Open the first image to figure out the image type.
         match image::open(&paths[0])? {
             DynamicImage::ImageRgb8(rgb_img_0) => {
