@@ -6,6 +6,43 @@
 
 use nalgebra::{DMatrix, Scalar};
 
+/// Transform an RGB value into a single channel gray value.
+pub trait ToGray {
+    type Output: Scalar;
+    fn to_gray(self) -> Self::Output;
+}
+
+impl ToGray for u8 {
+    type Output = u8;
+    fn to_gray(self) -> Self::Output {
+        self
+    }
+}
+
+impl ToGray for u16 {
+    type Output = u16;
+    fn to_gray(self) -> Self::Output {
+        self
+    }
+}
+
+impl ToGray for (u8, u8, u8) {
+    type Output = u8;
+    fn to_gray(self) -> Self::Output {
+        let (_, g, _) = self;
+        g
+    }
+}
+
+impl ToGray for (u16, u16, u16) {
+    type Output = u16;
+    fn to_gray(self) -> Self::Output {
+        let (_, g, _) = self;
+        g
+    }
+}
+
+/// Ugrade a mono-channel value to a gray RGB value.
 pub trait ToRgb8 {
     fn to_rgb8(self) -> (u8, u8, u8);
 }

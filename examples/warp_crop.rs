@@ -1,17 +1,21 @@
 use lowrr::img::crop::{crop, Crop};
+use lowrr::img::interpolation::CanLinearInterpolate;
 use lowrr::img::registration;
-use lowrr::interop::{self, IntoDMatrix, IntoImage};
+use lowrr::img::viz::ToGray;
+use lowrr::interop::{IntoDMatrix, IntoImage};
+use lowrr::utils::CanEqualize;
 
 use glob::glob;
 use image::io::Reader as ImageReader;
-use image::{DynamicImage, GenericImageView};
-use nalgebra::{DMatrix, Vector6};
+use image::GenericImageView;
+use nalgebra::{DMatrix, Scalar, Vector6};
 use std::io::prelude::*;
-use std::path::PathBuf;
+use std::ops::{Add, Mul};
+use std::path::{Path, PathBuf};
 
 // Default values for some of the program arguments.
-const DEFAULT_OUT_DIR: &str = "generated";
 const DEFAULT_FLOW: f64 = 0.01;
+const DEFAULT_OUT_DIR: &str = "generated";
 
 /// Entry point of the program.
 fn main() {
@@ -41,7 +45,7 @@ FLAGS:
     --crop x1,y1,x2,y2     # Crop image into a restricted working area (use no space between coordinates)
     --out-dir dir/         # Output directory to save registered images (default: {})
 "#,
-        DEFAULT_OUT_DIR, DEFAULT_FLOW,
+        DEFAULT_FLOW, DEFAULT_OUT_DIR,
     )
 }
 
@@ -162,34 +166,63 @@ fn run(args: Args) -> Result<(), Box<dyn std::error::Error>> {
             .as_bytes(),
         )?;
 
-        // TODO: change the u16 to something generic here!
-        let img_mat: DMatrix<(u16, u16, u16)> = dyn_img.clone().into_dmatrix();
-
-        // Warp the image.
-        // TODO: change the u16 to something generic here!
-        let warp_img_mat: DMatrix<(u16, u16, u16)> = registration::warp(&img_mat, &motion);
-
-        // Crop it to the provided area.
-        // TODO: we could do the warping and cropping all at once for perf improvements.
-        let cropped_img = match &args.crop {
-            None => warp_img_mat,
-            Some(frame) => crop(frame, &warp_img_mat),
-        };
-
-        // Only keep one channel (green).
-        let cropped_img = cropped_img.map(|(_r, g, _b)| g);
-
-        // Equalize mean intensities of cropped area.
-        let mut temp = vec![cropped_img];
-        lowrr::utils::equalize_mean(0.15, temp.as_mut_slice());
-        let cropped_img = temp.pop().unwrap();
-
-        // Save the image to disk.
-        let warp_img = cropped_img.into_image();
-        warp_img.save(warp_dir.join(format!("{:02}.png", id)))?;
+        let save_path = warp_dir.join(format!("{:02}.png", id));
+        if dyn_img.as_luma8().is_some() {
+            warp_crop::<_, u8, _, u8, _>(dyn_img, motion, &args.crop, &save_path)?;
+        } else if dyn_img.as_luma16().is_some() {
+            warp_crop::<_, u16, _, u16, _>(dyn_img, motion, &args.crop, &save_path)?;
+        } else if dyn_img.as_rgb8().is_some() {
+            warp_crop::<_, (u8, u8, u8), _, (u8, u8, u8), _>(
+                dyn_img, motion, &args.crop, &save_path,
+            )?;
+        } else if dyn_img.as_rgb16().is_some() {
+            warp_crop::<_, (u16, u16, u16), _, (u16, u16, u16), _>(
+                dyn_img, motion, &args.crop, &save_path,
+            )?;
+        } else {
+            panic!("Unknown image type");
+        }
 
         pb.inc(1);
     }
     pb.finish();
+    Ok(())
+}
+
+fn warp_crop<P, T, V, O, I>(
+    img: I,
+    motion: Vector6<f32>,
+    crop_frame: &Option<Crop>,
+    save_path: &Path,
+) -> Result<(), Box<dyn std::error::Error>>
+where
+    O: Scalar + ToGray,
+    <O as ToGray>::Output: CanEqualize,
+    DMatrix<<O as ToGray>::Output>: IntoImage,
+    V: Add<Output = V>,
+    f32: Mul<V, Output = V>,
+    T: Scalar + Copy + CanLinearInterpolate<V, O>,
+    I: IntoDMatrix<P, T>,
+{
+    let mat = img.into_dmatrix();
+    let warp_mat = registration::warp(&mat, &motion);
+
+    // Crop it to the provided area.
+    let cropped_mat = match crop_frame {
+        None => warp_mat,
+        Some(frame) => crop(frame, &warp_mat),
+    };
+
+    // Only keep one channel (green).
+    let cropped_mat = cropped_mat.map(ToGray::to_gray);
+
+    // Equalize mean intensities of cropped area.
+    let mut temp = vec![cropped_mat];
+    lowrr::utils::equalize_mean(0.15, temp.as_mut_slice());
+    let cropped_mat = temp.pop().unwrap();
+
+    // Save the image to disk.
+    let warp_img = cropped_mat.into_image();
+    warp_img.save(save_path)?;
     Ok(())
 }
