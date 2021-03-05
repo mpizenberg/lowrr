@@ -186,7 +186,7 @@ fn run(args: Args) -> Result<(), Box<dyn std::error::Error>> {
             let now = std::time::Instant::now();
 
             // Extract the cropped area from the images.
-            let cropped_imgs: Vec<_> = match &args.crop {
+            let cropped_imgs: Vec<_> = match args.crop {
                 None => gray_imgs,
                 Some(frame) => gray_imgs.iter().map(|im| crop(frame, im)).collect(),
             };
@@ -194,7 +194,7 @@ fn run(args: Args) -> Result<(), Box<dyn std::error::Error>> {
             // Compute the motion of each image for registration.
             let (motion_vec_crop, cropped_imgs) =
                 registration::gray_affine(args.config, cropped_imgs, 10 * 256)?;
-            let motion_vec = match &args.crop {
+            let motion_vec = match args.crop {
                 None => motion_vec_crop.clone(),
                 Some(frame) => recover_original_motion(frame, &motion_vec_crop),
             };
