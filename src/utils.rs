@@ -4,7 +4,6 @@
 
 //! Helper module for functions that didn't fit anywhere else.
 
-use image::{EncodableLayout, Primitive};
 use nalgebra::base::dimension::{Dim, Dynamic};
 use nalgebra::base::{Scalar, VecStorage};
 use nalgebra::{DMatrix, Matrix};

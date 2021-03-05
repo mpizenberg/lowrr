@@ -168,16 +168,16 @@ fn run(args: Args) -> Result<(), Box<dyn std::error::Error>> {
 
         let save_path = warp_dir.join(format!("{:02}.png", id));
         if dyn_img.as_luma8().is_some() {
-            warp_crop::<_, u8, _, u8, _>(dyn_img, motion, &args.crop, &save_path)?;
+            warp_crop::<_, u8, _, u8, _>(dyn_img, motion, args.crop, &save_path)?;
         } else if dyn_img.as_luma16().is_some() {
-            warp_crop::<_, u16, _, u16, _>(dyn_img, motion, &args.crop, &save_path)?;
+            warp_crop::<_, u16, _, u16, _>(dyn_img, motion, args.crop, &save_path)?;
         } else if dyn_img.as_rgb8().is_some() {
             warp_crop::<_, (u8, u8, u8), _, (u8, u8, u8), _>(
-                dyn_img, motion, &args.crop, &save_path,
+                dyn_img, motion, args.crop, &save_path,
             )?;
         } else if dyn_img.as_rgb16().is_some() {
             warp_crop::<_, (u16, u16, u16), _, (u16, u16, u16), _>(
-                dyn_img, motion, &args.crop, &save_path,
+                dyn_img, motion, args.crop, &save_path,
             )?;
         } else {
             panic!("Unknown image type");
@@ -192,7 +192,7 @@ fn run(args: Args) -> Result<(), Box<dyn std::error::Error>> {
 fn warp_crop<P, T, V, O, I>(
     img: I,
     motion: Vector6<f32>,
-    crop_frame: &Option<Crop>,
+    crop_frame: Option<Crop>,
     save_path: &Path,
 ) -> Result<(), Box<dyn std::error::Error>>
 where
