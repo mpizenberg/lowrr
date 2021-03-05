@@ -4,16 +4,17 @@
 
 //! Registration algorithm for a sequence of slightly misaligned images.
 
-use image::{EncodableLayout, Primitive};
+use image::Primitive;
 use nalgebra::{DMatrix, Matrix3, Matrix6, RealField, Scalar, Vector3, Vector6};
 use std::ops::{Add, Mul};
 use std::rc::Rc;
 
 use crate::affine2d::{projection_mat, projection_params};
 use crate::img::interpolation::CanLinearInterpolate;
+use crate::interop::IntoImage;
 
 /// Configuration (parameters) of the registration algorithm.
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub struct Config {
     pub do_image_correction: bool,
     pub lambda: f32,
@@ -29,27 +30,46 @@ pub struct Config {
 /// Type alias just to semantically differenciate Vec<Levels<_>> and Levels<Vec<_>>.
 type Levels<T> = Vec<T>;
 
+/// Trait for types that implement all the necessary stuff in order
+/// to do registration on matrices of that type.
+/// Basically u8 and u16 (only gray images supported for now).
+pub trait CanRegister:
+    Copy
+    + Scalar
+    + Primitive
+    + crate::img::viz::ToRgb8
+    + crate::img::multires::Bigger
+    + crate::img::gradients::Bigger<<Self as CanRegister>::Bigger>
+    + CanLinearInterpolate<f32, f32>
+    + CanLinearInterpolate<f32, Self>
+where
+    DMatrix<Self>: IntoImage,
+{
+    type Bigger: Scalar + Copy + PartialOrd + Add<Output = Self::Bigger>;
+}
+
+impl CanRegister for u8 {
+    type Bigger = u16;
+}
+impl CanRegister for u16 {
+    type Bigger = u32;
+}
+
 /// Affine registration of single channel images.
 ///
 /// Internally, this uses a multi-resolution approach,
 /// where the motion vector computed at one resolution serves
 /// as initialization for the next one.
-pub fn gray_affine<T, B>(
+///
+/// The input images are passed by value to be used as the first level
+/// of the multi-resolution pyramid.
+pub fn gray_affine<T: CanRegister>(
     config: Config,
     imgs: Vec<DMatrix<T>>,
-    sparse_diff_threshold: B, // 50
+    sparse_diff_threshold: T::Bigger, // 50
 ) -> Result<(Vec<Vector6<f32>>, Vec<DMatrix<T>>), Box<dyn std::error::Error>>
 where
-    B: Scalar + Copy + PartialOrd + Add<Output = B>, // for gradients
-    T: Copy
-        + Scalar
-        + Primitive
-        + crate::img::viz::ToRgb8
-        + crate::img::multires::Bigger
-        + crate::img::gradients::Bigger<B>
-        + CanLinearInterpolate<f32, f32>
-        + CanLinearInterpolate<f32, T>,
-    [T]: EncodableLayout,
+    DMatrix<T>: IntoImage,
 {
     // Get the number of images to align.
     let imgs_count = imgs.len();
@@ -59,7 +79,7 @@ where
     let mut multires_sparse_pixels: Vec<Levels<_>> = Vec::with_capacity(imgs_count);
     for im in imgs.into_iter() {
         let pyramid: Levels<DMatrix<T>> = crate::img::multires::mean_pyramid(config.levels, im);
-        let gradients: Levels<DMatrix<B>> = pyramid
+        let gradients: Levels<DMatrix<T::Bigger>> = pyramid
             .iter()
             .map(crate::img::gradients::squared_norm_direct)
             .collect();

@@ -1,10 +1,13 @@
 use lowrr::img::crop::{crop, recover_original_motion, Crop};
-use lowrr::img::registration;
-use lowrr::interop::IntoDMatrix;
+use lowrr::img::interpolation::CanLinearInterpolate;
+use lowrr::img::registration::{self, CanRegister};
+use lowrr::interop::{IntoDMatrix, IntoImage};
+use lowrr::utils::CanEqualize;
 
 use glob::glob;
 use image::DynamicImage;
-use nalgebra::{DMatrix, Scalar};
+use nalgebra::{DMatrix, Scalar, Vector6};
+use std::ops::{Add, Mul};
 use std::path::{Path, PathBuf};
 
 // Default values for some of the program arguments.
@@ -168,123 +171,100 @@ fn run(args: Args) -> Result<(), Box<dyn std::error::Error>> {
         std::process::exit(0);
     }
 
-    // Get the path of output directory.
-    let out_dir_path = PathBuf::from(args.out_dir);
-
     // Load the dataset in memory.
     let now = std::time::Instant::now();
     let (dataset, _) = load_dataset(&args.images_paths)?;
     eprintln!("Loading took {:.1} s", now.elapsed().as_secs_f32());
-    // panic!("stop");
 
     // Use the algorithm corresponding to the type of data.
-    match dataset {
+    let motion_vec = match dataset {
         Dataset::GrayImages(_) => unimplemented!(),
         Dataset::RgbImages(imgs) => {
-            let now = std::time::Instant::now();
-
-            // Convert RGB into gray
             let gray_imgs: Vec<_> = imgs.iter().map(|im| im.map(|(_r, g, _b)| g)).collect();
-
-            // Extract the cropped area from the images.
-            let mut cropped_imgs: Vec<_> = match &args.crop {
-                None => gray_imgs,
-                Some(frame) => gray_imgs.iter().map(|im| crop(frame, im)).collect(),
-            };
-
-            // Equalize mean intensities of cropped area.
-            lowrr::utils::equalize_mean(0.15, &mut cropped_imgs);
-
-            // Compute the motion of each image for registration.
-            let (motion_vec_crop, cropped_imgs) =
-                registration::gray_affine(args.config, cropped_imgs, 50)?;
-            let motion_vec = match &args.crop {
-                None => motion_vec_crop.clone(),
-                Some(frame) => recover_original_motion(frame, &motion_vec_crop),
-            };
-            eprintln!("Registration took {:.1} s", now.elapsed().as_secs_f32());
-
-            // // Reproject (interpolation + extrapolation) images according to that motion.
-            // // Write the registered images to the output directory.
-            // eprintln!("Saving registered images");
-            // let registered_imgs = registration::reproject(&imgs, &motion_vec);
-            // drop(imgs);
-            // lowrr::utils::save_rgbu8_imgs(&out_dir_path, &registered_imgs);
-            // drop(registered_imgs);
-
-            // Visualization of registered cropped images.
-            eprintln!("Saving registered cropped images");
-            let registered_cropped_imgs: Vec<DMatrix<u8>> =
-                registration::reproject(&cropped_imgs, &motion_vec_crop);
-            let cropped_aligned_dir = &out_dir_path.join("cropped_aligned");
-            lowrr::utils::save_imgs(&cropped_aligned_dir, &registered_cropped_imgs);
-            drop(registered_cropped_imgs);
-
-            // Visualization of original cropped images.
-            eprintln!("Saving original cropped images");
-            let cropped_dir = &out_dir_path.join("cropped");
-            lowrr::utils::save_imgs(&cropped_dir, &cropped_imgs);
-            drop(cropped_imgs);
-
-            // Write motion_vec to stdout.
-            for v in motion_vec.iter() {
-                println!("{}", v);
-            }
-            Ok(())
+            let (motion_vec_crop, cropped_eq_imgs) =
+                crop_and_register(args.crop, args.config, gray_imgs, 40)?;
+            original_motion(&args, motion_vec_crop, cropped_eq_imgs, &imgs)?
         }
         Dataset::RgbImagesU16(imgs) => {
-            let now = std::time::Instant::now();
-
-            // Convert RGB into gray
             let gray_imgs: Vec<_> = imgs.iter().map(|im| im.map(|(_r, g, _b)| g)).collect();
-
-            // Extract the cropped area from the images.
-            let mut cropped_imgs = match &args.crop {
-                None => gray_imgs,
-                Some(frame) => gray_imgs.iter().map(|im| crop(frame, im)).collect(),
-            };
-
-            // Equalize mean intensities of cropped area.
-            lowrr::utils::equalize_mean(0.15, &mut cropped_imgs);
-
-            // Visualization of original cropped images.
-            eprintln!("Saving original cropped images");
-            let cropped_dir = &out_dir_path.join("cropped");
-            lowrr::utils::save_imgs(&cropped_dir, &cropped_imgs);
-
-            // Compute the motion of each image for registration.
-            let (motion_vec_crop, cropped_imgs) =
-                registration::gray_affine(args.config, cropped_imgs, 10 * 256)?;
-            let motion_vec = match &args.crop {
-                None => motion_vec_crop.clone(),
-                Some(frame) => recover_original_motion(frame, &motion_vec_crop),
-            };
-            eprintln!("Registration took {:.1} s", now.elapsed().as_secs_f32());
-
-            // // Reproject (interpolation + extrapolation) images according to that motion.
-            // // Write the registered images to the output directory.
-            // eprintln!("Saving registered images");
-            // let registered_imgs = registration::reproject(&imgs, &motion_vec);
-            // drop(imgs);
-            // lowrr::utils::save_rgbu8_imgs(&out_dir_path, &registered_imgs);
-            // drop(registered_imgs);
-
-            // Visualization of registered cropped images.
-            eprintln!("Saving registered cropped images");
-            let registered_cropped_imgs: Vec<DMatrix<u16>> =
-                registration::reproject(&cropped_imgs, &motion_vec_crop);
-            let cropped_aligned_dir = &out_dir_path.join("cropped_aligned");
-            lowrr::utils::save_imgs(&cropped_aligned_dir, &registered_cropped_imgs);
-            drop(registered_cropped_imgs);
-
-            // Write motion_vec to stdout.
-            for v in motion_vec.iter() {
-                println!("{}", v);
-            }
-            Ok(())
+            let (motion_vec_crop, cropped_eq_imgs) =
+                crop_and_register(args.crop, args.config, gray_imgs, 10 * 256)?;
+            original_motion(&args, motion_vec_crop, cropped_eq_imgs, &imgs)?
         }
         Dataset::RawImages(_) => unimplemented!(),
+    };
+
+    // Write motion_vec to stdout.
+    for v in motion_vec.iter() {
+        println!("{}", v);
     }
+    Ok(())
+}
+
+fn crop_and_register<T: CanEqualize + CanRegister>(
+    args_crop: Option<Crop>,
+    registration_config: registration::Config,
+    gray_imgs: Vec<DMatrix<T>>,
+    sparse_diff_threshold: <T as CanRegister>::Bigger, // 50
+) -> Result<(Vec<Vector6<f32>>, Vec<DMatrix<T>>), Box<dyn std::error::Error>>
+where
+    DMatrix<T>: IntoImage,
+{
+    // Extract the cropped area from the images.
+    let mut cropped_imgs = match args_crop {
+        None => gray_imgs,
+        Some(frame) => gray_imgs.iter().map(|im| crop(frame, im)).collect(),
+    };
+
+    // Equalize mean intensities of cropped area.
+    lowrr::utils::equalize_mean(0.15, &mut cropped_imgs);
+
+    // Compute the motion of each image for registration.
+    registration::gray_affine(registration_config, cropped_imgs, sparse_diff_threshold)
+}
+
+fn original_motion<T: CanRegister, U: Scalar + Copy, V>(
+    args: &Args,
+    motion_vec_crop: Vec<Vector6<f32>>,
+    cropped_eq_imgs: Vec<DMatrix<T>>,
+    original_imgs: &[DMatrix<U>],
+) -> Result<Vec<Vector6<f32>>, Box<dyn std::error::Error>>
+where
+    DMatrix<T>: IntoImage,
+    U: CanLinearInterpolate<V, U>,
+    V: Add<Output = V>,
+    f32: Mul<V, Output = V>,
+    DMatrix<U>: IntoImage,
+{
+    // Recover motion parameters in the frame of the full image from the one in the cropped frame.
+    let motion_vec = match args.crop {
+        None => motion_vec_crop.clone(),
+        Some(frame) => recover_original_motion(frame, &motion_vec_crop),
+    };
+
+    // All that follows is just to help debugging.
+
+    let out_dir_path = Path::new(&args.out_dir);
+
+    // Visualization of cropped and equalized images.
+    eprintln!("Saving cropped + equalized images");
+    let cropped_dir = out_dir_path.join("cropped");
+    lowrr::utils::save_all_imgs(&cropped_dir, &cropped_eq_imgs);
+
+    // Visualization of registered cropped images.
+    eprintln!("Saving registered cropped images");
+    let registered_cropped_imgs: Vec<DMatrix<T>> =
+        registration::reproject::<T, f32, T>(&cropped_eq_imgs, &motion_vec_crop);
+    let cropped_aligned_dir = &out_dir_path.join("cropped_aligned");
+    lowrr::utils::save_all_imgs(&cropped_aligned_dir, &registered_cropped_imgs);
+
+    // Reproject (interpolation + extrapolation) images according to that motion.
+    // Write the registered images to the output directory.
+    eprintln!("Saving registered images");
+    let registered_imgs = registration::reproject::<U, V, U>(original_imgs, &motion_vec);
+    lowrr::utils::save_all_imgs(&out_dir_path, registered_imgs.as_slice());
+
+    Ok(motion_vec)
 }
 
 enum Dataset {

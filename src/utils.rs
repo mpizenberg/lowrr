@@ -11,6 +11,8 @@ use nalgebra::{DMatrix, Matrix};
 use std::ops::Mul;
 use std::path::Path;
 
+use crate::interop::IntoImage;
+
 /// Same as rgb2gray matlab function, but for u8.
 pub fn rgb_to_gray(red: &DMatrix<u8>, green: &DMatrix<u8>, blue: &DMatrix<u8>) -> DMatrix<u8> {
     let (rows, cols) = red.shape();
@@ -70,31 +72,12 @@ pub fn transpose<T: Clone>(v: Vec<Vec<T>>) -> Vec<Vec<T>> {
     v_transposed
 }
 
-// Helper functions to save images to disk.
-
-/// Save a bunch of gray images into the given directory.
-pub fn save_imgs<P: AsRef<Path>, T: Scalar + Primitive>(dir: P, imgs: &[DMatrix<T>])
-where
-    [T]: EncodableLayout,
-{
+/// Save a bunch of images into the given directory.
+pub fn save_all_imgs<P: AsRef<Path>, I: IntoImage>(dir: P, imgs: &[I]) {
     let dir = dir.as_ref();
     std::fs::create_dir_all(dir).expect(&format!("Could not create output dir: {:?}", dir));
     imgs.iter().enumerate().for_each(|(i, img)| {
-        crate::interop::image_from_matrix(img)
-            .save(dir.join(format!("{}.png", i)))
-            .expect("Error saving image");
-    });
-}
-
-/// Save a bunch of RGB images into the given directory.
-pub fn save_rgb_imgs<P: AsRef<Path>, T: Scalar + Primitive>(dir: P, imgs: &[DMatrix<(T, T, T)>])
-where
-    [T]: EncodableLayout,
-{
-    let dir = dir.as_ref();
-    std::fs::create_dir_all(dir).expect(&format!("Could not create output dir: {:?}", dir));
-    imgs.iter().enumerate().for_each(|(i, img)| {
-        crate::interop::rgb_from_matrix(img)
+        img.into_image()
             .save(dir.join(format!("{}.png", i)))
             .expect("Error saving image");
     });
