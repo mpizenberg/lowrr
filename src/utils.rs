@@ -8,9 +8,24 @@ use nalgebra::base::dimension::{Dim, Dynamic};
 use nalgebra::base::{Scalar, VecStorage};
 use nalgebra::{DMatrix, Matrix};
 use std::ops::Mul;
-use std::path::Path;
+use std::path::{Path, PathBuf};
+use thiserror::Error;
 
 use crate::interop::IntoImage;
+
+#[derive(Error, Debug)]
+pub enum UtilsError {
+    #[error("Failed to create directory {dir} with the following error: {source}")]
+    CreateDir {
+        dir: PathBuf,
+        source: std::io::Error,
+    },
+    #[error("Failed to save image {path} with the following error: {source}")]
+    SavingImg {
+        path: PathBuf,
+        source: image::ImageError,
+    },
+}
 
 /// Same as rgb2gray matlab function, but for u8.
 pub fn rgb_to_gray(red: &DMatrix<u8>, green: &DMatrix<u8>, blue: &DMatrix<u8>) -> DMatrix<u8> {
@@ -47,7 +62,7 @@ where
 }
 
 /// Transpose a Vec of Vec.
-/// Will crash if the inner vecs are not all the same size.
+/// Will panic if the inner vecs are not all the same size.
 pub fn transpose<T: Clone>(v: Vec<Vec<T>>) -> Vec<Vec<T>> {
     // Checking case of an empty vec.
     if v.is_empty() {
@@ -72,14 +87,22 @@ pub fn transpose<T: Clone>(v: Vec<Vec<T>>) -> Vec<Vec<T>> {
 }
 
 /// Save a bunch of images into the given directory.
-pub fn save_all_imgs<P: AsRef<Path>, I: IntoImage>(dir: P, imgs: &[I]) {
+pub fn save_all_imgs<P: AsRef<Path>, I: IntoImage>(dir: P, imgs: &[I]) -> Result<(), UtilsError> {
     let dir = dir.as_ref();
-    std::fs::create_dir_all(dir).expect(&format!("Could not create output dir: {:?}", dir));
-    imgs.iter().enumerate().for_each(|(i, img)| {
+    std::fs::create_dir_all(dir).map_err(|source| UtilsError::CreateDir {
+        dir: PathBuf::from(dir),
+        source,
+    })?;
+    for (i, img) in imgs.iter().enumerate() {
+        let img_path = dir.join(format!("{}.png", i));
         img.into_image()
-            .save(dir.join(format!("{}.png", i)))
-            .expect("Error saving image");
-    });
+            .save(&img_path)
+            .map_err(|source| UtilsError::SavingImg {
+                path: img_path,
+                source,
+            })?;
+    }
+    Ok(())
 }
 
 // Helper functions to play with coordinates iterators.
