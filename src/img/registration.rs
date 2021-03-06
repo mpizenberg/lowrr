@@ -8,6 +8,7 @@ use image::Primitive;
 use nalgebra::{DMatrix, Matrix3, Matrix6, RealField, Scalar, Vector3, Vector6};
 use std::ops::{Add, Mul};
 use std::rc::Rc;
+use thiserror::Error;
 
 use crate::affine2d::{projection_mat, projection_params};
 use crate::img::interpolation::CanLinearInterpolate;
@@ -53,6 +54,14 @@ impl CanRegister for u16 {
     type Bigger = u32;
 }
 
+#[derive(Error, Debug)]
+pub enum RegistrationError {
+    #[error("Error while trying to inverse the motion of the reference image: {0:?}")]
+    InverseRefMotion(Vector6<f32>),
+    #[error("The Hessian matrix computed for the direct alignment is not definite positive so its Choleski decomposition failed: {0:?}")]
+    NonDefinitePositiveHessian(Matrix6<f32>),
+}
+
 /// Affine registration of single channel images.
 ///
 /// Internally, this uses a multi-resolution approach,
@@ -65,7 +74,7 @@ pub fn gray_affine<T: CanRegister>(
     config: Config,
     imgs: Vec<DMatrix<T>>,
     sparse_diff_threshold: T::Bigger, // 50
-) -> Result<(Vec<Vector6<f32>>, Vec<DMatrix<T>>), Box<dyn std::error::Error>>
+) -> Result<(Vec<Vector6<f32>>, Vec<DMatrix<T>>), RegistrationError>
 where
     DMatrix<T>: IntoImage,
 {
@@ -213,7 +222,7 @@ where
         // Main loop.
         let mut continuation = Continue::Forward;
         while continuation == Continue::Forward {
-            continuation = loop_state.step(&step_config, &obs);
+            continuation = loop_state.step(&step_config, &obs)?;
         }
 
         // Update the motion vec before next level
@@ -275,7 +284,7 @@ impl State {
         &mut self,
         config: &StepConfig,
         obs: &Obs<T>,
-    ) -> Continue {
+    ) -> Result<Continue, RegistrationError> {
         // Extract state variables to avoid prefixed notation later.
         let (width, height) = obs.image_size;
         let State {
@@ -325,7 +334,7 @@ impl State {
                 obs.coordinates.iter().cloned(),
                 residuals.column(i).iter().cloned(),
                 gradients.into_iter(),
-            );
+            )?;
 
             // Save motion for this image.
             motion_vec[i] =
@@ -335,7 +344,7 @@ impl State {
         // Transform all motion parameters such that image 0 is the reference.
         let inverse_motion_ref = projection_mat(&motion_vec[0])
             .try_inverse()
-            .expect("Error while inversing motion of reference image");
+            .ok_or_else(|| RegistrationError::InverseRefMotion(motion_vec[0]))?;
         for motion_params in motion_vec.iter_mut() {
             *motion_params =
                 projection_params(&(inverse_motion_ref * projection_mat(&motion_params)));
@@ -381,7 +390,7 @@ impl State {
         *old_imgs_a = imgs_a;
 
         // Returned value.
-        continuation
+        Ok(continuation)
     }
 }
 
@@ -436,7 +445,7 @@ fn forwards_compositional_step(
     coordinates: impl Iterator<Item = (usize, usize)>,
     residuals: impl Iterator<Item = f32>,
     gradients: impl Iterator<Item = (f32, f32)>,
-) -> Vector6<f32> {
+) -> Result<Vector6<f32>, RegistrationError> {
     let (height, width) = shape;
     let mut descent_params = Vector6::zeros();
     let mut hessian = Matrix6::zeros();
@@ -451,8 +460,10 @@ fn forwards_compositional_step(
             descent_params += res * jac_t;
         }
     }
-    let hessian_chol = hessian.cholesky().expect("Error hessian choleski");
-    hessian_chol.solve(&descent_params)
+    let hessian_chol = hessian
+        .cholesky()
+        .ok_or_else(|| RegistrationError::NonDefinitePositiveHessian(hessian))?;
+    Ok(hessian_chol.solve(&descent_params))
 }
 
 /// Compute the projection of each pixel of the image (modify in place).
