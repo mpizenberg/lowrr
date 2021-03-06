@@ -1,6 +1,5 @@
 use nalgebra::{DMatrix, Scalar, Vector6};
 use std::convert::TryFrom;
-use std::str::FromStr;
 
 #[derive(Debug, Clone, Copy)]
 pub struct Crop {
@@ -18,25 +17,6 @@ impl TryFrom<clap::Values<'_>> for Crop {
             top: clap_values.next().unwrap().parse()?,
             right: clap_values.next().unwrap().parse()?,
             bottom: clap_values.next().unwrap().parse()?,
-        })
-    }
-}
-
-impl FromStr for Crop {
-    type Err = std::num::ParseIntError;
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let parts: Vec<_> = s.splitn(4, ',').collect();
-        assert!(parts.len() == 4,   "--crop argument must be of the shape left,top,right,bottom with no space between coordinates"
-        );
-        let left = parts[0].parse()?;
-        let top = parts[1].parse()?;
-        let right = parts[2].parse()?;
-        let bottom = parts[3].parse()?;
-        Ok(Crop {
-            left,
-            top,
-            right,
-            bottom,
         })
     }
 }
