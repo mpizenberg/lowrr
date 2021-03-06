@@ -16,6 +16,16 @@ use std::ops::{Add, Div, Mul, Sub};
 pub fn centered(img: &DMatrix<u8>) -> (DMatrix<i16>, DMatrix<i16>) {
     // TODO: might be better to return DMatrix<(i16,i16)>?
     let (nb_rows, nb_cols) = img.shape();
+    assert!(
+        nb_rows > 2,
+        "Impossible to compute centered gradients with only {} rows",
+        nb_rows
+    );
+    assert!(
+        nb_cols > 2,
+        "Impossible to compute centered gradients with only {} columns",
+        nb_cols
+    );
     let top = img.slice((0, 1), (nb_rows - 2, nb_cols - 2));
     let bottom = img.slice((2, 1), (nb_rows - 2, nb_cols - 2));
     let left = img.slice((1, 0), (nb_rows - 2, nb_cols - 2));
@@ -42,6 +52,16 @@ pub fn centered(img: &DMatrix<u8>) -> (DMatrix<i16>, DMatrix<i16>) {
 pub fn centered_f32(img: &DMatrix<f32>) -> DMatrix<(f32, f32)> {
     // TODO: might be better to return DMatrix<(i16,i16)>?
     let (nb_rows, nb_cols) = img.shape();
+    assert!(
+        nb_rows > 2,
+        "Impossible to compute centered gradients with only {} rows",
+        nb_rows
+    );
+    assert!(
+        nb_cols > 2,
+        "Impossible to compute centered gradients with only {} columns",
+        nb_cols
+    );
     let top = img.slice((0, 1), (nb_rows - 2, nb_cols - 2));
     let bottom = img.slice((2, 1), (nb_rows - 2, nb_cols - 2));
     let left = img.slice((1, 0), (nb_rows - 2, nb_cols - 2));
@@ -66,6 +86,17 @@ pub fn centered_f32(img: &DMatrix<f32>) -> DMatrix<(f32, f32)> {
 #[allow(clippy::similar_names)]
 pub fn centered_4(img: &DMatrix<u8>) -> (DMatrix<i16>, DMatrix<i16>) {
     let (nb_rows, nb_cols) = img.shape();
+    assert!(
+        nb_rows > 4,
+        "Impossible to compute centered gradients with only {} rows",
+        nb_rows
+    );
+    assert!(
+        nb_cols > 4,
+        "Impossible to compute centered gradients with only {} columns",
+        nb_cols
+    );
+
     let img_i16 = img.map(|x| x as i16);
 
     let left_2 = img_i16.slice((2, 0), (nb_rows - 4, nb_cols - 4));
@@ -102,6 +133,16 @@ pub fn centered_4(img: &DMatrix<u8>) -> (DMatrix<i16>, DMatrix<i16>) {
 #[allow(clippy::similar_names)]
 pub fn centered_4_f32(img: &DMatrix<f32>) -> (DMatrix<f32>, DMatrix<f32>) {
     let (nb_rows, nb_cols) = img.shape();
+    assert!(
+        nb_rows > 4,
+        "Impossible to compute centered gradients with only {} rows",
+        nb_rows
+    );
+    assert!(
+        nb_cols > 4,
+        "Impossible to compute centered gradients with only {} columns",
+        nb_cols
+    );
 
     let left_2 = img.slice((2, 0), (nb_rows - 4, nb_cols - 4));
     let left_1 = img.slice((2, 1), (nb_rows - 4, nb_cols - 4));
@@ -181,6 +222,16 @@ where
     U: Scalar + Copy,
 {
     let (nb_rows, nb_cols) = im.shape();
+    assert!(
+        nb_rows > 2,
+        "Impossible to compute gradients squared norms with only {} rows",
+        nb_rows
+    );
+    assert!(
+        nb_cols > 2,
+        "Impossible to compute gradients squared norms with only {} columns",
+        nb_cols
+    );
     let top = im.slice((0, 1), (nb_rows - 2, nb_cols - 2));
     let bottom = im.slice((2, 1), (nb_rows - 2, nb_cols - 2));
     let left = im.slice((1, 0), (nb_rows - 2, nb_cols - 2));

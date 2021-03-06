@@ -56,9 +56,11 @@ impl CanRegister for u16 {
 
 #[derive(Error, Debug)]
 pub enum RegistrationError {
-    #[error("Error while trying to inverse the motion of the reference image: {0:?}")]
+    #[error("Error while trying to inverse the motion of the reference image: {0}")]
     InverseRefMotion(Vector6<f32>),
-    #[error("The Hessian matrix computed for the direct alignment is not definite positive so its Choleski decomposition failed: {0:?}")]
+    #[error("Not enough pixels to perform a direct image alignment estimation: {0}")]
+    NotEnoughPoints(u32),
+    #[error("The Hessian matrix computed for the direct alignment is not definite positive so its Choleski decomposition failed: {0}")]
     NonDefinitePositiveHessian(Matrix6<f32>),
 }
 
@@ -450,6 +452,7 @@ fn forwards_compositional_step(
     let mut descent_params = Vector6::zeros();
     let mut hessian = Matrix6::zeros();
     let border = (0.04 * height.min(width) as f32) as usize;
+    let mut pixels_count_inside = 0;
     for (((x, y), res), (gx, gy)) in coordinates.zip(residuals).zip(gradients) {
         // Only use points within a given margin.
         if x > border && x + border < width && y > border && y + border < height {
@@ -458,7 +461,11 @@ fn forwards_compositional_step(
             let jac_t = Vector6::new(x_ * gx, x_ * gy, y_ * gx, y_ * gy, gx, gy);
             hessian += jac_t * jac_t.transpose();
             descent_params += res * jac_t;
+            pixels_count_inside += 1;
         }
+    }
+    if pixels_count_inside < 6 {
+        return Err(RegistrationError::NotEnoughPoints(pixels_count_inside));
     }
     let hessian_chol = hessian
         .cholesky()

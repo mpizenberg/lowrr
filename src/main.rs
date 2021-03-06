@@ -203,10 +203,8 @@ where
     lowrr::utils::equalize_mean(0.15, &mut cropped_imgs);
 
     // Compute the motion of each image for registration.
-    Ok(
-        registration::gray_affine(registration_config, cropped_imgs, sparse_diff_threshold)
-            .unwrap(),
-    )
+    registration::gray_affine(registration_config, cropped_imgs, sparse_diff_threshold)
+        .context("Failed to register images")
 }
 
 fn original_motion<T: CanRegister, U: Scalar + Copy, V>(
@@ -235,20 +233,23 @@ where
     // Visualization of cropped and equalized images.
     eprintln!("Saving cropped + equalized images");
     let cropped_dir = out_dir_path.join("cropped");
-    lowrr::utils::save_all_imgs(&cropped_dir, &cropped_eq_imgs);
+    lowrr::utils::save_all_imgs(&cropped_dir, &cropped_eq_imgs)
+        .context("Failed to save cropped images")?;
 
     // Visualization of registered cropped images.
     eprintln!("Saving registered cropped images");
     let registered_cropped_imgs: Vec<DMatrix<T>> =
         registration::reproject::<T, f32, T>(&cropped_eq_imgs, &motion_vec_crop);
     let cropped_aligned_dir = &out_dir_path.join("cropped_aligned");
-    lowrr::utils::save_all_imgs(&cropped_aligned_dir, &registered_cropped_imgs);
+    lowrr::utils::save_all_imgs(&cropped_aligned_dir, &registered_cropped_imgs)
+        .context("Failed to save registered cropped images")?;
 
     // Reproject (interpolation + extrapolation) images according to that motion.
     // Write the registered images to the output directory.
     eprintln!("Saving registered images");
     let registered_imgs = registration::reproject::<U, V, U>(original_imgs, &motion_vec);
-    lowrr::utils::save_all_imgs(&out_dir_path, registered_imgs.as_slice());
+    lowrr::utils::save_all_imgs(&out_dir_path, registered_imgs.as_slice())
+        .context("Failed to save registered images")?;
 
     Ok(motion_vec)
 }
@@ -263,26 +264,25 @@ enum Dataset {
 /// Load all images into memory.
 fn load_dataset<P: AsRef<Path>>(paths: &[P]) -> anyhow::Result<(Dataset, (usize, usize))> {
     eprintln!("Images to be processed:");
-    let images_types: Vec<_> = paths
-        .iter()
-        .map(|path| {
-            eprintln!("    {:?}", path.as_ref());
-            match path
-                .as_ref()
-                .extension()
-                .and_then(|e| e.to_str())
-                .map(|e| e.to_lowercase())
-                .as_deref()
-            {
-                Some("nef") => "raw",
-                Some("png") => "image",
-                Some("jpg") => "image",
-                Some("jpeg") => "image",
-                Some(ext) => panic!("Unrecognized extension: {}", ext),
-                None => panic!("Hum no extension?"),
-            }
-        })
-        .collect();
+    let mut images_types = Vec::with_capacity(paths.len());
+    for path in paths.iter() {
+        let path = path.as_ref();
+        eprintln!("    {}", path.display());
+        let img_type = match path
+            .extension()
+            .and_then(|e| e.to_str())
+            .map(|e| e.to_lowercase())
+            .as_deref()
+        {
+            Some("nef") => "raw",
+            Some("png") => "image",
+            Some("jpg") => "image",
+            Some("jpeg") => "image",
+            Some(ext) => anyhow::bail!("Unrecognized extension: {}", ext),
+            None => anyhow::bail!("Hum no extension for {}?", path.display()),
+        };
+        images_types.push(img_type);
+    }
 
     if images_types.is_empty() {
         anyhow::bail!("There is no such image. Use --help to know how to use this tool.")
@@ -293,25 +293,25 @@ fn load_dataset<P: AsRef<Path>>(paths: &[P]) -> anyhow::Result<(Dataset, (usize,
         match image::open(&paths[0])? {
             DynamicImage::ImageRgb8(rgb_img_0) => {
                 let (imgs, (height, width)) =
-                    load_all(DynamicImage::ImageRgb8(rgb_img_0), &paths[1..]);
+                    load_all(DynamicImage::ImageRgb8(rgb_img_0), &paths[1..])?;
                 Ok((Dataset::RgbImages(imgs), (width, height)))
             }
             DynamicImage::ImageRgb16(rgb_img_0) => {
                 let (imgs, (height, width)) =
-                    load_all(DynamicImage::ImageRgb16(rgb_img_0), &paths[1..]);
+                    load_all(DynamicImage::ImageRgb16(rgb_img_0), &paths[1..])?;
                 Ok((Dataset::RgbImagesU16(imgs), (width, height)))
             }
-            _ => anyhow::bail!("Unknow image type"),
+            _ => anyhow::bail!("Unsupported image type"),
         }
     } else {
-        panic!("There is a mix of image types")
+        anyhow::bail!("There is a mix of image types")
     }
 }
 
 fn load_all<P: AsRef<Path>, Pixel, T: Scalar>(
     first_img: DynamicImage,
     other_paths: &[P],
-) -> (Vec<DMatrix<T>>, (usize, usize))
+) -> anyhow::Result<(Vec<DMatrix<T>>, (usize, usize))>
 where
     DynamicImage: IntoDMatrix<Pixel, T>,
 {
@@ -323,10 +323,14 @@ where
     let shape = img_mat.shape();
     imgs.push(img_mat);
     pb.inc(1);
-    for rgb_img in other_paths.iter().map(|p| image::open(p).unwrap()) {
+    for img_path in other_paths.iter() {
+        let rgb_img = image::open(img_path).context(format!(
+            "Failed to open image {}",
+            img_path.as_ref().display()
+        ))?;
         imgs.push(rgb_img.into_dmatrix());
         pb.inc(1);
     }
     pb.finish();
-    (imgs, shape)
+    Ok((imgs, shape))
 }
