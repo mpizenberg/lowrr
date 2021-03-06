@@ -193,10 +193,11 @@ where
     DMatrix<T>: IntoImage,
 {
     // Extract the cropped area from the images.
-    let mut cropped_imgs = match args_crop {
-        None => gray_imgs,
+    let cropped_imgs: Result<Vec<DMatrix<T>>, _> = match args_crop {
+        None => Ok(gray_imgs),
         Some(frame) => gray_imgs.iter().map(|im| crop(frame, im)).collect(),
     };
+    let mut cropped_imgs = cropped_imgs.context("Failed to crop images")?;
 
     // Equalize mean intensities of cropped area.
     lowrr::utils::equalize_mean(0.15, &mut cropped_imgs);

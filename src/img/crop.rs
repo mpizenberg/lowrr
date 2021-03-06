@@ -1,5 +1,6 @@
 use nalgebra::{DMatrix, Scalar, Vector6};
 use std::convert::TryFrom;
+use thiserror::Error;
 
 #[derive(Debug, Clone, Copy)]
 pub struct Crop {
@@ -9,19 +10,38 @@ pub struct Crop {
     bottom: usize,
 }
 
+#[derive(Error, Debug)]
+pub enum CropError {
+    #[error("Invalid crop frame coordinates: {0}")]
+    InvalidFrame(String),
+    #[error("Not enough arguments: expected 4 but got only {0}")]
+    NotEnoughArgs(usize),
+    #[error("Too many arguments: expected 4 but got more")]
+    TooManyArgs,
+    #[error("Error parsing crop frame coordinates")]
+    Parse(#[from] std::num::ParseIntError),
+}
+
 impl TryFrom<clap::Values<'_>> for Crop {
-    type Error = std::num::ParseIntError;
-    fn try_from(mut clap_values: clap::Values) -> Result<Self, Self::Error> {
-        Ok(Crop {
-            left: clap_values.next().unwrap().parse()?,
-            top: clap_values.next().unwrap().parse()?,
-            right: clap_values.next().unwrap().parse()?,
-            bottom: clap_values.next().unwrap().parse()?,
-        })
+    type Error = CropError;
+    fn try_from(mut vs: clap::Values) -> Result<Self, Self::Error> {
+        match (vs.next(), vs.next(), vs.next(), vs.next(), vs.next()) {
+            (None, _, _, _, _) => return Err(CropError::NotEnoughArgs(0)),
+            (_, None, _, _, _) => return Err(CropError::NotEnoughArgs(1)),
+            (_, _, None, _, _) => return Err(CropError::NotEnoughArgs(2)),
+            (_, _, _, None, _) => return Err(CropError::NotEnoughArgs(3)),
+            (_, _, _, _, Some(_)) => return Err(CropError::TooManyArgs),
+            (Some(left), Some(top), Some(right), Some(bottom), None) => Ok(Crop {
+                left: left.parse()?,
+                top: top.parse()?,
+                right: right.parse()?,
+                bottom: bottom.parse()?,
+            }),
+        }
     }
 }
 
-pub fn crop<T: Scalar>(frame: Crop, img: &DMatrix<T>) -> DMatrix<T> {
+pub fn crop<T: Scalar>(frame: Crop, img: &DMatrix<T>) -> Result<DMatrix<T>, CropError> {
     let Crop {
         left,
         top,
@@ -29,15 +49,48 @@ pub fn crop<T: Scalar>(frame: Crop, img: &DMatrix<T>) -> DMatrix<T> {
         bottom,
     } = frame;
     let (height, width) = img.shape();
-    assert!(left < width, "Error: left >= image width");
-    assert!(right < width, "Error: right >= image width");
-    assert!(top < height, "Error: top >= image height");
-    assert!(bottom < height, "Error: bottom >= image height");
-    assert!(left <= right, "Error: right must be greater than left");
-    assert!(top <= bottom, "Error: bottom must be greater than top");
+
+    // Check that the frame coordinates make sense.
+    if left >= width {
+        return Err(CropError::InvalidFrame(format!(
+            "left >= width ({} >= {})",
+            left, width
+        )));
+    }
+    if right > width {
+        return Err(CropError::InvalidFrame(format!(
+            "right > width ({} > {})",
+            right, width
+        )));
+    }
+    if top >= height {
+        return Err(CropError::InvalidFrame(format!(
+            "top >= height ({} >= {})",
+            top, height
+        )));
+    }
+    if bottom > height {
+        return Err(CropError::InvalidFrame(format!(
+            "bottom > height ({} > {})",
+            bottom, height
+        )));
+    }
+    if left >= right {
+        return Err(CropError::InvalidFrame(format!(
+            "left >= right ({} >= {})",
+            left, right
+        )));
+    }
+    if top >= bottom {
+        return Err(CropError::InvalidFrame(format!(
+            "top >= bottom ({} >= {})",
+            top, bottom
+        )));
+    }
+    // Extract the cropped slice.
     let nrows = bottom - top;
     let ncols = right - left;
-    img.slice((top, left), (nrows, ncols)).into_owned()
+    Ok(img.slice((top, left), (nrows, ncols)).into_owned())
 }
 
 pub fn recover_original_motion(crop: Crop, motion_vec_crop: &[Vector6<f32>]) -> Vec<Vector6<f32>> {
