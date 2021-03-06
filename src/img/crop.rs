@@ -1,4 +1,5 @@
 use nalgebra::{DMatrix, Scalar, Vector6};
+use std::convert::TryFrom;
 use std::str::FromStr;
 
 #[derive(Debug, Clone, Copy)]
@@ -7,6 +8,18 @@ pub struct Crop {
     top: usize,
     right: usize,
     bottom: usize,
+}
+
+impl TryFrom<clap::Values<'_>> for Crop {
+    type Error = std::num::ParseIntError;
+    fn try_from(mut clap_values: clap::Values) -> Result<Self, Self::Error> {
+        Ok(Crop {
+            left: clap_values.next().unwrap().parse()?,
+            top: clap_values.next().unwrap().parse()?,
+            right: clap_values.next().unwrap().parse()?,
+            bottom: clap_values.next().unwrap().parse()?,
+        })
+    }
 }
 
 impl FromStr for Crop {

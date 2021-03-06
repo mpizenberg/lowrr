@@ -16,13 +16,11 @@ use crate::interop::IntoImage;
 /// Configuration (parameters) of the registration algorithm.
 #[derive(Debug, Clone, Copy)]
 pub struct Config {
-    pub do_image_correction: bool,
     pub lambda: f32,
     pub rho: f32,
     pub max_iterations: usize,
     pub threshold: f32,
     pub sparse_ratio_threshold: f32,
-    pub image_max: f32,
     pub levels: usize,
     pub trace: bool,
 }
@@ -144,7 +142,6 @@ where
         // Algorithm parameters.
         let (height, width) = lvl_imgs[0].shape();
         let step_config = StepConfig {
-            do_image_correction: config.do_image_correction,
             lambda: config.lambda,
             rho: config.rho,
             max_iterations: config.max_iterations,
@@ -233,7 +230,6 @@ where
 
 /// Configuration parameters for the core loop of the algorithm.
 struct StepConfig {
-    do_image_correction: bool,
     lambda: f32,
     rho: f32,
     max_iterations: usize,
@@ -304,9 +300,7 @@ impl State {
 
         // e-update: L1-regularized least-squares
         let errors_temp = &imgs_a - &*imgs_registered - &*lagrange_mult_rho;
-        if config.do_image_correction {
-            *errors = errors_temp.map(|x| shrink(lambda / config.rho, x));
-        }
+        *errors = errors_temp.map(|x| shrink(lambda / config.rho, x));
 
         // theta-update: forwards compositional step of a Gauss-Newton approximation.
         let residuals = &errors_temp - &*errors;

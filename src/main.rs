@@ -4,148 +4,139 @@ use lowrr::img::registration::{self, CanRegister};
 use lowrr::interop::{IntoDMatrix, IntoImage};
 use lowrr::utils::CanEqualize;
 
+use anyhow::Context;
 use glob::glob;
 use image::DynamicImage;
 use nalgebra::{DMatrix, Scalar, Vector6};
+use std::convert::TryFrom;
 use std::ops::{Add, Mul};
 use std::path::{Path, PathBuf};
 
 // Default values for some of the program arguments.
 const DEFAULT_OUT_DIR: &str = "out";
-const DEFAULT_LEVELS: usize = 1;
-const DEFAULT_LAMBDA: f32 = 1.5;
-const DEFAULT_RHO: f32 = 0.1;
-const DEFAULT_THRESHOLD: f32 = 1e-3;
-const DEFAULT_SPARSE_RATIO_THRESHOLD: f32 = 0.5;
-const DEFAULT_MAX_ITERATIONS: usize = 40;
-const DEFAULT_IMAGE_MAX: f32 = 255.0;
+
+const DEFAULT_LEVELS: &str = "4";
+const DEFAULT_SPARSE_RATIO_THRESHOLD: &str = "0.5";
+
+const DEFAULT_LAMBDA: &str = "1.5";
+const DEFAULT_RHO: &str = "0.1";
+
+const DEFAULT_THRESHOLD: &str = "1e-3";
+const DEFAULT_MAX_ITERATIONS: &str = "40";
 
 /// Entry point of the program.
-fn main() {
-    parse_args()
-        .and_then(run)
-        .unwrap_or_else(|err| eprintln!("Error: {:?}", err));
-}
-
-fn display_help() {
-    eprintln!(
-        r#"
-lowrr
-
-Low-rank registration of slightly unaligned images for photometric stereo.
-Some algorithm info is output to stderr while running.
-You can ignore them by redirecting stderr to /dev/null.
-The final motion vector is written to stdout,
-you can redirect it to a file with the usual pipes.
-
-USAGE:
-    lowrr [FLAGS] IMAGE_FILES
-    For example:
-        lowrr --trace *.png
-        lowrr *.jpg 2> /dev/null
-        lowrr *.png > result.txt
-
-FLAGS:
-    --help                 # Print this message and exit
-    --version              # Print version and exit
-    --out-dir dir/         # Output directory to save registered images (default: {})
-    --trace                # Print more debug output to stderr while running
-    --crop x1,y1,x2,y2     # Crop image into a restricted working area (use no space between coordinates)
-    --no-image-correction  # Avoid image correction
-    --levels int           # Number of levels for the multi-resolution approach (default: {})
-    --lambda float         # Weight of the L1 term (high means no correction) (default: {})
-    --rho float            # Lagrangian penalty (default: {})
-    --threshold float      # Stop when relative diff between two estimate of corrected image falls below this (default: {})
-    --sparse float         # Sparse ratio threshold to switch between dense and sparse resolution (default: {})
-                           # Use dense resolution if the ratio at current level is higher than this threshold
-    --max-iterations int   # Maximum number of iterations (default: {})
-    --image-max float      # Maximum possible value of the images for scaling (default: {})
-"#,
-        DEFAULT_OUT_DIR,
-        DEFAULT_LEVELS,
-        DEFAULT_LAMBDA,
-        DEFAULT_RHO,
-        DEFAULT_THRESHOLD,
-        DEFAULT_SPARSE_RATIO_THRESHOLD,
-        DEFAULT_MAX_ITERATIONS,
-        DEFAULT_IMAGE_MAX,
-    )
+fn main() -> anyhow::Result<()> {
+    // CLI arguments related to the core parameters of the algorithm.
+    let core_args = vec![
+        clap::Arg::with_name("lambda")
+            .long("lambda")
+            .value_name("x")
+            .default_value(DEFAULT_LAMBDA)
+            .help("Weight of the L1 term (high means no correction)"),
+        clap::Arg::with_name("rho")
+            .long("rho")
+            .value_name("x")
+            .default_value(DEFAULT_RHO)
+            .help("Lagrangian penalty"),
+        clap::Arg::with_name("convergence-threshold")
+            .long("convergence-threshold")
+            .value_name("x")
+            .default_value(DEFAULT_THRESHOLD)
+            .help(
+                "Stop when relative diff between two estimate of corrected image falls below this",
+            ),
+        clap::Arg::with_name("max-iterations")
+            .long("max-iterations")
+            .default_value(DEFAULT_MAX_ITERATIONS)
+            .value_name("N")
+            .help("Maximum number of iterations"),
+    ];
+    // CLI arguments related to algorithm speedup techniques.
+    let speed_args = vec![
+        clap::Arg::with_name("crop")
+            .long("crop")
+            .number_of_values(4)
+            .value_names(&["left", "top", "right", "bottom"])
+            .use_delimiter(true)
+            .help("Crop image into a restricted working area"),
+        clap::Arg::with_name("levels")
+            .long("levels")
+            .default_value(DEFAULT_LEVELS)
+            .value_name("N")
+            .help("Number of levels for the multi-resolution approach"),
+        clap::Arg::with_name("sparse-switch")
+            .long("sparse-switch")
+            .value_name("ratio")
+            .default_value(DEFAULT_SPARSE_RATIO_THRESHOLD)
+            .help("Sparse ratio threshold to switch between dense and sparse resolution. Use dense resolution if the ratio at current level is higher than this threshold"),
+    ];
+    // CLI arguments related to input, output and the rest.
+    let input_output_args = vec![
+        clap::Arg::with_name("out-dir")
+            .long("out-dir")
+            .default_value(DEFAULT_OUT_DIR)
+            .value_name("path")
+            .help("Output directory to save registered images"),
+        clap::Arg::with_name("trace")
+            .long("trace")
+            .help("Print more debug output to stderr while running"),
+        clap::Arg::with_name("IMAGE or GLOB")
+            .multiple(true)
+            .required(true)
+            .help("Paths to images, or glob pattern such as \"img/*.png\""),
+    ];
+    // Read all CLI arguments.
+    let matches = clap::App::new("lowrr")
+        .version(std::env!("CARGO_PKG_VERSION"))
+        .about("Low-rank registration of slightly misaligned images for photometric stereo")
+        .args(&core_args)
+        .args(&speed_args)
+        .args(&input_output_args)
+        .get_matches();
+    run(get_args(&matches)?)
 }
 
 #[derive(Debug)]
 /// Type holding command line arguments.
 struct Args {
     config: registration::Config,
-    help: bool,
-    version: bool,
     out_dir: String,
     images_paths: Vec<PathBuf>,
     crop: Option<Crop>,
 }
 
-/// Function parsing the command line arguments and returning an Args object or an error.
-fn parse_args() -> Result<Args, Box<dyn std::error::Error>> {
-    let mut args = pico_args::Arguments::from_env();
+/// Retrieve the program arguments from clap matches.
+fn get_args(matches: &clap::ArgMatches) -> anyhow::Result<Args> {
+    let config = registration::Config {
+        trace: matches.is_present("trace"),
+        lambda: matches.value_of("lambda").unwrap().parse()?,
+        rho: matches.value_of("rho").unwrap().parse()?,
+        threshold: matches.value_of("convergence-threshold").unwrap().parse()?,
+        sparse_ratio_threshold: matches.value_of("sparse-switch").unwrap().parse()?,
+        max_iterations: matches.value_of("max-iterations").unwrap().parse()?,
+        levels: matches.value_of("levels").unwrap().parse()?,
+    };
 
-    // Retrieve command line arguments.
-    let help = args.contains(["-h", "--help"]);
-    let version = args.contains(["-v", "--version"]);
-    let do_image_correction = !args.contains("--no-image-correction");
-    let trace = args.contains("--trace");
-    let crop = args.opt_value_from_str("--crop")?;
-    let lambda = args
-        .opt_value_from_str("--lambda")?
-        .unwrap_or(DEFAULT_LAMBDA);
-    let rho = args.opt_value_from_str("--rho")?.unwrap_or(DEFAULT_RHO);
-    let threshold = args
-        .opt_value_from_str("--threshold")?
-        .unwrap_or(DEFAULT_THRESHOLD);
-    let sparse_ratio_threshold = args
-        .opt_value_from_str("--sparse")?
-        .unwrap_or(DEFAULT_SPARSE_RATIO_THRESHOLD);
-    let max_iterations = args
-        .opt_value_from_str("--max-iterations")?
-        .unwrap_or(DEFAULT_MAX_ITERATIONS);
-    let levels = args
-        .opt_value_from_str("--levels")?
-        .unwrap_or(DEFAULT_LEVELS);
-    let image_max = args
-        .opt_value_from_str("--image-max")?
-        .unwrap_or(DEFAULT_IMAGE_MAX);
-    let out_dir = args
-        .opt_value_from_str("--out-dir")?
-        .unwrap_or(DEFAULT_OUT_DIR.into());
+    let crop = match matches.values_of("crop") {
+        None => None,
+        Some(str_coords) => Some(Crop::try_from(str_coords)?),
+    };
 
-    // Verify that images paths are correct.
-    let free_args = args.free()?;
-    let images_paths = absolute_file_paths(&free_args)?;
-
-    // Return Args struct.
     Ok(Args {
-        config: registration::Config {
-            do_image_correction,
-            trace,
-            lambda,
-            rho,
-            threshold,
-            sparse_ratio_threshold,
-            max_iterations,
-            levels,
-            image_max,
-        },
-        help,
-        version,
-        out_dir,
-        images_paths,
+        config,
+        out_dir: matches.value_of("out-dir").unwrap().to_string(),
+        images_paths: absolute_file_paths(matches.values_of("IMAGE or GLOB").unwrap())?,
         crop,
     })
 }
 
 /// Retrieve the absolute paths of all files matching the arguments.
-fn absolute_file_paths(args: &[String]) -> Result<Vec<PathBuf>, Box<dyn std::error::Error>> {
+fn absolute_file_paths<S: AsRef<str>, Paths: Iterator<Item = S>>(
+    args: Paths,
+) -> anyhow::Result<Vec<PathBuf>> {
     let mut abs_paths = Vec::new();
     for path_glob in args {
-        let mut paths = paths_from_glob(path_glob)?;
+        let mut paths = paths_from_glob(path_glob.as_ref())?;
         abs_paths.append(&mut paths);
     }
     abs_paths
@@ -155,22 +146,13 @@ fn absolute_file_paths(args: &[String]) -> Result<Vec<PathBuf>, Box<dyn std::err
 }
 
 /// Retrieve the paths of files matchin the glob pattern.
-fn paths_from_glob(p: &str) -> Result<Vec<PathBuf>, Box<dyn std::error::Error>> {
+fn paths_from_glob(p: &str) -> anyhow::Result<Vec<PathBuf>> {
     let paths = glob(p)?;
     Ok(paths.into_iter().filter_map(|x| x.ok()).collect())
 }
 
 /// Start actual program with command line arguments successfully parsed.
-fn run(args: Args) -> Result<(), Box<dyn std::error::Error>> {
-    // Check if the --help or --version flags are present.
-    if args.help {
-        display_help();
-        std::process::exit(0);
-    } else if args.version {
-        println!("{}", std::env!("CARGO_PKG_VERSION"));
-        std::process::exit(0);
-    }
-
+fn run(args: Args) -> anyhow::Result<()> {
     // Load the dataset in memory.
     let now = std::time::Instant::now();
     let (dataset, _) = load_dataset(&args.images_paths)?;
@@ -206,7 +188,7 @@ fn crop_and_register<T: CanEqualize + CanRegister>(
     registration_config: registration::Config,
     gray_imgs: Vec<DMatrix<T>>,
     sparse_diff_threshold: <T as CanRegister>::Bigger, // 50
-) -> Result<(Vec<Vector6<f32>>, Vec<DMatrix<T>>), Box<dyn std::error::Error>>
+) -> anyhow::Result<(Vec<Vector6<f32>>, Vec<DMatrix<T>>)>
 where
     DMatrix<T>: IntoImage,
 {
@@ -220,7 +202,10 @@ where
     lowrr::utils::equalize_mean(0.15, &mut cropped_imgs);
 
     // Compute the motion of each image for registration.
-    registration::gray_affine(registration_config, cropped_imgs, sparse_diff_threshold)
+    Ok(
+        registration::gray_affine(registration_config, cropped_imgs, sparse_diff_threshold)
+            .unwrap(),
+    )
 }
 
 fn original_motion<T: CanRegister, U: Scalar + Copy, V>(
@@ -228,7 +213,7 @@ fn original_motion<T: CanRegister, U: Scalar + Copy, V>(
     motion_vec_crop: Vec<Vector6<f32>>,
     cropped_eq_imgs: Vec<DMatrix<T>>,
     original_imgs: &[DMatrix<U>],
-) -> Result<Vec<Vector6<f32>>, Box<dyn std::error::Error>>
+) -> anyhow::Result<Vec<Vector6<f32>>>
 where
     DMatrix<T>: IntoImage,
     U: CanLinearInterpolate<V, U>,
@@ -275,9 +260,7 @@ enum Dataset {
 }
 
 /// Load all images into memory.
-fn load_dataset<P: AsRef<Path>>(
-    paths: &[P],
-) -> Result<(Dataset, (usize, usize)), Box<dyn std::error::Error>> {
+fn load_dataset<P: AsRef<Path>>(paths: &[P]) -> anyhow::Result<(Dataset, (usize, usize))> {
     eprintln!("Images to be processed:");
     let images_types: Vec<_> = paths
         .iter()
@@ -301,7 +284,7 @@ fn load_dataset<P: AsRef<Path>>(
         .collect();
 
     if images_types.is_empty() {
-        Err("There is no such image. Use --help to know how to use this tool.".into())
+        anyhow::bail!("There is no such image. Use --help to know how to use this tool.")
     } else if images_types.iter().all(|&t| t == "raw") {
         unimplemented!("imread raw")
     } else if images_types.iter().all(|&t| t == "image") {
@@ -317,7 +300,7 @@ fn load_dataset<P: AsRef<Path>>(
                     load_all(DynamicImage::ImageRgb16(rgb_img_0), &paths[1..]);
                 Ok((Dataset::RgbImagesU16(imgs), (width, height)))
             }
-            _ => Err("Unknow image type".into()),
+            _ => anyhow::bail!("Unknow image type"),
         }
     } else {
         panic!("There is a mix of image types")
