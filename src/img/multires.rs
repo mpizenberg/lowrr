@@ -115,6 +115,7 @@ where
 /// the image at the higher resolution.
 ///
 /// As a consequence there is one less level in the gradients pyramid.
+/// The input matrices are given with decreasing resolution.
 pub fn gradients_squared_norm(multires_mat: &[DMatrix<u8>]) -> Vec<DMatrix<u16>> {
     let nb_levels = multires_mat.len();
     multires_mat
@@ -122,7 +123,7 @@ pub fn gradients_squared_norm(multires_mat: &[DMatrix<u8>]) -> Vec<DMatrix<u16>>
         .take(nb_levels - 1)
         .map(|mat| {
             halve(mat, crate::img::gradients::bloc_squared_norm)
-                .expect("There is an issue in gradients_squared_norm")
+                .expect("gradients_squared_norm: error due to image with less than 2 pixels")
         })
         .collect()
 }
@@ -131,6 +132,7 @@ pub fn gradients_squared_norm(multires_mat: &[DMatrix<u8>]) -> Vec<DMatrix<u16>>
 /// the image at the higher resolution.
 ///
 /// As a consequence there is one less level in the gradients pyramid.
+/// The input matrices are given with decreasing resolution.
 pub fn gradients_xy(multires_mat: &[DMatrix<u8>]) -> Vec<(DMatrix<i16>, DMatrix<i16>)> {
     // TODO: maybe it would be better to return Vec<DMatrix<(i16,i16)>>,
     // to colocate the x and y gradient and do only one "halve" call?
@@ -141,9 +143,9 @@ pub fn gradients_xy(multires_mat: &[DMatrix<u8>]) -> Vec<(DMatrix<i16>, DMatrix<
         .map(|mat| {
             (
                 halve(mat, crate::img::gradients::bloc_x)
-                    .expect("There is an issue in gradients_xy x."),
+                    .expect("gradients_xy x: error due to image with less than 2 pixels"),
                 halve(mat, crate::img::gradients::bloc_y)
-                    .expect("There is an issue in gradients_xy y."),
+                    .expect("gradients_xy y: error due to image with less than 2 pixels"),
             )
         })
         .collect()
