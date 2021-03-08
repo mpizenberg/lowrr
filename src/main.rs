@@ -72,15 +72,21 @@ fn main() -> anyhow::Result<()> {
     ];
     // CLI arguments related to input, output and the rest.
     let input_output_args = vec![
+        clap::Arg::with_name("verbose")
+            .short("v")
+            .multiple(true)
+            .help("Multiple levels of verbosity (up to -vvvv)"),
         clap::Arg::with_name("out-dir")
             .long("out-dir")
             .default_value(DEFAULT_OUT_DIR)
             .value_name("path")
             .help("Output directory to save registered images"),
-        clap::Arg::with_name("verbose")
-            .short("v")
-            .multiple(true)
-            .help("Multiple levels of verbosity (up to -vvvv)"),
+        clap::Arg::with_name("save-crop")
+            .long("save-crop")
+            .help("Save the cropped images and their registered counterpart"),
+        clap::Arg::with_name("save-imgs")
+            .long("save-imgs")
+            .help("Save the registered images"),
         clap::Arg::with_name("IMAGE or GLOB")
             .multiple(true)
             .required(true)
@@ -112,6 +118,8 @@ fn main() -> anyhow::Result<()> {
 struct Args {
     config: registration::Config,
     out_dir: String,
+    save_crop: bool,
+    save_imgs: bool,
     images_paths: Vec<PathBuf>,
     crop: Option<Crop>,
 }
@@ -136,6 +144,8 @@ fn get_args(matches: &clap::ArgMatches) -> anyhow::Result<Args> {
     Ok(Args {
         config,
         out_dir: matches.value_of("out-dir").unwrap().to_string(),
+        save_crop: matches.is_present("save-crop"),
+        save_imgs: matches.is_present("save-imgs"),
         images_paths: absolute_file_paths(matches.values_of("IMAGE or GLOB").unwrap())?,
         crop,
     })
@@ -174,14 +184,12 @@ fn run(args: Args) -> anyhow::Result<()> {
         Dataset::GrayImages(_) => unimplemented!(),
         Dataset::RgbImages(imgs) => {
             let gray_imgs: Vec<_> = imgs.iter().map(|im| im.map(|(_r, g, _b)| g)).collect();
-            let (motion_vec_crop, cropped_eq_imgs) =
-                crop_and_register(args.crop, args.config, gray_imgs, 40)?;
+            let (motion_vec_crop, cropped_eq_imgs) = crop_and_register(&args, gray_imgs, 40)?;
             original_motion(&args, motion_vec_crop, cropped_eq_imgs, &imgs)?
         }
         Dataset::RgbImagesU16(imgs) => {
             let gray_imgs: Vec<_> = imgs.iter().map(|im| im.map(|(_r, g, _b)| g)).collect();
-            let (motion_vec_crop, cropped_eq_imgs) =
-                crop_and_register(args.crop, args.config, gray_imgs, 10 * 256)?;
+            let (motion_vec_crop, cropped_eq_imgs) = crop_and_register(&args, gray_imgs, 10 * 256)?;
             original_motion(&args, motion_vec_crop, cropped_eq_imgs, &imgs)?
         }
         Dataset::RawImages(_) => unimplemented!(),
@@ -195,8 +203,7 @@ fn run(args: Args) -> anyhow::Result<()> {
 }
 
 fn crop_and_register<T: CanEqualize + CanRegister>(
-    args_crop: Option<Crop>,
-    registration_config: registration::Config,
+    args: &Args,
     gray_imgs: Vec<DMatrix<T>>,
     sparse_diff_threshold: <T as CanRegister>::Bigger, // 50
 ) -> anyhow::Result<(Vec<Vector6<f32>>, Vec<DMatrix<T>>)>
@@ -204,7 +211,7 @@ where
     DMatrix<T>: IntoImage,
 {
     // Extract the cropped area from the images.
-    let cropped_imgs: Result<Vec<DMatrix<T>>, _> = match args_crop {
+    let cropped_imgs: Result<Vec<DMatrix<T>>, _> = match args.crop {
         None => Ok(gray_imgs),
         Some(frame) => {
             log::warn!("Cropping images ...");
@@ -219,7 +226,7 @@ where
 
     // Compute the motion of each image for registration.
     log::error!("Registration of images ...");
-    registration::gray_affine(registration_config, cropped_imgs, sparse_diff_threshold)
+    registration::gray_affine(args.config, cropped_imgs, sparse_diff_threshold)
         .context("Failed to register images")
 }
 
@@ -247,25 +254,29 @@ where
     let out_dir_path = Path::new(&args.out_dir);
 
     // Visualization of cropped and equalized images.
-    log::warn!("Saving cropped + equalized images");
-    let cropped_dir = out_dir_path.join("cropped");
-    lowrr::utils::save_all_imgs(&cropped_dir, &cropped_eq_imgs)
-        .context("Failed to save cropped images")?;
+    if args.save_crop {
+        log::warn!("Saving cropped + equalized images");
+        let cropped_dir = out_dir_path.join("cropped");
+        lowrr::utils::save_all_imgs(&cropped_dir, &cropped_eq_imgs)
+            .context("Failed to save cropped images")?;
 
-    // Visualization of registered cropped images.
-    log::warn!("Saving registered cropped images");
-    let registered_cropped_imgs: Vec<DMatrix<T>> =
-        registration::reproject::<T, f32, T>(&cropped_eq_imgs, &motion_vec_crop);
-    let cropped_aligned_dir = &out_dir_path.join("cropped_aligned");
-    lowrr::utils::save_all_imgs(&cropped_aligned_dir, &registered_cropped_imgs)
-        .context("Failed to save registered cropped images")?;
+        // Visualization of registered cropped images.
+        log::warn!("Saving registered cropped images");
+        let registered_cropped_imgs: Vec<DMatrix<T>> =
+            registration::reproject::<T, f32, T>(&cropped_eq_imgs, &motion_vec_crop);
+        let cropped_aligned_dir = &out_dir_path.join("cropped_aligned");
+        lowrr::utils::save_all_imgs(&cropped_aligned_dir, &registered_cropped_imgs)
+            .context("Failed to save registered cropped images")?;
+    }
 
-    // // Reproject (interpolation + extrapolation) images according to that motion.
-    // // Write the registered images to the output directory.
-    // log::warn!("Saving registered images");
-    // let registered_imgs = registration::reproject::<U, V, U>(original_imgs, &motion_vec);
-    // lowrr::utils::save_all_imgs(&out_dir_path, registered_imgs.as_slice())
-    //     .context("Failed to save registered images")?;
+    // Reproject (interpolation + extrapolation) images according to that motion.
+    // Write the registered images to the output directory.
+    if args.save_imgs {
+        log::warn!("Saving registered images");
+        let registered_imgs = registration::reproject::<U, V, U>(original_imgs, &motion_vec);
+        lowrr::utils::save_all_imgs(&out_dir_path, registered_imgs.as_slice())
+            .context("Failed to save registered images")?;
+    }
 
     Ok(motion_vec)
 }
