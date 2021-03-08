@@ -77,9 +77,10 @@ fn main() -> anyhow::Result<()> {
             .default_value(DEFAULT_OUT_DIR)
             .value_name("path")
             .help("Output directory to save registered images"),
-        clap::Arg::with_name("trace")
-            .long("trace")
-            .help("Print more debug output to stderr while running"),
+        clap::Arg::with_name("verbose")
+            .short("v")
+            .multiple(true)
+            .help("Multiple levels of verbosity (up to -vvvv)"),
         clap::Arg::with_name("IMAGE or GLOB")
             .multiple(true)
             .required(true)
@@ -93,6 +94,16 @@ fn main() -> anyhow::Result<()> {
         .args(&speed_args)
         .args(&input_output_args)
         .get_matches();
+    // Set log verbosity.
+    let verbosity = matches.occurrences_of("verbose");
+    stderrlog::new()
+        .quiet(false)
+        .verbosity(verbosity as usize)
+        .show_level(false)
+        .color(stderrlog::ColorChoice::Never)
+        .init()
+        .context("Failed to initialize log verbosity")?;
+    // Start program.
     run(get_args(&matches)?)
 }
 
@@ -108,7 +119,7 @@ struct Args {
 /// Retrieve the program arguments from clap matches.
 fn get_args(matches: &clap::ArgMatches) -> anyhow::Result<Args> {
     let config = registration::Config {
-        trace: matches.is_present("trace"),
+        verbosity: matches.occurrences_of("verbose") as u32,
         lambda: matches.value_of("lambda").unwrap().parse()?,
         rho: matches.value_of("rho").unwrap().parse()?,
         threshold: matches.value_of("convergence-threshold").unwrap().parse()?,
@@ -156,7 +167,7 @@ fn run(args: Args) -> anyhow::Result<()> {
     // Load the dataset in memory.
     let now = std::time::Instant::now();
     let (dataset, _) = load_dataset(&args.images_paths)?;
-    eprintln!("Loading took {:.1} s", now.elapsed().as_secs_f32());
+    log::warn!("Loading images took {:.1} s", now.elapsed().as_secs_f32());
 
     // Use the algorithm corresponding to the type of data.
     let motion_vec = match dataset {
@@ -178,7 +189,7 @@ fn run(args: Args) -> anyhow::Result<()> {
 
     // Write motion_vec to stdout.
     for v in motion_vec.iter() {
-        println!("{}", v);
+        println!("{}, {}, {}, {}, {}, {}", v[0], v[1], v[2], v[3], v[4], v[5]);
     }
     Ok(())
 }
@@ -195,14 +206,19 @@ where
     // Extract the cropped area from the images.
     let cropped_imgs: Result<Vec<DMatrix<T>>, _> = match args_crop {
         None => Ok(gray_imgs),
-        Some(frame) => gray_imgs.iter().map(|im| crop(frame, im)).collect(),
+        Some(frame) => {
+            log::warn!("Cropping images ...");
+            gray_imgs.iter().map(|im| crop(frame, im)).collect()
+        }
     };
     let mut cropped_imgs = cropped_imgs.context("Failed to crop images")?;
 
     // Equalize mean intensities of cropped area.
+    log::warn!("Equalizing images mean intensities ...");
     lowrr::utils::equalize_mean(0.15, &mut cropped_imgs);
 
     // Compute the motion of each image for registration.
+    log::error!("Registration of images ...");
     registration::gray_affine(registration_config, cropped_imgs, sparse_diff_threshold)
         .context("Failed to register images")
 }
@@ -231,25 +247,25 @@ where
     let out_dir_path = Path::new(&args.out_dir);
 
     // Visualization of cropped and equalized images.
-    eprintln!("Saving cropped + equalized images");
+    log::warn!("Saving cropped + equalized images");
     let cropped_dir = out_dir_path.join("cropped");
     lowrr::utils::save_all_imgs(&cropped_dir, &cropped_eq_imgs)
         .context("Failed to save cropped images")?;
 
     // Visualization of registered cropped images.
-    eprintln!("Saving registered cropped images");
+    log::warn!("Saving registered cropped images");
     let registered_cropped_imgs: Vec<DMatrix<T>> =
         registration::reproject::<T, f32, T>(&cropped_eq_imgs, &motion_vec_crop);
     let cropped_aligned_dir = &out_dir_path.join("cropped_aligned");
     lowrr::utils::save_all_imgs(&cropped_aligned_dir, &registered_cropped_imgs)
         .context("Failed to save registered cropped images")?;
 
-    // Reproject (interpolation + extrapolation) images according to that motion.
-    // Write the registered images to the output directory.
-    eprintln!("Saving registered images");
-    let registered_imgs = registration::reproject::<U, V, U>(original_imgs, &motion_vec);
-    lowrr::utils::save_all_imgs(&out_dir_path, registered_imgs.as_slice())
-        .context("Failed to save registered images")?;
+    // // Reproject (interpolation + extrapolation) images according to that motion.
+    // // Write the registered images to the output directory.
+    // log::warn!("Saving registered images");
+    // let registered_imgs = registration::reproject::<U, V, U>(original_imgs, &motion_vec);
+    // lowrr::utils::save_all_imgs(&out_dir_path, registered_imgs.as_slice())
+    //     .context("Failed to save registered images")?;
 
     Ok(motion_vec)
 }
@@ -263,11 +279,11 @@ enum Dataset {
 
 /// Load all images into memory.
 fn load_dataset<P: AsRef<Path>>(paths: &[P]) -> anyhow::Result<(Dataset, (usize, usize))> {
-    eprintln!("Images to be processed:");
+    log::warn!("Images to be processed:");
     let mut images_types = Vec::with_capacity(paths.len());
     for path in paths.iter() {
         let path = path.as_ref();
-        eprintln!("    {}", path.display());
+        log::warn!("    {}", path.display());
         let img_type = match path
             .extension()
             .and_then(|e| e.to_str())
@@ -285,18 +301,22 @@ fn load_dataset<P: AsRef<Path>>(paths: &[P]) -> anyhow::Result<(Dataset, (usize,
     }
 
     if images_types.is_empty() {
-        anyhow::bail!("There is no such image. Use --help to know how to use this tool.")
+        anyhow::bail!(
+            "Something is wrong, I didn't find any image. Use --help to know how to use this program."
+        )
     } else if images_types.iter().all(|&t| t == "raw") {
         unimplemented!("imread raw")
     } else if images_types.iter().all(|&t| t == "image") {
         // Open the first image to figure out the image type.
         match image::open(&paths[0])? {
             DynamicImage::ImageRgb8(rgb_img_0) => {
+                log::warn!("Images are of type RGB (u8, u8, u8)");
                 let (imgs, (height, width)) =
                     load_all(DynamicImage::ImageRgb8(rgb_img_0), &paths[1..])?;
                 Ok((Dataset::RgbImages(imgs), (width, height)))
             }
             DynamicImage::ImageRgb16(rgb_img_0) => {
+                log::warn!("Images are of type RGB (u16, u16, u16)");
                 let (imgs, (height, width)) =
                     load_all(DynamicImage::ImageRgb16(rgb_img_0), &paths[1..])?;
                 Ok((Dataset::RgbImagesU16(imgs), (width, height)))
@@ -316,7 +336,7 @@ where
     DynamicImage: IntoDMatrix<Pixel, T>,
 {
     let img_count = 1 + other_paths.len();
-    eprintln!("Loading {} images ...", img_count);
+    log::error!("Loading {} images ...", img_count);
     let pb = indicatif::ProgressBar::new(img_count as u64);
     let mut imgs = Vec::with_capacity(img_count);
     let img_mat = first_img.into_dmatrix();

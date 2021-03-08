@@ -23,7 +23,7 @@ pub struct Config {
     pub threshold: f32,
     pub sparse_ratio_threshold: f32,
     pub levels: usize,
-    pub trace: bool,
+    pub verbosity: u32,
 }
 
 /// Type alias just to semantically differenciate Vec<Levels<_>> and Levels<Vec<_>>.
@@ -84,6 +84,8 @@ where
     let imgs_count = imgs.len();
 
     // Precompute a hierarchy of multi-resolution images and gradients norm.
+    log::debug!("Precompute multiresolution images");
+    log::debug!("Precompute sparse pixels");
     let mut multires_imgs: Vec<Levels<_>> = Vec::with_capacity(imgs_count);
     let mut multires_sparse_pixels: Vec<Levels<_>> = Vec::with_capacity(imgs_count);
     for im in imgs.into_iter() {
@@ -148,7 +150,7 @@ where
         .enumerate()
         .rev()
     {
-        eprintln!("\n=============  Start level {}  =============\n", level);
+        log::warn!("=============  Start level {}  =============", level);
 
         // Algorithm parameters.
         let (height, width) = lvl_imgs[0].shape();
@@ -157,7 +159,7 @@ where
             rho: config.rho,
             max_iterations: config.max_iterations,
             threshold: config.threshold,
-            debug_trace: config.trace,
+            verbosity: config.verbosity,
         };
 
         // motion_vec is adapted when changing level.
@@ -173,20 +175,30 @@ where
             .map(|x| if *x { 1 } else { 0 })
             .sum();
         let sparse_ratio = sparse_count as f32 / pixels_count as f32;
-        eprintln!(
-            "Sparse ratio: {} / {} = {:.2}",
-            sparse_count, pixels_count, sparse_ratio
-        );
 
         // Choose sparsity.
         let sparsity: Sparsity;
         let actual_pixel_count: usize;
         let pixel_coordinates: Rc<Vec<(usize, usize)>>;
         if sparse_ratio > config.sparse_ratio_threshold {
+            log::info!(
+                "Sparse ratio: {} / {} = {:.2} >= {:.2}    using DENSE resolution",
+                sparse_count,
+                pixels_count,
+                sparse_ratio,
+                config.sparse_ratio_threshold
+            );
             sparsity = Sparsity::Full;
             actual_pixel_count = pixels_count;
             pixel_coordinates = Rc::new(crate::utils::coords_col_major((height, width)).collect());
         } else {
+            log::info!(
+                "Sparse ratio: {} / {} = {:.2} <= {:.2}    using SPARSE resolution",
+                sparse_count,
+                pixels_count,
+                sparse_ratio,
+                config.sparse_ratio_threshold
+            );
             sparsity = Sparsity::Sparse;
             actual_pixel_count = sparse_count;
             pixel_coordinates = Rc::new(crate::utils::coordinates_from_mask(lvl_sparse_pixels));
@@ -229,8 +241,9 @@ where
 
         // Update the motion vec before next level
         motion_vec = loop_state.motion_vec;
-        // eprintln!("motion_vec:");
-        // motion_vec.iter().for_each(|v| eprintln!("   {:?}", v.data));
+        motion_vec
+            .iter()
+            .for_each(|v| log::debug!("   {:?}", v.data));
     } // End of levels
 
     // Return the final motion vector.
@@ -245,7 +258,7 @@ struct StepConfig {
     rho: f32,
     max_iterations: usize,
     threshold: f32,
-    debug_trace: bool,
+    verbosity: u32,
 }
 
 /// "Observations" contains the data provided outside the core of the algorithm.
@@ -301,19 +314,24 @@ impl State {
         let lambda = config.lambda / (imgs_registered.nrows() as f32).sqrt();
 
         // A-update: low-rank approximation.
+        log::trace!("A-update: low-rank approximation");
         let imgs_a_temp = &*imgs_registered + &*errors + &*lagrange_mult_rho;
         let mut svd = imgs_a_temp.svd(true, true);
+        log::trace!("   singular values before shrink: {}", svd.singular_values);
         for x in svd.singular_values.iter_mut() {
             *x = shrink(1.0 / config.rho, *x);
         }
+        log::trace!("   singular values after shrink: {}", svd.singular_values);
         let singular_values = svd.singular_values.clone();
         let imgs_a = svd.recompose().unwrap();
 
         // e-update: L1-regularized least-squares
+        log::trace!("e-update: L1-regularized least-squares");
         let errors_temp = &imgs_a - &*imgs_registered - &*lagrange_mult_rho;
         *errors = errors_temp.map(|x| shrink(lambda / config.rho, x));
 
         // theta-update: forwards compositional step of a Gauss-Newton approximation.
+        log::trace!("theta-update: forwards compositional step of GN approximation");
         let residuals = &errors_temp - &*errors;
         for i in 0..obs.images.len() {
             // Compute gradients for the registered image.
@@ -361,11 +379,13 @@ impl State {
         );
 
         // y-update: dual ascent
+        log::trace!("y-update: dual ascent");
         *lagrange_mult_rho += &*imgs_registered - &imgs_a + &*errors;
 
         // Check convergence
+        log::trace!("Checking convergence");
         let residual = norm(&(&imgs_a - &*old_imgs_a)) / 1e-12.max(norm(old_imgs_a));
-        if config.debug_trace {
+        if config.verbosity >= 3 {
             let nuclear_norm = singular_values.sum();
             let l1_norm = lambda * errors.map(|x| x.abs()).sum();
             let r = &*imgs_registered - &imgs_a + &*errors;
@@ -373,14 +393,22 @@ impl State {
                 + l1_norm
                 + config.rho * (lagrange_mult_rho.component_mul(&r)).sum()
                 + 0.5 * config.rho * (norm_sqr(&r) as f32);
-            eprintln!("");
-            eprintln!("Iteration {}:", nb_iter);
-            eprintln!("    Nucl norm: {}", nuclear_norm);
-            eprintln!("    L1 norm: {}", l1_norm);
-            eprintln!("    Nucl + L1: {}", l1_norm + nuclear_norm);
-            eprintln!("    Aug. Lagrangian: {}", augmented_lagrangian);
-            eprintln!("    residual: {}", residual);
-            eprintln!("");
+            log::debug!(
+                "
+            Iteration {}:
+                Nucl norm: {}
+                L1 norm: {}
+                Nucl + L1: {}
+                Aug. Lagrangian: {}
+                residual: {}
+            ",
+                nb_iter,
+                nuclear_norm,
+                l1_norm,
+                l1_norm + nuclear_norm,
+                augmented_lagrangian,
+                residual
+            );
         }
         let mut continuation = Continue::Forward;
         if *nb_iter >= config.max_iterations || residual < config.threshold {
