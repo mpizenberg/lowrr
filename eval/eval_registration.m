@@ -85,6 +85,7 @@ for seq_id = 1:length(diligent_sequences)
 
 		% Run low rank registration on those images.
 		display('    Running low rank registration');
+		% TODO: Change output params to fit with matlab functions (it's the inverse).
 		system(['lowrr_eval ' output_dir '/cropped/*.png > ' this_out_dir '/warp-lowrr.txt 2> /dev/null']);
 
 		% Run matlab intensity image registration on those images.
