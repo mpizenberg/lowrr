@@ -202,7 +202,16 @@ fn run(args: Args) -> anyhow::Result<()> {
 
     // Use the algorithm corresponding to the type of data.
     let motion_vec = match dataset {
-        Dataset::GrayImages(_) => unimplemented!(),
+        Dataset::GrayImages(gray_imgs) => {
+            let (motion_vec_crop, cropped_eq_imgs) =
+                crop_and_register(&args, gray_imgs.clone(), 40)?;
+            original_motion(&args, motion_vec_crop, cropped_eq_imgs, &gray_imgs)?
+        }
+        Dataset::GrayImagesU16(gray_imgs) => {
+            let (motion_vec_crop, cropped_eq_imgs) =
+                crop_and_register(&args, gray_imgs.clone(), 10 * 256)?;
+            original_motion(&args, motion_vec_crop, cropped_eq_imgs, &gray_imgs)?
+        }
         Dataset::RgbImages(imgs) => {
             let gray_imgs: Vec<_> = imgs.iter().map(|im| im.map(|(_r, g, _b)| g)).collect();
             let (motion_vec_crop, cropped_eq_imgs) = crop_and_register(&args, gray_imgs, 40)?;
@@ -309,6 +318,7 @@ where
 enum Dataset {
     RawImages(Vec<DMatrix<u16>>),
     GrayImages(Vec<DMatrix<u8>>),
+    GrayImagesU16(Vec<DMatrix<u16>>),
     RgbImages(Vec<DMatrix<(u8, u8, u8)>>),
     RgbImagesU16(Vec<DMatrix<(u16, u16, u16)>>),
 }
@@ -345,6 +355,18 @@ fn load_dataset<P: AsRef<Path>>(paths: &[P]) -> anyhow::Result<(Dataset, (usize,
     } else if images_types.iter().all(|&t| t == "image") {
         // Open the first image to figure out the image type.
         match image::open(&paths[0])? {
+            DynamicImage::ImageLuma8(img_0) => {
+                log::warn!("Images are of type Gray u8");
+                let (imgs, (height, width)) =
+                    load_all(DynamicImage::ImageLuma8(img_0), &paths[1..])?;
+                Ok((Dataset::GrayImages(imgs), (width, height)))
+            }
+            DynamicImage::ImageLuma16(img_0) => {
+                log::warn!("Images are of type Gray u16");
+                let (imgs, (height, width)) =
+                    load_all(DynamicImage::ImageLuma16(img_0), &paths[1..])?;
+                Ok((Dataset::GrayImagesU16(imgs), (width, height)))
+            }
             DynamicImage::ImageRgb8(rgb_img_0) => {
                 log::warn!("Images are of type RGB (u8, u8, u8)");
                 let (imgs, (height, width)) =
