@@ -5,93 +5,113 @@ use lowrr::img::viz::ToGray;
 use lowrr::interop::{IntoDMatrix, IntoImage};
 use lowrr::utils::CanEqualize;
 
+use anyhow::Context;
 use glob::glob;
 use image::io::Reader as ImageReader;
 use image::GenericImageView;
 use nalgebra::{DMatrix, Scalar, Vector6};
+use std::convert::TryFrom;
 use std::io::prelude::*;
 use std::ops::{Add, Mul};
 use std::path::{Path, PathBuf};
 
 // Default values for some of the program arguments.
-const DEFAULT_FLOW: f64 = 0.01;
+const DEFAULT_MAX_DISPLACEMENT: &str = "0.01";
 const DEFAULT_OUT_DIR: &str = "generated";
 
 /// Entry point of the program.
-fn main() {
-    parse_args()
-        .and_then(run)
-        .unwrap_or_else(|err| eprintln!("Error: {:?}", err));
-}
+fn main() -> anyhow::Result<()> {
+    // CLI arguments.
+    let args = vec![
+        clap::Arg::with_name("equalize")
+            .long("equalize")
+            .value_name("x")
+            .help("Equalize the mean intensity of all images. Value in [0.0, 1.0]."),
+        clap::Arg::with_name("max-displacement")
+            .long("max-displacement")
+            .value_name("x")
+            .default_value(DEFAULT_MAX_DISPLACEMENT)
+            .help("Max displacement (in ratio with the image size)."),
+        clap::Arg::with_name("crop")
+            .long("crop")
+            .number_of_values(4)
+            .value_names(&["left", "top", "right", "bottom"])
+            .use_delimiter(true)
+            .help("Crop image into a restricted working area"),
+        clap::Arg::with_name("out-dir")
+            .long("out-dir")
+            .default_value(DEFAULT_OUT_DIR)
+            .value_name("path")
+            .help("Output directory to save registered images"),
+        clap::Arg::with_name("IMAGE or GLOB")
+            .multiple(true)
+            .required(true)
+            .help("Paths to images, or glob pattern such as \"img/*.png\""),
+    ];
+    // Read all CLI arguments.
+    let matches = clap::App::new("warp_crop")
+        .version(std::env!("CARGO_PKG_VERSION"))
+        .about(
+            "
+Generate random translations and crop images with the provided frame.
 
-fn display_help() {
-    eprintln!(
-        r#"
-warp_crop
-
-Generate a random translation of 1% and crop the defined crop area.
-It will generate images in generated/cropped/.
-First image should be warped with identity to keep the same reference frame.
-Save the warp transformation of every image, in the frame of the cropped area,
-in a file called generated/warp-gt.txt.
-
-USAGE: warp_crop [FLAGS...] IMAGE_FILES...
-
-    warp_crop --flow 0.01 --crop x1,y1,x2,y2 --out-dir generated path/to/images/*.png
-
-FLAGS:
-    --help                 # Print this message and exit
-    --flow                 # Max random optical flow, in percent of image size (default: {})
-    --crop x1,y1,x2,y2     # Crop image into a restricted working area (use no space between coordinates)
-    --out-dir dir/         # Output directory to save registered images (default: {})
-"#,
-        DEFAULT_FLOW, DEFAULT_OUT_DIR,
-    )
+The first image is not warped to keep its reference frame.
+The generated translations of each image are saved in a text file: warp-gt.txt.",
+        )
+        .args(&args)
+        .get_matches();
+    // Start program.
+    run(get_args(&matches)?)
 }
 
 #[derive(Debug)]
 /// Type holding command line arguments.
 struct Args {
-    help: bool,
-    flow: f64,
+    equalize: Option<f32>,
+    max_displacement: f32,
     out_dir: String,
     images_paths: Vec<PathBuf>,
     crop: Option<Crop>,
 }
 
-/// Function parsing the command line arguments and returning an Args object or an error.
-fn parse_args() -> Result<Args, Box<dyn std::error::Error>> {
-    let mut args = pico_args::Arguments::from_env();
+/// Retrieve the program arguments from clap matches.
+fn get_args(matches: &clap::ArgMatches) -> anyhow::Result<Args> {
+    // Retrieving the equalize argument.
+    let equalize = match matches.value_of("equalize") {
+        None => None,
+        Some(str_value) => {
+            let value = str_value
+                .parse()
+                .context(format!("Failed to parse \"{}\" into a float", str_value))?;
+            if value < 0.0 || value > 1.0 {
+                anyhow::bail!("Expecting an intensity value in [0,1], got {}", value)
+            }
+            Some(value)
+        }
+    };
 
-    // Retrieve command line arguments.
-    let help = args.contains(["-h", "--help"]);
-    let out_dir = args
-        .opt_value_from_str("--out-dir")?
-        .unwrap_or(DEFAULT_OUT_DIR.into());
-    let flow = args
-        .opt_value_from_str("--flow")?
-        .unwrap_or(DEFAULT_FLOW.into());
-    let crop = args.opt_value_from_str("--crop")?;
+    // Retrieving the crop argument.
+    let crop = match matches.values_of("crop") {
+        None => None,
+        Some(str_coords) => Some(Crop::try_from(str_coords)?),
+    };
 
-    // Verify that images paths are correct.
-    let free_args = args.free()?;
-    let images_paths = absolute_file_paths(&free_args)?;
-
-    // Return Args struct.
     Ok(Args {
-        help,
-        flow,
-        out_dir,
-        images_paths,
+        equalize,
+        max_displacement: matches.value_of("max-displacement").unwrap().parse()?,
+        out_dir: matches.value_of("out-dir").unwrap().to_string(),
+        images_paths: absolute_file_paths(matches.values_of("IMAGE or GLOB").unwrap())?,
         crop,
     })
 }
 
 /// Retrieve the absolute paths of all files matching the arguments.
-fn absolute_file_paths(args: &[String]) -> Result<Vec<PathBuf>, Box<dyn std::error::Error>> {
+fn absolute_file_paths<S: AsRef<str>, Paths: Iterator<Item = S>>(
+    args: Paths,
+) -> anyhow::Result<Vec<PathBuf>> {
     let mut abs_paths = Vec::new();
     for path_glob in args {
-        let mut paths = paths_from_glob(path_glob)?;
+        let mut paths = paths_from_glob(path_glob.as_ref())?;
         abs_paths.append(&mut paths);
     }
     abs_paths
@@ -100,26 +120,22 @@ fn absolute_file_paths(args: &[String]) -> Result<Vec<PathBuf>, Box<dyn std::err
         .collect()
 }
 
-/// Retrieve the paths of files matching the glob pattern.
-fn paths_from_glob(p: &str) -> Result<Vec<PathBuf>, Box<dyn std::error::Error>> {
+/// Retrieve the paths of files matchin the glob pattern.
+fn paths_from_glob(p: &str) -> anyhow::Result<Vec<PathBuf>> {
     let paths = glob(p)?;
     Ok(paths.into_iter().filter_map(|x| x.ok()).collect())
 }
 
 /// Start actual program with command line arguments successfully parsed.
-fn run(args: Args) -> Result<(), Box<dyn std::error::Error>> {
-    // Check if the --help flag is present.
-    if args.help {
-        display_help();
-        std::process::exit(0);
-    }
-
+fn run(args: Args) -> anyhow::Result<()> {
     // Get the path of output directory.
     let out_dir_path = PathBuf::from(args.out_dir);
     let warp_dir = out_dir_path.join("cropped");
     let warp_txt = warp_dir.join("warp-gt.txt");
-    std::fs::create_dir_all(&warp_dir)
-        .expect(&format!("Could not create output dir: {:?}", &warp_dir));
+    std::fs::create_dir_all(&warp_dir).context(format!(
+        "Could not create output dir: {}",
+        warp_dir.display()
+    ))?;
     let mut warp_txt_file = std::fs::File::create(&warp_txt)?;
 
     // Display progress bar.
@@ -142,18 +158,17 @@ fn run(args: Args) -> Result<(), Box<dyn std::error::Error>> {
         let r1 = (1103515245 * seed + 12345) % 2147483648;
         let r2 = (1103515245 * r1 + 12345) % 2147483648;
         seed = r2;
-        let min_size = width.min(height) as f64;
-        // 5% of size translations max.
-        let translation_scale = args.flow * min_size;
+        let min_size = width.min(height);
+        let translation_scale = args.max_displacement * min_size as f32;
         // Values seems to be in [0.0, 0.5[ so I multiply them by 2.
-        let tx = (r1 as f64 / (u32::MAX as f64) * 2.0 - 0.5) * translation_scale;
-        let ty = (r2 as f64 / (u32::MAX as f64) * 2.0 - 0.5) * translation_scale;
+        let tx = (r1 as f64 / (u32::MAX as f64) * 2.0 - 0.5) as f32 * translation_scale;
+        let ty = (r2 as f64 / (u32::MAX as f64) * 2.0 - 0.5) as f32 * translation_scale;
 
         // Do not warp the first image.
         let motion = if id == 0 {
             Vector6::new(0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
         } else {
-            Vector6::new(0.0, 0.0, 0.0, 0.0, tx as f32, ty as f32)
+            Vector6::new(0.0, 0.0, 0.0, 0.0, tx, ty)
         };
 
         // TODO: update motion to the cropped area.
@@ -168,16 +183,24 @@ fn run(args: Args) -> Result<(), Box<dyn std::error::Error>> {
 
         let save_path = warp_dir.join(format!("{:02}.png", id));
         if dyn_img.as_luma8().is_some() {
-            warp_crop::<_, u8, _, u8, _>(dyn_img, motion, args.crop, &save_path)?;
+            warp_crop::<_, u8, _, u8, _>(dyn_img, motion, args.equalize, args.crop, &save_path)?;
         } else if dyn_img.as_luma16().is_some() {
-            warp_crop::<_, u16, _, u16, _>(dyn_img, motion, args.crop, &save_path)?;
+            warp_crop::<_, u16, _, u16, _>(dyn_img, motion, args.equalize, args.crop, &save_path)?;
         } else if dyn_img.as_rgb8().is_some() {
             warp_crop::<_, (u8, u8, u8), _, (u8, u8, u8), _>(
-                dyn_img, motion, args.crop, &save_path,
+                dyn_img,
+                motion,
+                args.equalize,
+                args.crop,
+                &save_path,
             )?;
         } else if dyn_img.as_rgb16().is_some() {
             warp_crop::<_, (u16, u16, u16), _, (u16, u16, u16), _>(
-                dyn_img, motion, args.crop, &save_path,
+                dyn_img,
+                motion,
+                args.equalize,
+                args.crop,
+                &save_path,
             )?;
         } else {
             panic!("Unknown image type");
@@ -192,9 +215,10 @@ fn run(args: Args) -> Result<(), Box<dyn std::error::Error>> {
 fn warp_crop<P, T, V, O, I>(
     img: I,
     motion: Vector6<f32>,
+    equalize: Option<f32>,
     crop_frame: Option<Crop>,
     save_path: &Path,
-) -> Result<(), Box<dyn std::error::Error>>
+) -> anyhow::Result<()>
 where
     O: Scalar + ToGray,
     <O as ToGray>::Output: CanEqualize,
@@ -210,16 +234,18 @@ where
     // Crop it to the provided area.
     let cropped_mat = match crop_frame {
         None => warp_mat,
-        Some(frame) => crop(frame, &warp_mat),
+        Some(frame) => crop(frame, &warp_mat)?,
     };
 
-    // Only keep one channel (green).
-    let cropped_mat = cropped_mat.map(ToGray::to_gray);
+    // Transform image to gray.
+    let mut cropped_mat = cropped_mat.map(ToGray::to_gray);
 
     // Equalize mean intensities of cropped area.
-    let mut temp = vec![cropped_mat];
-    lowrr::utils::equalize_mean(0.15, temp.as_mut_slice());
-    let cropped_mat = temp.pop().unwrap();
+    if let Some(target) = equalize {
+        let mut temp = vec![cropped_mat];
+        lowrr::utils::equalize_mean(target, temp.as_mut_slice());
+        cropped_mat = temp.pop().unwrap();
+    }
 
     // Save the image to disk.
     let warp_img = cropped_mat.into_image();
