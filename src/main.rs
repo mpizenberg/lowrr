@@ -28,6 +28,10 @@ const DEFAULT_MAX_ITERATIONS: &str = "40";
 fn main() -> anyhow::Result<()> {
     // CLI arguments related to the core parameters of the algorithm.
     let core_args = vec![
+        clap::Arg::with_name("equalize")
+            .long("equalize")
+            .value_name("x")
+            .help("Value in [0.0, 1.0]. Equalize the mean intensity of all images. This improves the registration by making all images equally important to compute the aggregated singular values."),
         clap::Arg::with_name("lambda")
             .long("lambda")
             .value_name("x")
@@ -117,6 +121,7 @@ fn main() -> anyhow::Result<()> {
 /// Type holding command line arguments.
 struct Args {
     config: registration::Config,
+    equalize: Option<f32>,
     out_dir: String,
     save_crop: bool,
     save_imgs: bool,
@@ -136,6 +141,21 @@ fn get_args(matches: &clap::ArgMatches) -> anyhow::Result<Args> {
         levels: matches.value_of("levels").unwrap().parse()?,
     };
 
+    // Retrieving the equalize argument.
+    let equalize = match matches.value_of("equalize") {
+        None => None,
+        Some(str_value) => {
+            let value = str_value
+                .parse()
+                .context(format!("Failed to parse \"{}\" into a float", str_value))?;
+            if value < 0.0 || value > 1.0 {
+                anyhow::bail!("Expecting an intensity value in [0,1], got {}", value)
+            }
+            Some(value)
+        }
+    };
+
+    // Retrieving the crop argument.
     let crop = match matches.values_of("crop") {
         None => None,
         Some(str_coords) => Some(Crop::try_from(str_coords)?),
@@ -143,6 +163,7 @@ fn get_args(matches: &clap::ArgMatches) -> anyhow::Result<Args> {
 
     Ok(Args {
         config,
+        equalize,
         out_dir: matches.value_of("out-dir").unwrap().to_string(),
         save_crop: matches.is_present("save-crop"),
         save_imgs: matches.is_present("save-imgs"),
@@ -221,8 +242,10 @@ where
     let mut cropped_imgs = cropped_imgs.context("Failed to crop images")?;
 
     // Equalize mean intensities of cropped area.
-    log::warn!("Equalizing images mean intensities ...");
-    lowrr::utils::equalize_mean(0.15, &mut cropped_imgs);
+    if let Some(mean_intensity) = args.equalize {
+        log::warn!("Equalizing images mean intensities ...");
+        lowrr::utils::equalize_mean(mean_intensity, &mut cropped_imgs);
+    }
 
     // Compute the motion of each image for registration.
     log::error!("Registration of images ...");

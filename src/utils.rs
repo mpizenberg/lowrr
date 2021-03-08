@@ -175,7 +175,7 @@ pub fn equalize_mean<T: CanEqualize>(target: f32, imgs: &mut [DMatrix<T>]) {
         .iter()
         .map(|x| x / nb_pixels as f32)
         .collect();
-    // eprintln!("mean intensities {:?}", mean_intensities);
+    log::info!("mean intensities {:?}", mean_intensities);
 
     // Multiply all images such that the mean intensity is near the target.
     for (im, mean) in imgs.iter_mut().zip(mean_intensities) {
