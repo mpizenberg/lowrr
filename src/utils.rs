@@ -88,6 +88,7 @@ pub fn transpose<T: Clone>(v: Vec<Vec<T>>) -> Vec<Vec<T>> {
 
 /// Save a bunch of images into the given directory.
 pub fn save_all_imgs<P: AsRef<Path>, I: IntoImage>(dir: P, imgs: &[I]) -> Result<(), UtilsError> {
+    let pb = indicatif::ProgressBar::new(imgs.len() as u64);
     let dir = dir.as_ref();
     std::fs::create_dir_all(dir).map_err(|source| UtilsError::CreateDir {
         dir: PathBuf::from(dir),
@@ -101,7 +102,9 @@ pub fn save_all_imgs<P: AsRef<Path>, I: IntoImage>(dir: P, imgs: &[I]) -> Result
                 path: img_path,
                 source,
             })?;
+        pb.inc(1);
     }
+    pb.finish();
     Ok(())
 }
 

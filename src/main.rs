@@ -278,16 +278,17 @@ where
 
     // Visualization of cropped and equalized images.
     if args.save_crop {
-        log::warn!("Saving cropped + equalized images");
+        log::warn!("Saving cropped + equalized images ...");
         let cropped_dir = out_dir_path.join("cropped");
         lowrr::utils::save_all_imgs(&cropped_dir, &cropped_eq_imgs)
             .context("Failed to save cropped images")?;
 
         // Visualization of registered cropped images.
-        log::warn!("Saving registered cropped images");
+        log::warn!("Applying registration on cropped images ...");
         let registered_cropped_imgs: Vec<DMatrix<T>> =
             registration::reproject::<T, f32, T>(&cropped_eq_imgs, &motion_vec_crop);
         let cropped_aligned_dir = &out_dir_path.join("cropped_aligned");
+        log::warn!("Saving registered cropped images ...");
         lowrr::utils::save_all_imgs(&cropped_aligned_dir, &registered_cropped_imgs)
             .context("Failed to save registered cropped images")?;
     }
@@ -295,8 +296,9 @@ where
     // Reproject (interpolation + extrapolation) images according to that motion.
     // Write the registered images to the output directory.
     if args.save_imgs {
-        log::warn!("Saving registered images");
+        log::warn!("Applying registration on original images ...");
         let registered_imgs = registration::reproject::<U, V, U>(original_imgs, &motion_vec);
+        log::warn!("Saving registered images ...");
         lowrr::utils::save_all_imgs(&out_dir_path, registered_imgs.as_slice())
             .context("Failed to save registered images")?;
     }
