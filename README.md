@@ -3,6 +3,8 @@
 Low-rank registration of slightly misaligned images for photometric stereo.
 This repository holds both the `lowrr` library, and a `lowrr` command-line executable.
 
+> TODO: add citation here
+
 ## Install
 
 To install the `lowrr` executable, you just have to download it
