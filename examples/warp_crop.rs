@@ -1,8 +1,8 @@
 use lowrr::img::crop::{crop, Crop};
 use lowrr::img::interpolation::CanLinearInterpolate;
 use lowrr::img::registration;
-use lowrr::img::viz::ToGray;
-use lowrr::interop::{IntoDMatrix, IntoImage};
+use lowrr::img::viz::IntoGray;
+use lowrr::interop::{IntoDMatrix, ToImage};
 use lowrr::utils::CanEqualize;
 
 use anyhow::Context;
@@ -219,9 +219,9 @@ fn warp_crop<P, T, V, O, I>(
     save_path: &Path,
 ) -> anyhow::Result<()>
 where
-    O: Scalar + ToGray,
-    <O as ToGray>::Output: CanEqualize,
-    DMatrix<<O as ToGray>::Output>: IntoImage,
+    O: Scalar + IntoGray,
+    <O as IntoGray>::Output: CanEqualize,
+    DMatrix<<O as IntoGray>::Output>: ToImage,
     V: Add<Output = V>,
     f32: Mul<V, Output = V>,
     T: Scalar + Copy + CanLinearInterpolate<V, O>,
@@ -237,7 +237,7 @@ where
     };
 
     // Transform image to gray.
-    let mut cropped_mat = cropped_mat.map(ToGray::to_gray);
+    let mut cropped_mat = cropped_mat.map(IntoGray::into_gray);
 
     // Equalize mean intensities of cropped area.
     if let Some(target) = equalize {
@@ -247,7 +247,7 @@ where
     }
 
     // Save the image to disk.
-    let warp_img = cropped_mat.into_image();
+    let warp_img = cropped_mat.to_image();
     warp_img.save(save_path)?;
     Ok(())
 }
