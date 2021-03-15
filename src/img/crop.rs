@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MPL-2.0
+
 use nalgebra::{DMatrix, Scalar, Vector6};
 use std::convert::TryFrom;
 use thiserror::Error;

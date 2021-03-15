@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MPL-2.0
+
 use nalgebra::{Matrix3, Vector6};
 
 #[rustfmt::skip]

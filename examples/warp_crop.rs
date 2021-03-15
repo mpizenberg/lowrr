@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MPL-2.0
+
 use lowrr::img::crop::{crop, Crop};
 use lowrr::img::interpolation::CanLinearInterpolate;
 use lowrr::img::registration;
