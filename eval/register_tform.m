@@ -1,14 +1,15 @@
 function warps = register_tform(folder)
+% REGISTER_TFORM register all images in a folder with the first one using matlab default alignment algorithm.
 
 im_files = dir([folder '/*.png']);
-
-% [optimizer, metric] = imregconfig('multimodal');
-[optimizer, metric] = imregconfig('monomodal');
 
 folder = im_files(1).folder;
 im_ref_file = [folder '/' im_files(1).name];
 im_ref = imread(im_ref_file);
 % imwrite(im_ref, ['out/', im_files(1).name]);
+
+% [optimizer, metric] = imregconfig('multimodal');
+[optimizer, metric] = imregconfig('monomodal');
 
 nb_files = length(im_files);
 warps = repmat([1 0 0 1 0 0], nb_files, 1);

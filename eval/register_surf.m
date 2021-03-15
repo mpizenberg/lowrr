@@ -1,4 +1,5 @@
-function warps = register_tform(folder)
+function warps = register_surf(folder)
+% REGISTER_SURF register all images in a folder with the first one using SURF features.
 
 im_files = dir([folder '/*.png']);
 
@@ -8,8 +9,9 @@ im_ref = imread(im_ref_file);
 % imwrite(im_ref, ['out/', im_files(1).name]);
 
 % Detect and extract SURF features in reference image.
-ptsOriginal  = detectSURFFeatures(im_ref, 'MetricThreshold', 100);
-[featuresOriginal,  validPtsOriginal]  = extractFeatures(im_ref,  ptsOriginal);
+metric_threshold = 100;
+ptsOriginal = detectSURFFeatures(im_ref, 'MetricThreshold', metric_threshold);
+[featuresOriginal, validPtsOriginal] = extractFeatures(im_ref, ptsOriginal);
 
 nb_files = length(im_files);
 warps = repmat([1 0 0 1 0 0], nb_files, 1);
@@ -20,7 +22,7 @@ for i = 2:nb_files
 	im_mov = imread(im_mov_file);
 
 	% Detect and extract SURF features.
-	ptsDistorted = detectSURFFeatures(im_mov, 'MetricThreshold', 100);
+	ptsDistorted = detectSURFFeatures(im_mov, 'MetricThreshold', metric_threshold);
 	[featuresDistorted, validPtsDistorted] = extractFeatures(im_mov, ptsDistorted);
 
 	% Match features.

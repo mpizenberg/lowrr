@@ -130,11 +130,10 @@ fn paths_from_glob(p: &str) -> anyhow::Result<Vec<PathBuf>> {
 fn run(args: Args) -> anyhow::Result<()> {
     // Get the path of output directory.
     let out_dir_path = PathBuf::from(args.out_dir);
-    let warp_dir = out_dir_path.join("cropped");
-    let warp_txt = warp_dir.join("warp-gt.txt");
-    std::fs::create_dir_all(&warp_dir).context(format!(
+    let warp_txt = out_dir_path.join("warp-gt.txt");
+    std::fs::create_dir_all(&out_dir_path).context(format!(
         "Could not create output dir: {}",
-        warp_dir.display()
+        out_dir_path.display()
     ))?;
     let mut warp_txt_file = std::fs::File::create(&warp_txt)?;
 
@@ -181,7 +180,7 @@ fn run(args: Args) -> anyhow::Result<()> {
             .as_bytes(),
         )?;
 
-        let save_path = warp_dir.join(format!("{:02}.png", id));
+        let save_path = out_dir_path.join(format!("{:02}.png", id));
         if dyn_img.as_luma8().is_some() {
             warp_crop::<_, u8, _, u8, _>(dyn_img, motion, args.equalize, args.crop, &save_path)?;
         } else if dyn_img.as_luma16().is_some() {

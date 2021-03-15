@@ -1,4 +1,5 @@
-function warps = register_tform(folder)
+function warps = register_corr(folder)
+% REGISTER_CORR register all images in a folder with the first one using phase correlation.
 
 im_files = dir([folder '/*.png']);
 
