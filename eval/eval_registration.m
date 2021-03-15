@@ -59,8 +59,7 @@ diligent_dir = '~/Downloads/DiLiGenT/pmsData';
 output_dir = 'out';
 [~,~] = mkdir(output_dir);
 
-for seq_id = 3:4
-% for seq_id = 1:length(diligent_sequences)
+for seq_id = 1:length(diligent_sequences)
 	name = diligent_sequences{seq_id};
 	crop = crop_areas(seq_id, :);
 	crop_params = [ int2str(crop(1)) ',' int2str(crop(2)) ',' int2str(crop(3)) ',' int2str(crop(4)) ];
@@ -73,8 +72,7 @@ for seq_id = 3:4
 	[~,~] = mkdir([ output_dir '/' name ]);
 
 	% Start randomizing warps.
-	for rand_id = 1:2
-	% for rand_id = 1:nb_random
+	for rand_id = 1:nb_random
 		disp(['  random iteration: ' int2str(rand_id)]);
 		this_out_dir = [ output_dir '/' name '/rand_' sprintf('%02d',rand_id) ];
 		[~,~] = rmdir(this_out_dir, 's');
