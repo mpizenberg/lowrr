@@ -19,14 +19,14 @@ where
     Vector: Add<Output = Vector>,
     f32: Mul<Vector, Output = Vector>,
 {
-    fn to_vector(self) -> Vector;
+    fn into_vector(self) -> Vector;
     fn from_vector(v: Vector) -> Output;
 }
 
 /// Implement CanLinearInterpolate for u8 with f32 outputs.
 /// WARNING: beware that interpolating with a f32 output normalizes values from [0-255] to [0.0, 1.0].
 impl CanLinearInterpolate<f32, f32> for u8 {
-    fn to_vector(self) -> f32 {
+    fn into_vector(self) -> f32 {
         self as f32
     }
     fn from_vector(v: f32) -> f32 {
@@ -36,7 +36,7 @@ impl CanLinearInterpolate<f32, f32> for u8 {
 
 /// Implement CanLinearInterpolate for u8.
 impl CanLinearInterpolate<f32, u8> for u8 {
-    fn to_vector(self) -> f32 {
+    fn into_vector(self) -> f32 {
         self as f32
     }
     fn from_vector(v: f32) -> u8 {
@@ -47,7 +47,7 @@ impl CanLinearInterpolate<f32, u8> for u8 {
 /// Implement CanLinearInterpolate for u16 with f32 outputs.
 /// WARNING: beware that interpolating with a f32 output normalizes values from [0-65535] to [0.0, 1.0].
 impl CanLinearInterpolate<f32, f32> for u16 {
-    fn to_vector(self) -> f32 {
+    fn into_vector(self) -> f32 {
         self as f32
     }
     fn from_vector(v: f32) -> f32 {
@@ -57,7 +57,7 @@ impl CanLinearInterpolate<f32, f32> for u16 {
 
 /// Implement CanLinearInterpolate for u16.
 impl CanLinearInterpolate<f32, u16> for u16 {
-    fn to_vector(self) -> f32 {
+    fn into_vector(self) -> f32 {
         self as f32
     }
     fn from_vector(v: f32) -> u16 {
@@ -69,8 +69,12 @@ impl CanLinearInterpolate<f32, u16> for u16 {
 impl<O, T: CanLinearInterpolate<f32, O>> CanLinearInterpolate<Vector3<f32>, (O, O, O)>
     for (T, T, T)
 {
-    fn to_vector(self) -> Vector3<f32> {
-        Vector3::new(self.0.to_vector(), self.1.to_vector(), self.2.to_vector())
+    fn into_vector(self) -> Vector3<f32> {
+        Vector3::new(
+            self.0.into_vector(),
+            self.1.into_vector(),
+            self.2.into_vector(),
+        )
     }
     fn from_vector(v: Vector3<f32>) -> (O, O, O) {
         (
@@ -104,10 +108,10 @@ where
         let v_1 = v_0 + 1;
         let a = x - u;
         let b = y - v;
-        let vu_00 = image[(v_0, u_0)].to_vector();
-        let vu_10 = image[(v_1, u_0)].to_vector();
-        let vu_01 = image[(v_0, u_1)].to_vector();
-        let vu_11 = image[(v_1, u_1)].to_vector();
+        let vu_00 = image[(v_0, u_0)].into_vector();
+        let vu_10 = image[(v_1, u_0)].into_vector();
+        let vu_01 = image[(v_0, u_1)].into_vector();
+        let vu_11 = image[(v_1, u_1)].into_vector();
         let interp = Mul::<f32>::mul(1.0 - b, 1.0 - a) * vu_00
             + Mul::<f32>::mul(b, 1.0 - a) * vu_10
             + Mul::<f32>::mul(1.0 - b, a) * vu_01
@@ -115,7 +119,7 @@ where
         T::from_vector(interp)
     } else {
         // Nearest neighbour extrapolation outside boundaries.
-        T::from_vector(image[nearest_border(x, y, width, height)].to_vector())
+        T::from_vector(image[nearest_border(x, y, width, height)].into_vector())
     }
 }
 

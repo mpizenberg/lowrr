@@ -18,9 +18,9 @@ pub fn smooth(img: &DMatrix<u8>) -> DMatrix<u8> {
     for j in 0..ncols {
         for i in 0..nrows {
             let center = (i, j);
-            let left = (i, j.checked_sub(1).unwrap_or(0));
+            let left = (i, j.saturating_sub(1));
             let right = (i, (j + 1).min(ncols - 1));
-            let top = (i.checked_sub(1).unwrap_or(0), j);
+            let top = (i.saturating_sub(1), j);
             let bottom = ((i + 1).min(nrows - 1), j);
             smoothed[(i, j)] = ((img[left] as f32
                 + img[top] as f32

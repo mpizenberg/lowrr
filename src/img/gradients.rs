@@ -189,13 +189,13 @@ pub trait Bigger<B: Copy>: Copy {
         + Div<Output = Self::BigSigned>
         + From<u8>
         + From<Self>;
-    fn as_from(b: Self::BigSigned) -> B;
+    fn from_as(b: Self::BigSigned) -> B;
     fn zero() -> B;
 }
 
 impl Bigger<u16> for u8 {
     type BigSigned = i32;
-    fn as_from(b: Self::BigSigned) -> u16 {
+    fn from_as(b: Self::BigSigned) -> u16 {
         b as u16
     }
     fn zero() -> u16 {
@@ -205,7 +205,7 @@ impl Bigger<u16> for u8 {
 
 impl Bigger<u32> for u16 {
     type BigSigned = i64;
-    fn as_from(b: Self::BigSigned) -> u32 {
+    fn from_as(b: Self::BigSigned) -> u32 {
         b as u32
     }
     fn zero() -> u32 {
@@ -242,7 +242,7 @@ where
         for i in 0..nb_rows - 2 {
             let gx = T::BigSigned::from(right[(i, j)]) - T::BigSigned::from(left[(i, j)]);
             let gy = T::BigSigned::from(bottom[(i, j)]) - T::BigSigned::from(top[(i, j)]);
-            grad_inner[(i, j)] = T::as_from((gx * gx + gy * gy) / T::BigSigned::from(4));
+            grad_inner[(i, j)] = T::from_as((gx * gx + gy * gy) / T::BigSigned::from(4));
         }
     }
     squared_norm_mat

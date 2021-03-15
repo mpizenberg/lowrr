@@ -11,7 +11,7 @@ use std::ops::Mul;
 use std::path::{Path, PathBuf};
 use thiserror::Error;
 
-use crate::interop::IntoImage;
+use crate::interop::ToImage;
 
 #[derive(Error, Debug)]
 pub enum UtilsError {
@@ -87,7 +87,7 @@ pub fn transpose<T: Clone>(v: Vec<Vec<T>>) -> Vec<Vec<T>> {
 }
 
 /// Save a bunch of images into the given directory.
-pub fn save_all_imgs<P: AsRef<Path>, I: IntoImage>(dir: P, imgs: &[I]) -> Result<(), UtilsError> {
+pub fn save_all_imgs<P: AsRef<Path>, I: ToImage>(dir: P, imgs: &[I]) -> Result<(), UtilsError> {
     let pb = indicatif::ProgressBar::new(imgs.len() as u64);
     let dir = dir.as_ref();
     std::fs::create_dir_all(dir).map_err(|source| UtilsError::CreateDir {
@@ -96,7 +96,7 @@ pub fn save_all_imgs<P: AsRef<Path>, I: IntoImage>(dir: P, imgs: &[I]) -> Result
     })?;
     for (i, img) in imgs.iter().enumerate() {
         let img_path = dir.join(format!("{}.png", i));
-        img.into_image()
+        img.to_image()
             .save(&img_path)
             .map_err(|source| UtilsError::SavingImg {
                 path: img_path,

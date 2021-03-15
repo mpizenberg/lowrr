@@ -26,11 +26,11 @@ impl TryFrom<clap::Values<'_>> for Crop {
     type Error = CropError;
     fn try_from(mut vs: clap::Values) -> Result<Self, Self::Error> {
         match (vs.next(), vs.next(), vs.next(), vs.next(), vs.next()) {
-            (None, _, _, _, _) => return Err(CropError::NotEnoughArgs(0)),
-            (_, None, _, _, _) => return Err(CropError::NotEnoughArgs(1)),
-            (_, _, None, _, _) => return Err(CropError::NotEnoughArgs(2)),
-            (_, _, _, None, _) => return Err(CropError::NotEnoughArgs(3)),
-            (_, _, _, _, Some(_)) => return Err(CropError::TooManyArgs),
+            (None, _, _, _, _) => Err(CropError::NotEnoughArgs(0)),
+            (_, None, _, _, _) => Err(CropError::NotEnoughArgs(1)),
+            (_, _, None, _, _) => Err(CropError::NotEnoughArgs(2)),
+            (_, _, _, None, _) => Err(CropError::NotEnoughArgs(3)),
+            (_, _, _, _, Some(_)) => Err(CropError::TooManyArgs),
             (Some(left), Some(top), Some(right), Some(bottom), None) => Ok(Crop {
                 left: left.parse()?,
                 top: top.parse()?,

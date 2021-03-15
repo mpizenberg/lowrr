@@ -12,7 +12,7 @@ use thiserror::Error;
 
 use crate::affine2d::{projection_mat, projection_params};
 use crate::img::interpolation::CanLinearInterpolate;
-use crate::interop::IntoImage;
+use crate::interop::ToImage;
 
 /// Configuration (parameters) of the registration algorithm.
 #[derive(Debug, Clone, Copy)]
@@ -36,13 +36,13 @@ pub trait CanRegister:
     Copy
     + Scalar
     + Primitive
-    + crate::img::viz::ToRgb8
+    + crate::img::viz::IntoRgb8
     + crate::img::multires::Bigger
     + crate::img::gradients::Bigger<<Self as CanRegister>::Bigger>
     + CanLinearInterpolate<f32, f32>
     + CanLinearInterpolate<f32, Self>
 where
-    DMatrix<Self>: IntoImage,
+    DMatrix<Self>: ToImage,
 {
     type Bigger: Scalar + Copy + PartialOrd + Add<Output = Self::Bigger>;
 }
@@ -72,13 +72,14 @@ pub enum RegistrationError {
 ///
 /// The input images are passed by value to be used as the first level
 /// of the multi-resolution pyramid.
+#[allow(clippy::type_complexity)]
 pub fn gray_affine<T: CanRegister>(
     config: Config,
     imgs: Vec<DMatrix<T>>,
     sparse_diff_threshold: T::Bigger, // 50
 ) -> Result<(Vec<Vector6<f32>>, Vec<DMatrix<T>>), RegistrationError>
 where
-    DMatrix<T>: IntoImage,
+    DMatrix<T>: ToImage,
 {
     // Get the number of images to align.
     let imgs_count = imgs.len();
@@ -164,8 +165,8 @@ where
 
         // motion_vec is adapted when changing level.
         for motion in motion_vec.iter_mut() {
-            motion[4] = 2.0 * motion[4];
-            motion[5] = 2.0 * motion[5];
+            motion[4] *= 2.0;
+            motion[5] *= 2.0;
         }
 
         // Sparse filter.
@@ -333,6 +334,7 @@ impl State {
         // theta-update: forwards compositional step of a Gauss-Newton approximation.
         log::trace!("theta-update: forwards compositional step of GN approximation");
         let residuals = &errors_temp - &*errors;
+        #[allow(clippy::needless_range_loop)]
         for i in 0..obs.images.len() {
             // Compute gradients for the registered image.
             let gradients = match &obs.sparsity {
@@ -497,7 +499,7 @@ fn forwards_compositional_step(
     }
     let hessian_chol = hessian
         .cholesky()
-        .ok_or_else(|| RegistrationError::NonDefinitePositiveHessian(hessian))?;
+        .ok_or(RegistrationError::NonDefinitePositiveHessian(hessian))?;
     Ok(hessian_chol.solve(&descent_params))
 }
 

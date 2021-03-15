@@ -9,13 +9,13 @@ use std::ops::{Add, Div};
 
 pub trait Bigger: Copy {
     type Big: Copy + Add<Output = Self::Big> + Div<Output = Self::Big> + From<u8> + From<Self>;
-    fn as_from(b: Self::Big) -> Self;
+    fn from_as(b: Self::Big) -> Self;
 }
 
 impl Bigger for u8 {
     type Big = u16;
     #[allow(clippy::cast_possible_truncation)]
-    fn as_from(b: Self::Big) -> Self {
+    fn from_as(b: Self::Big) -> Self {
         b as Self
     }
 }
@@ -23,7 +23,7 @@ impl Bigger for u8 {
 impl Bigger for u16 {
     type Big = u32;
     #[allow(clippy::cast_possible_truncation)]
-    fn as_from(b: Self::Big) -> Self {
+    fn from_as(b: Self::Big) -> Self {
         b as Self
     }
 }
@@ -47,7 +47,7 @@ pub fn mean_pyramid<T: Scalar + Copy + Bigger>(
             let b = T::Big::from(b);
             let c = T::Big::from(c);
             let d = T::Big::from(d);
-            T::as_from((a + b + c + d) / T::Big::from(4u8))
+            T::from_as((a + b + c + d) / T::Big::from(4u8))
         })
     })
 }

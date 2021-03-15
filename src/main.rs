@@ -1,7 +1,7 @@
 use lowrr::img::crop::{crop, recover_original_motion, Crop};
 use lowrr::img::interpolation::CanLinearInterpolate;
 use lowrr::img::registration::{self, CanRegister};
-use lowrr::interop::{IntoDMatrix, IntoImage};
+use lowrr::interop::{IntoDMatrix, ToImage};
 use lowrr::utils::CanEqualize;
 
 use anyhow::Context;
@@ -148,7 +148,7 @@ fn get_args(matches: &clap::ArgMatches) -> anyhow::Result<Args> {
             let value = str_value
                 .parse()
                 .context(format!("Failed to parse \"{}\" into a float", str_value))?;
-            if value < 0.0 || value > 1.0 {
+            if !(0.0..=1.0).contains(&value) {
                 anyhow::bail!("Expecting an intensity value in [0,1], got {}", value)
             }
             Some(value)
@@ -222,7 +222,6 @@ fn run(args: Args) -> anyhow::Result<()> {
             let (motion_vec_crop, cropped_eq_imgs) = crop_and_register(&args, gray_imgs, 10 * 256)?;
             original_motion(&args, motion_vec_crop, cropped_eq_imgs, &imgs)?
         }
-        Dataset::RawImages(_) => unimplemented!(),
     };
 
     // Write motion_vec to stdout.
@@ -232,13 +231,14 @@ fn run(args: Args) -> anyhow::Result<()> {
     Ok(())
 }
 
+#[allow(clippy::type_complexity)]
 fn crop_and_register<T: CanEqualize + CanRegister>(
     args: &Args,
     gray_imgs: Vec<DMatrix<T>>,
     sparse_diff_threshold: <T as CanRegister>::Bigger, // 50
 ) -> anyhow::Result<(Vec<Vector6<f32>>, Vec<DMatrix<T>>)>
 where
-    DMatrix<T>: IntoImage,
+    DMatrix<T>: ToImage,
 {
     // Extract the cropped area from the images.
     let cropped_imgs: Result<Vec<DMatrix<T>>, _> = match args.crop {
@@ -269,11 +269,11 @@ fn original_motion<T: CanRegister, U: Scalar + Copy, V>(
     original_imgs: &[DMatrix<U>],
 ) -> anyhow::Result<Vec<Vector6<f32>>>
 where
-    DMatrix<T>: IntoImage,
+    DMatrix<T>: ToImage,
     U: CanLinearInterpolate<V, U>,
     V: Add<Output = V>,
     f32: Mul<V, Output = V>,
-    DMatrix<U>: IntoImage,
+    DMatrix<U>: ToImage,
 {
     // Recover motion parameters in the frame of the full image from the one in the cropped frame.
     let motion_vec = match args.crop {
@@ -316,7 +316,6 @@ where
 }
 
 enum Dataset {
-    RawImages(Vec<DMatrix<u16>>),
     GrayImages(Vec<DMatrix<u8>>),
     GrayImagesU16(Vec<DMatrix<u16>>),
     RgbImages(Vec<DMatrix<(u8, u8, u8)>>),
@@ -386,6 +385,7 @@ fn load_dataset<P: AsRef<Path>>(paths: &[P]) -> anyhow::Result<(Dataset, (usize,
     }
 }
 
+#[allow(clippy::type_complexity)]
 fn load_all<P: AsRef<Path>, Pixel, T: Scalar>(
     first_img: DynamicImage,
     other_paths: &[P],
