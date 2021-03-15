@@ -1,21 +1,59 @@
 # image: 'rust:latest'
 image: 'clux/muslrust:stable'
 
-stages:
-  - test
-  - doc
-  - build
-
 variables:
   CARGO_HOME: $CI_PROJECT_DIR/cargo
   APT_CACHE_DIR: $CI_PROJECT_DIR/apt
 
-test:
-  stage: test
+cache:
+  paths:
+    - apt/
+    - cargo/
+    - target/
+
+stages:
+  - check
+  - test
+  - build_main
+  - build_warp_crop
+  - doc
+
+check:
+  stage: check
   script:
     - rustc --version
     - cargo --version
+    - cargo check --verbose
+  only:
+    - master
+    - tags
+
+test:
+  stage: test
+  script:
     - cargo test --verbose
+  only:
+    - master
+    - tags
+
+linux-musl-main:
+  stage: build_main
+  artifacts:
+    expose_as: 'lowrr'
+    paths: ['target/x86_64-unknown-linux-musl/release/lowrr']
+  script:
+    - cargo build --release --target x86_64-unknown-linux-musl
+  only:
+    - master
+    - tags
+
+linux-musl-warp-crop:
+  stage: build_warp_crop
+  artifacts:
+    expose_as: 'warp_crop'
+    paths: ['target/x86_64-unknown-linux-musl/release/examples/warp_crop']
+  script:
+    - cargo build --release --target x86_64-unknown-linux-musl --example warp_crop
   only:
     - master
     - tags
@@ -31,19 +69,3 @@ pages:
       - public
   only:
     - tags
-
-linux-musl:
-  stage: build
-  artifacts:
-    expose_as: 'lowrr'
-    paths: ['target/x86_64-unknown-linux-musl/release/lowrr']
-  script:
-    - cargo build --release --target x86_64-unknown-linux-musl
-  only:
-    - tags
-
-cache:
-  paths:
-    - apt/
-    - cargo/
-    - target/
