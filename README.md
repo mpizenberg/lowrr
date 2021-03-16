@@ -36,10 +36,12 @@ for supervising the image acquisition campaign of the Bayeux Tapestry.
 ## Installation
 
 To install the `lowrr` command-line program,
-simply download the executable for your platform (Windows, MacOS, Linux) on the latest release.
-TODO: make a GitHub release.
-Then simply extract and put the executable in a directory listed in your `PATH` environment variable.
+simply download the archive for your platform (Windows, MacOS, Linux)
+from the [latest release][releases].
+Then extract it and put the executable in a directory listed in your `PATH` environment variable.
 This way, you will be able to call `lowrr` from anywhere.
+
+[releases]: https://github.com/mpizenberg/lowrr/releases
 
 ## Usage
 
