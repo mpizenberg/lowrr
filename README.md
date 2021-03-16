@@ -201,3 +201,50 @@ The resulting binary will be located in `target/release/`.
 The first compilation may take a little while, but then will be pretty fast.
 
 [rust]: https://www.rust-lang.org/tools/install
+
+## Reproducing the paper figures
+
+> Warning: this has not been tested on Windows and Mac, only Linux.
+
+Some figure need to run a photometric stereo reconstruction
+and are not reproducible directly with the code in this directory
+since that is out of scope.
+All the figures that do not involve 3D reconstruction though
+are reproducible with the code provided in this repository.
+Most of them need to be able to run Matlab code, I leave that to you.
+
+First, you need to build the main `lowrr` executable.
+
+```sh
+cargo build --release
+```
+
+Then, you need to build the `warp_crop` example program.
+
+```sh
+cargo build --release --example warp_crop
+```
+
+Both these executable will be located at `target/release/lowrr`
+and `target/release/examples/warp_crop` respectively.
+Copy them somewhere in your path to have them available
+when we run the matlab scripts.
+
+Now you need to [download the DiLiGent dataset][diligent] and extract it.
+We are interested in the `pmsData/` directory containing
+photometric stereo images of 10 objects.
+
+The `eval/` directory contains two scripts `eval_registration.m`
+and `eval_all_displacement_errors.m`,
+as well as some helper functions for each of those scripts.
+Once the DiLiGent data has been downloaded and extracted,
+Change the path of `diligent_dir` in `eval_registration.m`,
+eventually also lower the `nb_random` to something small,
+and run the `eval_registration` Matlab script.
+
+Once the registration is done for each algorithm on all sequences,
+change `nb_random` in `eval_all_displacement_errors.m` to match
+what you set in the first script and run the `eval_all_displacement_errors` matlab script.
+This will generate all the visualizations available in the paper and others.
+
+[diligent]: https://drive.google.com/uc?id=1EgC3x8daOWL4uQmc6c4nXVe4mdAMJVfg&export=download
