@@ -126,7 +126,6 @@ In addition to the `lowrr` executable compiled from `src/main.rs`,
 we also provide the code in the form of a library,
 so that it can easily be re-used for other Rust applications.
 The API documentation of the library is available at
-TODO: change that
 https://matthieu.pizenberg.pages.unicaen.fr/low-rank-registration
 
 ## Unfamiliar with Rust?
