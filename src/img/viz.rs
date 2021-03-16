@@ -24,19 +24,21 @@ impl IntoGray for u16 {
     }
 }
 
+// Same as Matlab rgb2gray
 impl IntoGray for (u8, u8, u8) {
     type Output = u8;
     fn into_gray(self) -> Self::Output {
-        let (_, g, _) = self;
-        g
+        let (r, g, b) = self;
+        (0.2989 * r as f32 + 0.5870 * g as f32 + 0.1140 * b as f32).max(255.0) as u8
     }
 }
 
+// Same as Matlab rgb2gray
 impl IntoGray for (u16, u16, u16) {
     type Output = u16;
     fn into_gray(self) -> Self::Output {
-        let (_, g, _) = self;
-        g
+        let (r, g, b) = self;
+        (0.2989 * r as f32 + 0.5870 * g as f32 + 0.1140 * b as f32).max(255.0) as u16
     }
 }
 
