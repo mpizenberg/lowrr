@@ -24,7 +24,7 @@ check:
     - cargo --version
     - cargo check --verbose
   only:
-    - master
+    - main
     - tags
 
 test:
@@ -32,7 +32,7 @@ test:
   script:
     - cargo test --verbose
   only:
-    - master
+    - main
     - tags
 
 build-musl:
@@ -46,7 +46,7 @@ build-musl:
     - cargo build --release --target x86_64-unknown-linux-musl
     - cargo build --release --target x86_64-unknown-linux-musl --example warp_crop
   only:
-    - master
+    - main
     - tags
 
 pages:
@@ -60,5 +60,5 @@ pages:
     paths:
       - public
   only:
-    - master
+    - main
     - tags
