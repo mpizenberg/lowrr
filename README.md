@@ -36,7 +36,7 @@ for supervising the image acquisition campaign of the Bayeux Tapestry.
 ## Installation
 
 To install the `lowrr` command-line program,
-simply download the executable for your platform on the latest release.
+simply download the executable for your platform (Windows, MacOS, Linux) on the latest release.
 TODO: make a GitHub release.
 Then simply extract and put it in a directory listed in your `PATH` environment variable.
 This way, you will be able to call `lowrr` from anywhere.
@@ -159,7 +159,7 @@ and print the message inside the `expect(...)`.
 ## Code contribution
 
 To compile the source code yourself, you just need to install [Rust][rust],
-and then run the command `cargo build --release`.
+and then run the command `cargo build --release` at the root of this project.
 Cargo is Rust build tool, it will automatically download dependencies
 and compile all the code.
 The resulting binary will be located in `target/release/`.
