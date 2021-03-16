@@ -9,7 +9,7 @@ This repository holds both the `lowrr` library, and a `lowrr` command-line execu
 > 2021.
 
 The algorithm presented here takes advantage of the fact that well aligned sets of images
-should form a low rank matrix.
+should form a matrix with low rank.
 We thus minimize the nuclear norm of that matrix (sum of singular values),
 which is the convex relaxation of its rank.
 
@@ -20,9 +20,9 @@ Some additional experiments show interesting results with multimodal images for 
 
 ![Alignment of photometric stereo images improves the 3D reconstruction][handheld]
 
-The previous figure showcases the improvement of both the 3D reconstruction,
-and the recovered albedo after an alignment of handheld photos of the
-Bayeux Tapestry.
+The previous figure showcases the improvement on both the 3D reconstruction,
+and the recovered albedo after an alignment of handheld photometric stereo images
+of the Bayeux Tapestry.
 
 [handheld]: https://mpizenberg.github.io/resources/lowrr/handheld.jpg
 
@@ -38,7 +38,7 @@ for supervising the image acquisition campaign of the Bayeux Tapestry.
 To install the `lowrr` command-line program,
 simply download the executable for your platform (Windows, MacOS, Linux) on the latest release.
 TODO: make a GitHub release.
-Then simply extract and put it in a directory listed in your `PATH` environment variable.
+Then simply extract and put the executable in a directory listed in your `PATH` environment variable.
 This way, you will be able to call `lowrr` from anywhere.
 
 ## Usage
