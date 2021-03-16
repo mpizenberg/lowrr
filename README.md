@@ -52,19 +52,36 @@ lowrr img/*.png
 
 By default, this will compute the registration and output to stdout
 the affine parameters of each image transformation as specified
-in the associated research paper.
+in our research paper.
 
 If you also want to apply the transformation and save the registered images,
 you can add the `--save-imgs` command line argument.
+
+```sh
+# Apply the transformation and save the registered images
+lowrr --save-imgs img/*.png
+```
 
 Usually, the algorithm can estimate the aligning transformation without working
 on the whole image, but just a cropped area of the image to make things faster.
 You can specify that working frame with the command line arguments
 `--crop <left> <top> <right> <bottom>` where the border coordinates of that frame
 are specified after the `--crop` argument (top-left corner is 0,0).
+In that case, I'd suggest to also add the `--save-crop` argument
+to be able to visualize the cropped area and its registration.
+
+```sh
+# Work on a reduced 500x300 cropped area and visualize its registration
+lowrr --crop 0 0 500 300 --save-crop img/*.png
+```
 
 You can also customize all the algorithm parameters.
-For more info, have a look at the program help with `lowrr --help`.
+For more info, have a look at the program help.
+
+```sh
+# Display the program help for more info
+lowrr --help
+```
 
 ## Lib documentation
 
