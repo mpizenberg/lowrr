@@ -4,13 +4,23 @@ Low-rank registration of slightly misaligned images for photometric stereo.
 This repository holds both the `lowrr` library, and a `lowrr` command-line executable.
 
 > Matthieu Pizenberg, Yvain Quéau, Abderrahim Elmoataz,
-> "Low-rank registration of images captured under unknown, varying lighting"
-> International Conference on Scale Space and Variational Methods in Computer Vision.
+> "Low-rank registration of images captured under unknown, varying lighting".
+> International Conference on Scale Space and Variational Methods in Computer Vision (SSVM).
 > 2021.
+
+The algorithm presented here takes advantage of the fact that well aligned sets of images
+should form a low rank matrix.
+We thus minimize the nuclear norm of that matrix (sum of singular values),
+which is the convex relaxation of its rank.
+
+This algorithm gives convincing results in the context of photometric stereo images,
+which is where we have evaluated it,
+but it should also work reliably in other situations where minimizing the rank makes sense.
+Some additional experiments show interesting results with multimodal images for example.
 
 ![Alignment of photometric stereo images improves the 3D reconstruction][handheld]
 
-The previous image showcases the improvement of both the 3D reconstruction,
+The previous figure showcases the improvement of both the 3D reconstruction,
 and the recovered albedo after an alignment of handheld photos of the
 Bayeux Tapestry.
 
