@@ -5,11 +5,14 @@ variables:
   CARGO_HOME: $CI_PROJECT_DIR/cargo
   APT_CACHE_DIR: $CI_PROJECT_DIR/apt
 
-cache:
-  paths:
-    - apt/
-    - cargo/
-    - target/
+# Cache is unusable currently:
+# https://gitlab.com/gitlab-org/gitlab-runner/-/issues/1797
+#
+# cache:
+#   paths:
+#     - apt/
+#     - cargo/
+#     - target/
 
 stages:
   - check
