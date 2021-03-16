@@ -85,11 +85,11 @@ lowrr --help
 
 ## Lib documentation
 
-In addition to the `lowrr` executable, that is compiled from `src/main.rs`,
+In addition to the `lowrr` executable compiled from `src/main.rs`,
 we also provide the code in the form of a library,
 so that it can easily be re-used for other Rust applications.
-The library code is fully documented, and the documentation is automatically
-generated and made available at
+The API documentation of the library is available at
+TODO: change that
 https://matthieu.pizenberg.pages.unicaen.fr/low-rank-registration
 
 ## Unfamiliar with Rust?
