@@ -341,6 +341,8 @@ fn load_dataset<P: AsRef<Path>>(paths: &[P]) -> anyhow::Result<(Dataset, (usize,
             Some("png") => "image",
             Some("jpg") => "image",
             Some("jpeg") => "image",
+            Some("tif") => "image",
+            Some("tiff") => "image",
             Some(ext) => anyhow::bail!("Unrecognized extension: {}", ext),
             None => anyhow::bail!("Hum no extension for {}?", path.display()),
         };
