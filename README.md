@@ -3,7 +3,10 @@
 Low-rank registration of slightly misaligned images for photometric stereo.
 This repository holds both the `lowrr` library, and a `lowrr` command-line executable.
 
-> TODO: add citation here
+> Matthieu Pizenberg, Yvain Quéau, Abderrahim Elmoataz,
+> "Low-rank registration of images captured under unknown, varying lighting"
+> International Conference on Scale Space and Variational Methods in Computer Vision.
+> 2021.
 
 ## Install
 
