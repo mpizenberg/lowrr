@@ -33,26 +33,13 @@ and by the ANR grant "Inclusive Museum Guide" (ANR-20-CE38-0007).
 The authors would like to thank C. Berthelot at the Bayeux Tapestry Museum
 for supervising the image acquisition campaign of the Bayeux Tapestry.
 
-## Install
+## Installation
 
-To install the `lowrr` executable, you just have to download it
-and put it in a directory listed in your `PATH` environment variable.
-Download links are available when clicking on the download icon
-of the [latest tagged version of the code][tags]
-(select the "linux-musl" artifact).
-
-Those executables are statically linked with musl-libc to work on all Linux distributions.
-If you are using Windows or MacOS, you can build it by [installing Rust][rust-install]
-and compiling it with
-
-```sh
-cargo build --release
-```
-
-This will generate the `lowrr` executable at `target/release/lowrr`.
-
-[tags]: https://git.unicaen.fr/matthieu.pizenberg/low-rank-registration/-/tags
-[rust-install]: https://www.rust-lang.org/tools/install
+To install the `lowrr` command-line program,
+simply download the executable for your platform on the latest release.
+TODO: make a GitHub release.
+Then simply extract and put it in a directory listed in your `PATH` environment variable.
+This way, you will be able to call `lowrr` from anywhere.
 
 ## Usage
 
