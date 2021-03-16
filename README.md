@@ -1,4 +1,4 @@
-# low-rank-registration
+# Low-rank registration (lowrr)
 
 Low-rank registration of slightly misaligned images for photometric stereo.
 This repository holds both the `lowrr` library, and a `lowrr` command-line executable.
@@ -82,6 +82,41 @@ For more info, have a look at the program help.
 # Display the program help for more info
 lowrr --help
 ```
+
+## Step by step example usage
+
+1. Install `lowrr` as described in the `Installation` section above.
+   Make sure it is available to the command line by running `lowrr --help`,
+   which should display the help menu of the program.
+2. Download and extract this [example set of 6 photos][bd-zip]
+   of the cover of a comic book about the city of Caen.
+3. Open a terminal in the directory containing those images and run
+
+```sh
+lowrr --crop 2300 2300 2800 2800 --save-crop --save-imgs -v *.jpg > params.txt
+```
+
+This command will load the 6 images into memory
+and extract a working area corresponding to the 500x500 frame
+located between left, top, right, bottom coordinates of
+2300, 2300, 2800 and 2800 respectively.
+It will then perform the registration algorithm on that working area
+with default parameters and save the registered images for that frame.
+Finally it will project the computed registration parameters from the cropped area
+to the frame of the whole image and output those into the file `params.txt`.
+Each line of `params.txt` contains the affine parameters `p1, p2, p3, p4, p5, p6`
+of the corresponding image, such that they form the following affine matrix:
+
+```txt
+| 1 + p1,     p3, p5 |
+|     p2, 1 + p4, p6 |
+|      0,      0,  1 |
+```
+
+In addition this also apply the computed registration to all images and save them on disk.
+All saved images will be located in the `out/` directory.
+
+[bd-zip]: https://unicloud.unicaen.fr/index.php/s/tBjo2YtwXHBqe7j/download
 
 ## Lib documentation
 
