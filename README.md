@@ -8,6 +8,21 @@ This repository holds both the `lowrr` library, and a `lowrr` command-line execu
 > International Conference on Scale Space and Variational Methods in Computer Vision.
 > 2021.
 
+![Alignment of photometric stereo images improves the 3D reconstruction][handheld]
+
+The previous image showcases the improvement of both the 3D reconstruction,
+and the recovered albedo after an alignment of handheld photos of the
+Bayeux Tapestry.
+
+[handheld]: https://mpizenberg.github.io/resources/lowrr/handheld.jpg
+
+## Acknowledgements
+
+This work was supported by the RIN project "Guide Muséal",
+and by the ANR grant "Inclusive Museum Guide" (ANR-20-CE38-0007).
+The authors would like to thank C. Berthelot at the Bayeux Tapestry Museum
+for supervising the image acquisition campaign of the Bayeux Tapestry.
+
 ## Install
 
 To install the `lowrr` executable, you just have to download it
