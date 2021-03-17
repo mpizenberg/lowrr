@@ -8,6 +8,13 @@ This repository holds both the `lowrr` library, and a `lowrr` command-line execu
 > International Conference on Scale Space and Variational Methods in Computer Vision (SSVM).
 > 2021.
 
+![Example alignment of photometric stereo images][lowrr-animated]
+
+In the animation above, we show a close-up view of the same image region
+in 6 successive photos of a surface under varying lighting.
+On the left, the original images are slightly misaligned.
+On the right, the registered images by lowrr are perfectly aligned.
+
 The algorithm presented here takes advantage of the fact that well aligned sets of images
 should form a matrix with low rank.
 We thus minimize the nuclear norm of that matrix (sum of singular values),
@@ -24,6 +31,7 @@ The previous figure showcases the improvement on both the 3D reconstruction,
 and the recovered albedo after an alignment of handheld photometric stereo images
 of the Bayeux Tapestry.
 
+[lowrr-animated]: https://mpizenberg.github.io/resources/lowrr/lowrr-animated.gif
 [handheld]: https://mpizenberg.github.io/resources/lowrr/handheld.jpg
 
 ## Acknowledgements
