@@ -10,6 +10,7 @@ import Html exposing (Html)
 import Html.Attributes
 import Icon
 import Json.Decode exposing (Value)
+import Simple.Transition as Transition
 import Style
 
 
@@ -234,7 +235,9 @@ dropIconBorderAttributes dashedAttribute =
     , centerX
     , dashedAttribute
     , Element.Border.rounded 16
-    , width Element.shrink
+    , height (Element.px (48 + (16 + 4) * 2))
+    , width (Element.px (48 + (16 + 4) * 2))
+    , borderTransition
     ]
 
 
@@ -246,8 +249,21 @@ loadingBoxBorderAttributes =
     , centerX
     , Element.Border.solid
     , Element.Border.rounded 0
+    , height (Element.px ((16 + 4) * 2))
     , width (Element.px 400)
+    , borderTransition
     ]
+
+
+borderTransition : Element.Attribute msg
+borderTransition =
+    Element.htmlAttribute
+        (Transition.properties
+            [ Transition.property "border-radius" 300 []
+            , Transition.property "height" 300 []
+            , Transition.property "width" 300 []
+            ]
+        )
 
 
 onDropAttributes : FileDraggingState -> List (Element.Attribute Msg)
