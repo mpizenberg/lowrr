@@ -192,11 +192,13 @@ viewLoading { names, loaded } =
     in
     Element.column [ padding 20, width fill, height fill ]
         [ viewTitle
-        , Element.column
-            [ centerX, centerY, spacing 32 ]
-            [ Element.el loadingBoxBorderAttributes (loadBar loadCount totalCount)
-            , Element.el [ centerX ] (Element.text ("Loading " ++ String.fromInt totalCount ++ " images"))
-            ]
+        , Element.el [ width fill, height fill ]
+            (Element.column
+                [ centerX, centerY, spacing 32 ]
+                [ Element.el loadingBoxBorderAttributes (loadBar loadCount totalCount)
+                , Element.el [ centerX ] (Element.text ("Loading " ++ String.fromInt totalCount ++ " images"))
+                ]
+            )
         ]
 
 
