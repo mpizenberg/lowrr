@@ -4,6 +4,7 @@ import Browser
 import Device exposing (Device)
 import Dict exposing (Dict)
 import Element exposing (Element, alignRight, centerX, centerY, fill, height, padding, paddingXY, spacing, width)
+import Element.Background
 import Element.Border
 import Element.Font
 import FileValue as File exposing (File)
@@ -201,7 +202,20 @@ viewLoading { names, loaded } =
 
 loadBar : Int -> Int -> Element msg
 loadBar loaded total =
-    Element.text (String.fromInt loaded ++ " / " ++ String.fromInt total)
+    let
+        barLength =
+            400 * 1 // total
+    in
+    Element.el
+        [ width (Element.px barLength)
+        , height Element.fill
+        , Element.Background.color Style.dropColor
+        , Element.htmlAttribute
+            (Transition.properties
+                [ Transition.property "width" 200 [] ]
+            )
+        ]
+        Element.none
 
 
 viewTitle : Element msg
@@ -277,7 +291,7 @@ loadingBoxBorderAttributes : List (Element.Attribute msg)
 loadingBoxBorderAttributes =
     [ Element.Border.width 4
     , Element.Font.color Style.dropColor
-    , paddingXY 0 16
+    , paddingXY 0 0
     , centerX
     , Element.Border.solid
     , Element.Border.rounded 0
