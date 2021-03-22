@@ -292,8 +292,11 @@ dropIconBorderAttributes : Element.Attribute msg -> List (Element.Attribute msg)
 dropIconBorderAttributes dashedAttribute =
     [ Element.Border.width 4
     , Element.Font.color Style.dropColor
-    , paddingXY 16 16
     , centerX
+    , Element.clip
+
+    -- below is different
+    , paddingXY 16 16
     , dashedAttribute
     , Element.Border.rounded 16
     , height (Element.px (48 + (16 + 4) * 2))
@@ -306,8 +309,11 @@ loadingBoxBorderAttributes : List (Element.Attribute msg)
 loadingBoxBorderAttributes =
     [ Element.Border.width 4
     , Element.Font.color Style.dropColor
-    , paddingXY 0 0
     , centerX
+    , Element.clip
+
+    -- below is different
+    , paddingXY 0 0
     , Element.Border.solid
     , Element.Border.rounded 0
     , height (Element.px ((16 + 4) * 2))
