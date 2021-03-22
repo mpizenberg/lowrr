@@ -39,7 +39,7 @@ const utils = (function () {
   // with the url corresponding to the image loaded
   function createImageObject(id, imageFile) {
     const promise = new Promise((resolve, reject) => {
-      if (imageFile.type.match(/image.*/)) {
+      if (imageFile.type.startsWith("image")) {
         const img = document.createElement("img");
         img.onload = () =>
           resolve({

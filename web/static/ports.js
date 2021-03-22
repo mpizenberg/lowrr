@@ -8,12 +8,24 @@ export function activatePorts(app, containerSize) {
     app.ports.resizes.send(containerSize())
   );
 
+  // // Create an image object and send it back to the Elm app.
+  // app.ports.loadImageFile.subscribe(value => {
+  //   utils
+  //     .createImageObject(value.id, value.file)
+  //     .then(image => app.ports.imageLoaded.send(image))
+  //     .catch(error => console.log(error));
+  // });
+
   // Listen for images to decode.
   app.ports.decodeImages.subscribe(async (imgs) => {
     console.log("Received images to decode");
-    for (let img of imgs) {
-      await sleep(500);
-      app.ports.imageDecoded.send({ name: img.name, url: "TODO url" });
+    try {
+      for (let img of imgs) {
+        let image = await utils.createImageObject(img.name, img);
+        app.ports.imageDecoded.send({ name: image.id, url: image.url });
+      }
+    } catch (error) {
+      console.error(error);
     }
   });
 
@@ -75,13 +87,6 @@ function startAnimationFrameLoop(port) {
 //
 //
 
-// // Create an image object and send it back to the Elm app.
-// app.ports.loadImageFile.subscribe(value => {
-//   utils
-//     .createImageObject(value.id, value.file)
-//     .then(image => app.ports.imageLoaded.send(image))
-//     .catch(error => console.log(error));
-// });
 //
 // // Read config file as text and send it back to the Elm app.
 // app.ports.loadConfigFile.subscribe(file => {
