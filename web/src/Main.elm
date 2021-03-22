@@ -2,6 +2,7 @@ port module Main exposing (main)
 
 import Browser
 import Device exposing (Device)
+import Dict exposing (Dict)
 import Element exposing (Element, alignRight, centerX, centerY, fill, height, padding, paddingXY, spacing, width)
 import Element.Border
 import Element.Font
@@ -10,11 +11,15 @@ import Html exposing (Html)
 import Html.Attributes
 import Icon
 import Json.Decode exposing (Value)
+import Set exposing (Set)
 import Simple.Transition as Transition
 import Style
 
 
 port resizes : (Device.Size -> msg) -> Sub msg
+
+
+port decodeImages : List Value -> Cmd msg
 
 
 main : Program Value Model Msg
@@ -37,7 +42,7 @@ type alias Model =
 
 type State
     = Home FileDraggingState
-    | Loading
+    | Loading { names : Set String, loaded : Dict String { name : String, url : String } }
     | Config { images : Images }
     | Processing { images : Images }
     | Results { images : Images }
@@ -46,7 +51,6 @@ type State
 type FileDraggingState
     = Idle
     | DraggingSomeFiles
-    | DroppedSomeFiles File (List File)
 
 
 type alias Images =
@@ -121,7 +125,16 @@ update msg model =
             ( { model | state = Home DraggingSomeFiles }, Cmd.none )
 
         ( DragDropMsg (Drop file otherFiles), Home _ ) ->
-            ( { model | state = Home (DroppedSomeFiles file otherFiles) }, Cmd.none )
+            let
+                imageFiles =
+                    List.filter (\f -> String.startsWith "image" f.mime) (file :: otherFiles)
+
+                names =
+                    Set.fromList (List.map .name imageFiles)
+            in
+            ( { model | state = Loading { names = names, loaded = Dict.empty } }
+            , decodeImages (List.map File.encode imageFiles)
+            )
 
         ( DragDropMsg DragLeave, Home _ ) ->
             ( { model | state = Home Idle }, Cmd.none )
@@ -146,8 +159,8 @@ viewElmUI model =
         Home draggingState ->
             viewHome draggingState
 
-        Loading ->
-            Element.none
+        Loading loadData ->
+            viewLoading loadData
 
         Config { images } ->
             Element.none
@@ -161,29 +174,66 @@ viewElmUI model =
 
 viewHome : FileDraggingState -> Element Msg
 viewHome draggingState =
-    Element.column (padding 20 :: width fill :: height fill :: onDropAttributes draggingState)
-        [ Element.column [ centerX, spacing 16 ]
-            [ Element.el [ Element.Font.size 32 ] (Element.text "Low rank image registration")
-            , Element.row [ alignRight, spacing 8 ]
-                [ Element.link [ Element.Font.underline ]
-                    { url = "https://github.com/mpizenberg/lowrr", label = Element.text "code on GitHub" }
-                , Element.el [] Element.none
-                , Icon.github 16
-                ]
-            , Element.row [ alignRight, spacing 8 ]
-                [ Element.link [ Element.Font.underline ]
-                    { url = "https://hal.archives-ouvertes.fr/hal-03172399", label = Element.text "read the paper" }
-                , Element.el [] Element.none
-                , Icon.fileText 16
-                ]
-            ]
+    Element.column (padding 20 :: width fill :: height fill :: onDropAttributes)
+        [ viewTitle
         , dropAndLoadArea draggingState
+        ]
+
+
+viewLoading : { names : Set String, loaded : Dict String { name : String, url : String } } -> Element Msg
+viewLoading { names, loaded } =
+    let
+        totalCount =
+            Set.size names
+
+        loadCount =
+            Dict.size loaded
+    in
+    Element.column [ padding 20, width fill, height fill ]
+        [ viewTitle
+        , Element.column
+            [ centerX, centerY, spacing 32 ]
+            [ Element.el loadingBoxBorderAttributes (loadBar loadCount totalCount)
+            , Element.el [ centerX ] (Element.text ("Loading " ++ String.fromInt totalCount ++ " images"))
+            ]
+        ]
+
+
+loadBar : Int -> Int -> Element msg
+loadBar loaded total =
+    Element.text (String.fromInt loaded ++ " / " ++ String.fromInt total)
+
+
+viewTitle : Element msg
+viewTitle =
+    Element.column [ centerX, spacing 16 ]
+        [ Element.el [ Element.Font.size 32 ] (Element.text "Low rank image registration")
+        , Element.row [ alignRight, spacing 8 ]
+            [ Element.link [ Element.Font.underline ]
+                { url = "https://github.com/mpizenberg/lowrr", label = Element.text "code on GitHub" }
+            , Element.el [] Element.none
+            , Icon.github 16
+            ]
+        , Element.row [ alignRight, spacing 8 ]
+            [ Element.link [ Element.Font.underline ]
+                { url = "https://hal.archives-ouvertes.fr/hal-03172399", label = Element.text "read the paper" }
+            , Element.el [] Element.none
+            , Icon.fileText 16
+            ]
         ]
 
 
 dropAndLoadArea : FileDraggingState -> Element Msg
 dropAndLoadArea draggingState =
     let
+        borderStyle =
+            case draggingState of
+                Idle ->
+                    Element.Border.dashed
+
+                DraggingSomeFiles ->
+                    Element.Border.solid
+
         dropOrLoadText =
             Element.row []
                 [ Element.text "Drop images or "
@@ -202,28 +252,10 @@ dropAndLoadArea draggingState =
                 ]
     in
     Element.el [ width fill, height fill ]
-        (case draggingState of
-            Idle ->
-                Element.column [ centerX, centerY, spacing 32 ]
-                    [ Element.el (dropIconBorderAttributes Element.Border.dashed) (Icon.arrowDown 48)
-                    , dropOrLoadText
-                    ]
-
-            DraggingSomeFiles ->
-                Element.column [ centerX, centerY, spacing 32 ]
-                    [ Element.el (dropIconBorderAttributes Element.Border.solid) (Icon.arrowDown 48)
-                    , dropOrLoadText
-                    ]
-
-            DroppedSomeFiles _ otherFiles ->
-                let
-                    filesCount =
-                        1 + List.length otherFiles
-                in
-                Element.column [ centerX, centerY, spacing 32 ]
-                    [ Element.el loadingBoxBorderAttributes Element.none
-                    , Element.el [ centerX ] (Element.text ("Loading " ++ String.fromInt filesCount ++ " files"))
-                    ]
+        (Element.column [ centerX, centerY, spacing 32 ]
+            [ Element.el (dropIconBorderAttributes borderStyle) (Icon.arrowDown 48)
+            , dropOrLoadText
+            ]
         )
 
 
@@ -266,17 +298,12 @@ borderTransition =
         )
 
 
-onDropAttributes : FileDraggingState -> List (Element.Attribute Msg)
-onDropAttributes draggingState =
-    case draggingState of
-        DroppedSomeFiles _ _ ->
-            []
-
-        _ ->
-            List.map Element.htmlAttribute
-                (File.onDrop
-                    { onOver = \file otherFiles -> DragDropMsg (DragOver file otherFiles)
-                    , onDrop = \file otherFiles -> DragDropMsg (Drop file otherFiles)
-                    , onLeave = Just { id = "FileDropArea", msg = DragDropMsg DragLeave }
-                    }
-                )
+onDropAttributes : List (Element.Attribute Msg)
+onDropAttributes =
+    List.map Element.htmlAttribute
+        (File.onDrop
+            { onOver = \file otherFiles -> DragDropMsg (DragOver file otherFiles)
+            , onDrop = \file otherFiles -> DragDropMsg (Drop file otherFiles)
+            , onLeave = Just { id = "FileDropArea", msg = DragDropMsg DragLeave }
+            }
+        )
