@@ -46,7 +46,7 @@ type alias Model =
 
 type State
     = Home FileDraggingState
-    | Loading { names : Set String, loaded : Dict String String }
+    | Loading { names : Set String, loaded : Dict String Image }
     | Config { images : List Image }
     | Processing { images : Images }
     | Results { images : Images }
@@ -152,11 +152,11 @@ update msg model =
         ( DragDropMsg DragLeave, Home _ ) ->
             ( { model | state = Home Idle }, Cmd.none )
 
-        ( ImageDecoded { id, url }, Loading { names, loaded } ) ->
+        ( ImageDecoded img, Loading { names, loaded } ) ->
             let
                 updatedLoadingState =
-                    { names = Set.insert id names
-                    , loaded = Dict.insert id url loaded
+                    { names = Set.insert img.id names
+                    , loaded = Dict.insert img.id img loaded
                     }
             in
             ( { model | state = Loading updatedLoadingState }, Cmd.none )
@@ -202,7 +202,7 @@ viewHome draggingState =
         ]
 
 
-viewLoading : { names : Set String, loaded : Dict String String } -> Element Msg
+viewLoading : { names : Set String, loaded : Dict String Image } -> Element Msg
 viewLoading { names, loaded } =
     let
         totalCount =
