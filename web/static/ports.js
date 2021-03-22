@@ -8,6 +8,15 @@ export function activatePorts(app, containerSize) {
     app.ports.resizes.send(containerSize())
   );
 
+  // Listen for images to decode.
+  app.ports.decodeImages.subscribe(async (imgs) => {
+    console.log("Received images to decode");
+    for (let img of imgs) {
+      await sleep(500);
+      app.ports.imageDecoded.send({ name: img.name, url: "TODO url" });
+    }
+  });
+
   // Replace elm Browser.onAnimationFrameDelta that seems to have timing issues.
   // startAnimationFrameLoop(app.ports.animationFrame);
 
@@ -26,6 +35,10 @@ export function activatePorts(app, containerSize) {
   // 	wasm_buffer.set(file_buffer, start);
   // 	file_buffer = null; arrayBuffer = null; // Free memory.
   // }
+}
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 function startAnimationFrameLoop(port) {

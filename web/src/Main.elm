@@ -23,13 +23,16 @@ port resizes : (Device.Size -> msg) -> Sub msg
 port decodeImages : List Value -> Cmd msg
 
 
+port imageDecoded : ({ name : String, url : String } -> msg) -> Sub msg
+
+
 main : Program Value Model Msg
 main =
     Browser.element
         { init = init
         , view = view
         , update = update
-        , subscriptions = \_ -> resizes WindowResizes
+        , subscriptions = \_ -> Sub.batch [ resizes WindowResizes, imageDecoded ImageDecoded ]
         }
 
 
@@ -43,7 +46,7 @@ type alias Model =
 
 type State
     = Home FileDraggingState
-    | Loading { names : Set String, loaded : Dict String { name : String, url : String } }
+    | Loading { names : Set String, loaded : Dict String String }
     | Config { images : Images }
     | Processing { images : Images }
     | Results { images : Images }
@@ -81,6 +84,7 @@ type Msg
     = NoMsg
     | WindowResizes Device.Size
     | DragDropMsg DragDropMsg
+    | ImageDecoded { name : String, url : String }
 
 
 type DragDropMsg
@@ -140,6 +144,15 @@ update msg model =
         ( DragDropMsg DragLeave, Home _ ) ->
             ( { model | state = Home Idle }, Cmd.none )
 
+        ( ImageDecoded { name, url }, Loading { names, loaded } ) ->
+            let
+                updatedLoadingState =
+                    { names = Set.insert name names
+                    , loaded = Dict.insert name url loaded
+                    }
+            in
+            ( { model | state = Loading updatedLoadingState }, Cmd.none )
+
         _ ->
             ( model, Cmd.none )
 
@@ -181,7 +194,7 @@ viewHome draggingState =
         ]
 
 
-viewLoading : { names : Set String, loaded : Dict String { name : String, url : String } } -> Element Msg
+viewLoading : { names : Set String, loaded : Dict String String } -> Element Msg
 viewLoading { names, loaded } =
     let
         totalCount =
@@ -206,7 +219,7 @@ loadBar : Int -> Int -> Element msg
 loadBar loaded total =
     let
         barLength =
-            400 * 1 // total
+            (400 - 2 * 4) * loaded // total
     in
     Element.el
         [ width (Element.px barLength)
