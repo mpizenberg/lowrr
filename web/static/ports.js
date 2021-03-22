@@ -22,7 +22,7 @@ export function activatePorts(app, containerSize) {
     try {
       for (let img of imgs) {
         let image = await utils.createImageObject(img.name, img);
-        app.ports.imageDecoded.send({ name: image.id, url: image.url });
+        app.ports.imageDecoded.send(image);
       }
     } catch (error) {
       console.error(error);

@@ -23,7 +23,7 @@ port resizes : (Device.Size -> msg) -> Sub msg
 port decodeImages : List Value -> Cmd msg
 
 
-port imageDecoded : ({ name : String, url : String } -> msg) -> Sub msg
+port imageDecoded : (Image -> msg) -> Sub msg
 
 
 main : Program Value Model Msg
@@ -47,7 +47,7 @@ type alias Model =
 type State
     = Home FileDraggingState
     | Loading { names : Set String, loaded : Dict String String }
-    | Config { images : Images }
+    | Config { images : List Image }
     | Processing { images : Images }
     | Results { images : Images }
 
@@ -55,6 +55,14 @@ type State
 type FileDraggingState
     = Idle
     | DraggingSomeFiles
+
+
+type alias Image =
+    { id : String
+    , url : String
+    , width : Int
+    , height : Int
+    }
 
 
 type alias Images =
@@ -84,7 +92,7 @@ type Msg
     = NoMsg
     | WindowResizes Device.Size
     | DragDropMsg DragDropMsg
-    | ImageDecoded { name : String, url : String }
+    | ImageDecoded Image
 
 
 type DragDropMsg
@@ -144,11 +152,11 @@ update msg model =
         ( DragDropMsg DragLeave, Home _ ) ->
             ( { model | state = Home Idle }, Cmd.none )
 
-        ( ImageDecoded { name, url }, Loading { names, loaded } ) ->
+        ( ImageDecoded { id, url }, Loading { names, loaded } ) ->
             let
                 updatedLoadingState =
-                    { names = Set.insert name names
-                    , loaded = Dict.insert name url loaded
+                    { names = Set.insert id names
+                    , loaded = Dict.insert id url loaded
                     }
             in
             ( { model | state = Loading updatedLoadingState }, Cmd.none )
