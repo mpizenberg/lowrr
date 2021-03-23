@@ -54,6 +54,7 @@ type State
     = Home FileDraggingState
     | Loading { names : Set String, loaded : Dict String Image }
     | ViewImgs { images : Pivot Image }
+    | Config { images : Pivot Image }
     | Processing { images : Images }
     | Results { images : Images }
 
@@ -104,7 +105,8 @@ init size =
 initialState : State
 initialState =
     -- Home Idle
-    ViewImgs { images = Pivot.fromCons (Image "ferris" "https://opensource.com/sites/default/files/styles/teaser-wide/public/lead-images/rust_programming_crab_sea.png?itok=Nq53PhmO" 249 140) [] }
+    -- ViewImgs { images = Pivot.fromCons (Image "ferris" "https://opensource.com/sites/default/files/styles/teaser-wide/public/lead-images/rust_programming_crab_sea.png?itok=Nq53PhmO" 249 140) [] }
+    Config { images = Pivot.fromCons (Image "ferris" "https://opensource.com/sites/default/files/styles/teaser-wide/public/lead-images/rust_programming_crab_sea.png?itok=Nq53PhmO" 249 140) [] }
 
 
 defaultParams : Parameters
@@ -148,6 +150,9 @@ subscriptions model =
 
         ViewImgs _ ->
             Sub.batch [ resizes WindowResizes, Keyboard.downs KeyDown ]
+
+        Config _ ->
+            Sub.batch [ resizes WindowResizes ]
 
         Processing _ ->
             Sub.batch [ resizes WindowResizes ]
@@ -243,7 +248,10 @@ viewElmUI model =
             viewLoading loadData
 
         ViewImgs { images } ->
-            viewConfig images model.device
+            viewImgs images model.device
+
+        Config { images } ->
+            viewConfig images model.params model.device
 
         Processing { images } ->
             Element.none
@@ -252,8 +260,13 @@ viewElmUI model =
             Element.none
 
 
-viewConfig : Pivot Image -> Device -> Element Msg
-viewConfig images device =
+viewConfig : Pivot Image -> Parameters -> Device -> Element Msg
+viewConfig images params device =
+    Debug.todo "config"
+
+
+viewImgs : Pivot Image -> Device -> Element Msg
+viewImgs images device =
     let
         img =
             Pivot.getC images
