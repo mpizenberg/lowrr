@@ -53,7 +53,7 @@ type alias Model =
 type State
     = Home FileDraggingState
     | Loading { names : Set String, loaded : Dict String Image }
-    | Config { images : Pivot Image }
+    | ViewImgs { images : Pivot Image }
     | Processing { images : Images }
     | Results { images : Images }
 
@@ -104,7 +104,7 @@ init size =
 initialState : State
 initialState =
     -- Home Idle
-    Config { images = Pivot.fromCons (Image "ferris" "https://opensource.com/sites/default/files/styles/teaser-wide/public/lead-images/rust_programming_crab_sea.png?itok=Nq53PhmO" 249 140) [] }
+    ViewImgs { images = Pivot.fromCons (Image "ferris" "https://opensource.com/sites/default/files/styles/teaser-wide/public/lead-images/rust_programming_crab_sea.png?itok=Nq53PhmO" 249 140) [] }
 
 
 defaultParams : Parameters
@@ -146,7 +146,7 @@ subscriptions model =
         Loading _ ->
             Sub.batch [ resizes WindowResizes, imageDecoded ImageDecoded ]
 
-        Config _ ->
+        ViewImgs _ ->
             Sub.batch [ resizes WindowResizes, Keyboard.downs KeyDown ]
 
         Processing _ ->
@@ -197,22 +197,22 @@ update msg model =
                         ( { model | state = Home Idle }, Cmd.none )
 
                     firstImage :: otherImages ->
-                        ( { model | state = Config { images = Pivot.fromCons firstImage otherImages } }
+                        ( { model | state = ViewImgs { images = Pivot.fromCons firstImage otherImages } }
                         , Cmd.none
                         )
 
             else
                 ( { model | state = Loading updatedLoadingState }, Cmd.none )
 
-        ( KeyDown rawKey, Config { images } ) ->
+        ( KeyDown rawKey, ViewImgs { images } ) ->
             case Keyboard.navigationKey rawKey of
                 Just Keyboard.ArrowRight ->
-                    ( { model | state = Config { images = Pivot.goR images |> Maybe.withDefault (Pivot.goToStart images) } }
+                    ( { model | state = ViewImgs { images = Pivot.goR images |> Maybe.withDefault (Pivot.goToStart images) } }
                     , Cmd.none
                     )
 
                 Just Keyboard.ArrowLeft ->
-                    ( { model | state = Config { images = Pivot.goL images |> Maybe.withDefault (Pivot.goToEnd images) } }
+                    ( { model | state = ViewImgs { images = Pivot.goL images |> Maybe.withDefault (Pivot.goToEnd images) } }
                     , Cmd.none
                     )
 
@@ -242,7 +242,7 @@ viewElmUI model =
         Loading loadData ->
             viewLoading loadData
 
-        Config { images } ->
+        ViewImgs { images } ->
             viewConfig images model.device
 
         Processing { images } ->
