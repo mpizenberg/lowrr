@@ -343,7 +343,7 @@ loadingBoxBorderAttributes =
     , Element.Border.solid
     , Element.Border.rounded 0
     , height (Element.px ((16 + 4) * 2))
-    , width (Element.px 400)
+    , width (Element.px 325)
     , borderTransition
     ]
 
