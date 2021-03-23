@@ -12,6 +12,7 @@ import Html exposing (Html)
 import Html.Attributes
 import Icon
 import Json.Decode exposing (Value)
+import Pivot exposing (Pivot)
 import Set exposing (Set)
 import Simple.Transition as Transition
 import Style
@@ -26,7 +27,7 @@ port decodeImages : List Value -> Cmd msg
 port imageDecoded : (Image -> msg) -> Sub msg
 
 
-main : Program Value Model Msg
+main : Program Device.Size Model Msg
 main =
     Browser.element
         { init = init
@@ -47,7 +48,7 @@ type alias Model =
 type State
     = Home FileDraggingState
     | Loading { names : Set String, loaded : Dict String Image }
-    | Config { images : List Image }
+    | Config { images : Pivot Image }
     | Processing { images : Images }
     | Results { images : Images }
 
@@ -103,9 +104,9 @@ type DragDropMsg
 
 {-| Initialize the model.
 -}
-init : Value -> ( Model, Cmd Msg )
-init flags =
-    ( { state = initialState, device = Device.default, params = defaultParams }, Cmd.none )
+init : Device.Size -> ( Model, Cmd Msg )
+init size =
+    ( { state = initialState, device = Device.classify size, params = defaultParams }, Cmd.none )
 
 
 initialState : State
@@ -155,11 +156,23 @@ update msg model =
         ( ImageDecoded img, Loading { names, loaded } ) ->
             let
                 updatedLoadingState =
-                    { names = Set.insert img.id names
+                    { names = names
                     , loaded = Dict.insert img.id img loaded
                     }
             in
-            ( { model | state = Loading updatedLoadingState }, Cmd.none )
+            if Set.size names == Dict.size updatedLoadingState.loaded then
+                case Dict.values updatedLoadingState.loaded of
+                    [] ->
+                        -- This should be impossible, there must be at least 1 image
+                        ( { model | state = Home Idle }, Cmd.none )
+
+                    firstImage :: otherImages ->
+                        ( { model | state = Config { images = Pivot.fromCons firstImage otherImages } }
+                        , Cmd.none
+                        )
+
+            else
+                ( { model | state = Loading updatedLoadingState }, Cmd.none )
 
         _ ->
             ( model, Cmd.none )
@@ -185,13 +198,18 @@ viewElmUI model =
             viewLoading loadData
 
         Config { images } ->
-            Element.none
+            viewConfig images
 
         Processing { images } ->
             Element.none
 
         Results { images } ->
             Element.none
+
+
+viewConfig : Pivot Image -> Element Msg
+viewConfig images =
+    Element.text "TODO: viewConfig"
 
 
 viewHome : FileDraggingState -> Element Msg

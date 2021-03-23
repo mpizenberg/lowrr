@@ -26,6 +26,7 @@ const layoutViewportSize = () => ({
 var app = Elm.Main.init({
   node: document.getElementById("app"),
   // flags: { keys: keys, values: values },
+  flags: layoutViewportSize(),
 });
 
 // Activate the app ports.
