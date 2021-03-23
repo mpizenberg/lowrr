@@ -7,6 +7,7 @@ import Element exposing (Element, alignRight, centerX, centerY, fill, height, pa
 import Element.Background
 import Element.Border
 import Element.Font
+import Element.Input
 import FileValue as File exposing (File)
 import Html exposing (Html)
 import Html.Attributes
@@ -78,6 +79,7 @@ type alias Images =
 
 type alias Parameters =
     { crop : Maybe Crop
+    , equalize : Bool
     , levels : Int
     , sparse : Float
     , lambda : Float
@@ -112,6 +114,7 @@ initialState =
 defaultParams : Parameters
 defaultParams =
     { crop = Nothing
+    , equalize = True
     , levels = 1
     , sparse = 0.5
     , lambda = 1.5
@@ -131,12 +134,17 @@ type Msg
     | DragDropMsg DragDropMsg
     | ImageDecoded Image
     | KeyDown RawKey
+    | ParamsMsg ParamsMsg
 
 
 type DragDropMsg
     = DragOver File (List File)
     | Drop File (List File)
     | DragLeave
+
+
+type ParamsMsg
+    = ToggleEqualize Bool
 
 
 subscriptions : Model -> Sub Msg
@@ -224,8 +232,18 @@ update msg model =
                 _ ->
                     ( model, Cmd.none )
 
+        ( ParamsMsg paramsMsg, Config _ ) ->
+            ( { model | params = updateParams paramsMsg model.params }, Cmd.none )
+
         _ ->
             ( model, Cmd.none )
+
+
+updateParams : ParamsMsg -> Parameters -> Parameters
+updateParams msg params =
+    case msg of
+        ToggleEqualize equalize ->
+            { params | equalize = equalize }
 
 
 
@@ -262,7 +280,107 @@ viewElmUI model =
 
 viewConfig : Pivot Image -> Parameters -> Device -> Element Msg
 viewConfig images params device =
-    Debug.todo "config"
+    Element.column [ padding 20, spacing 32 ]
+        [ Element.el [ Element.Font.center, Element.Font.size 32 ] (Element.text "Algorithm parameters")
+
+        -- preprocessing
+        , Element.paragraph [] [ Element.text "Cropped working frame: TODO" ]
+        , Element.column [ spacing 10 ]
+            [ Element.text "Equalize mean intensities:"
+            , Element.row [ spacing 10 ]
+                [ Element.text "Off"
+                , toggle (ParamsMsg << ToggleEqualize) params.equalize 20 "Toggle mean intensities equalization"
+                , Element.text "On"
+                ]
+            ]
+
+        -- stop criteria
+        , Element.paragraph [] [ Element.text "Maximum number of iterations: TODO" ]
+        , Element.paragraph [] [ Element.text "Convergence threshold: TODO" ]
+
+        -- quality/speed
+        , Element.paragraph [] [ Element.text "Number of pyramid levels: TODO" ]
+        , Element.paragraph [] [ Element.text "Sparse ratio threshold to switch: TODO" ]
+
+        -- optimization
+        , Element.paragraph [] [ Element.text "lambda: TODO" ]
+        , Element.paragraph [] [ Element.text "rho: TODO" ]
+        ]
+
+
+
+-- type alias Parameters =
+--     { crop : Maybe Crop
+--     , levels : Int
+--     , sparse : Float
+--     , lambda : Float
+--     , rho : Float
+--     , maxIterations : Int
+--     , convergenceThreshold : Float
+--     }
+
+
+toggle : (Bool -> Msg) -> Bool -> Float -> String -> Element Msg
+toggle msg checked toggleHeight label =
+    Element.Input.checkbox [] <|
+        { onChange = msg
+        , label = Element.Input.labelHidden label
+        , checked = checked
+        , icon =
+            toggleCheckboxWidget
+                { offColor = Style.lightGrey
+                , onColor = Style.green
+                , sliderColor = Style.white
+                , toggleWidth = 2 * round toggleHeight
+                , toggleHeight = round toggleHeight
+                }
+        }
+
+
+toggleCheckboxWidget : { offColor : Element.Color, onColor : Element.Color, sliderColor : Element.Color, toggleWidth : Int, toggleHeight : Int } -> Bool -> Element msg
+toggleCheckboxWidget { offColor, onColor, sliderColor, toggleWidth, toggleHeight } checked =
+    let
+        pad =
+            3
+
+        sliderSize =
+            toggleHeight - 2 * pad
+
+        translation =
+            (toggleWidth - sliderSize - pad)
+                |> String.fromInt
+    in
+    Element.el
+        [ Element.Background.color <|
+            if checked then
+                onColor
+
+            else
+                offColor
+        , Element.width <| Element.px <| toggleWidth
+        , Element.height <| Element.px <| toggleHeight
+        , Element.Border.rounded (toggleHeight // 2)
+        , Element.inFront <|
+            Element.el [ Element.height Element.fill ] <|
+                Element.el
+                    [ Element.Background.color sliderColor
+                    , Element.Border.rounded <| sliderSize // 2
+                    , Element.width <| Element.px <| sliderSize
+                    , Element.height <| Element.px <| sliderSize
+                    , Element.centerY
+                    , Element.moveRight pad
+                    , Element.htmlAttribute <|
+                        Html.Attributes.style "transition" ".4s"
+                    , Element.htmlAttribute <|
+                        if checked then
+                            Html.Attributes.style "transform" <| "translateX(" ++ translation ++ "px)"
+
+                        else
+                            Html.Attributes.class ""
+                    ]
+                    (Element.text "")
+        ]
+        (Element.text "")
 
 
 viewImgs : Pivot Image -> Device -> Element Msg
