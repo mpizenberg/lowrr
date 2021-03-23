@@ -206,12 +206,12 @@ update msg model =
         ( KeyDown rawKey, Config { images } ) ->
             case Keyboard.navigationKey rawKey of
                 Just Keyboard.ArrowRight ->
-                    ( { model | state = Config { images = Pivot.withRollback Pivot.goR images } }
+                    ( { model | state = Config { images = Pivot.goR images |> Maybe.withDefault (Pivot.goToStart images) } }
                     , Cmd.none
                     )
 
                 Just Keyboard.ArrowLeft ->
-                    ( { model | state = Config { images = Pivot.withRollback Pivot.goL images } }
+                    ( { model | state = Config { images = Pivot.goL images |> Maybe.withDefault (Pivot.goToEnd images) } }
                     , Cmd.none
                     )
 
