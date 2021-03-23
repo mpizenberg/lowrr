@@ -214,7 +214,7 @@ viewConfig images =
 
 viewHome : FileDraggingState -> Element Msg
 viewHome draggingState =
-    Element.column (padding 20 :: width fill :: height fill :: onDropAttributes)
+    Element.column (Element.clip :: padding 20 :: width fill :: height fill :: onDropAttributes)
         [ viewTitle
         , dropAndLoadArea draggingState
         ]
@@ -262,7 +262,7 @@ loadBar loaded total =
 viewTitle : Element msg
 viewTitle =
     Element.column [ centerX, spacing 16 ]
-        [ Element.el [ Element.Font.size 32 ] (Element.text "Low rank image registration")
+        [ Element.paragraph [ Element.Font.center, Element.Font.size 32 ] [ Element.text "Low rank image registration" ]
         , Element.row [ alignRight, spacing 8 ]
             [ Element.link [ Element.Font.underline ]
                 { url = "https://github.com/mpizenberg/lowrr", label = Element.text "code on GitHub" }
