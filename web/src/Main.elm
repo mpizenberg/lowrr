@@ -12,6 +12,7 @@ import Html exposing (Html)
 import Html.Attributes
 import Icon
 import Json.Decode exposing (Value)
+import Keyboard exposing (RawKey)
 import Pivot exposing (Pivot)
 import Set exposing (Set)
 import Simple.Transition as Transition
@@ -126,6 +127,7 @@ type Msg
     | WindowResizes Device.Size
     | DragDropMsg DragDropMsg
     | ImageDecoded Image
+    | KeyDown RawKey
 
 
 type DragDropMsg
@@ -136,7 +138,21 @@ type DragDropMsg
 
 subscriptions : Model -> Sub Msg
 subscriptions model =
-    Sub.batch [ resizes WindowResizes, imageDecoded ImageDecoded ]
+    case model.state of
+        Home _ ->
+            Sub.batch [ resizes WindowResizes, imageDecoded ImageDecoded ]
+
+        Loading _ ->
+            Sub.batch [ resizes WindowResizes, imageDecoded ImageDecoded ]
+
+        Config _ ->
+            Sub.batch [ resizes WindowResizes, Keyboard.downs KeyDown ]
+
+        Processing _ ->
+            Sub.batch [ resizes WindowResizes ]
+
+        Results _ ->
+            Sub.batch [ resizes WindowResizes ]
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -186,6 +202,21 @@ update msg model =
 
             else
                 ( { model | state = Loading updatedLoadingState }, Cmd.none )
+
+        ( KeyDown rawKey, Config { images } ) ->
+            case Keyboard.navigationKey rawKey of
+                Just Keyboard.ArrowRight ->
+                    ( { model | state = Config { images = Pivot.withRollback Pivot.goR images } }
+                    , Cmd.none
+                    )
+
+                Just Keyboard.ArrowLeft ->
+                    ( { model | state = Config { images = Pivot.withRollback Pivot.goL images } }
+                    , Cmd.none
+                    )
+
+                _ ->
+                    ( model, Cmd.none )
 
         _ ->
             ( model, Cmd.none )
@@ -237,12 +268,13 @@ viewConfig images device =
                 |> Viewer.fitImage 1.0 ( toFloat img.width, toFloat img.height )
                 |> Viewer.Svg.transform
     in
-    Element.html <|
-        Svg.svg
-            [ Html.Attributes.width (floor device.size.width)
-            , Html.Attributes.height (floor device.size.height)
-            ]
-            [ Svg.g [ viewerAttributes ] [ Svg.image imgSvgAttributes [] ] ]
+    Element.el [ Element.clip ] <|
+        Element.html <|
+            Svg.svg
+                [ Html.Attributes.width (floor device.size.width)
+                , Html.Attributes.height (floor device.size.height)
+                ]
+                [ Svg.g [ viewerAttributes ] [ Svg.image imgSvgAttributes [] ] ]
 
 
 viewHome : FileDraggingState -> Element Msg
