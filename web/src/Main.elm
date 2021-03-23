@@ -37,7 +37,7 @@ main =
         { init = init
         , view = view
         , update = update
-        , subscriptions = \_ -> Sub.batch [ resizes WindowResizes, imageDecoded ImageDecoded ]
+        , subscriptions = subscriptions
         }
 
 
@@ -93,19 +93,6 @@ type alias Crop =
     }
 
 
-type Msg
-    = NoMsg
-    | WindowResizes Device.Size
-    | DragDropMsg DragDropMsg
-    | ImageDecoded Image
-
-
-type DragDropMsg
-    = DragOver File (List File)
-    | Drop File (List File)
-    | DragLeave
-
-
 {-| Initialize the model.
 -}
 init : Device.Size -> ( Model, Cmd Msg )
@@ -128,6 +115,28 @@ defaultParams =
     , maxIterations = 40
     , convergenceThreshold = 0.001
     }
+
+
+
+-- Update ############################################################
+
+
+type Msg
+    = NoMsg
+    | WindowResizes Device.Size
+    | DragDropMsg DragDropMsg
+    | ImageDecoded Image
+
+
+type DragDropMsg
+    = DragOver File (List File)
+    | Drop File (List File)
+    | DragLeave
+
+
+subscriptions : Model -> Sub Msg
+subscriptions model =
+    Sub.batch [ resizes WindowResizes, imageDecoded ImageDecoded ]
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
