@@ -17,7 +17,7 @@ import Pivot exposing (Pivot)
 import Set exposing (Set)
 import Simple.Transition as Transition
 import Style
-import Svg exposing (Svg)
+import Svg
 import Svg.Attributes
 import Viewer
 import Viewer.Svg
@@ -103,7 +103,8 @@ init size =
 
 initialState : State
 initialState =
-    Home Idle
+    -- Home Idle
+    Config { images = Pivot.fromCons (Image "ferris" "https://opensource.com/sites/default/files/styles/teaser-wide/public/lead-images/rust_programming_crab_sea.png?itok=Nq53PhmO" 249 140) [] }
 
 
 defaultParams : Parameters
@@ -228,7 +229,7 @@ update msg model =
 
 view : Model -> Html Msg
 view model =
-    Element.layout [ Style.font ]
+    Element.layout [ Style.font, Element.clip ]
         (viewElmUI model)
 
 
@@ -268,18 +269,17 @@ viewConfig images device =
                 |> Viewer.fitImage 1.0 ( toFloat img.width, toFloat img.height )
                 |> Viewer.Svg.transform
     in
-    Element.el [ Element.clip ] <|
-        Element.html <|
-            Svg.svg
-                [ Html.Attributes.width (floor device.size.width)
-                , Html.Attributes.height (floor device.size.height)
-                ]
-                [ Svg.g [ viewerAttributes ] [ Svg.image imgSvgAttributes [] ] ]
+    Element.html <|
+        Svg.svg
+            [ Html.Attributes.width (floor device.size.width)
+            , Html.Attributes.height (floor device.size.height)
+            ]
+            [ Svg.g [ viewerAttributes ] [ Svg.image imgSvgAttributes [] ] ]
 
 
 viewHome : FileDraggingState -> Element Msg
 viewHome draggingState =
-    Element.column (Element.clip :: padding 20 :: width fill :: height fill :: onDropAttributes)
+    Element.column (padding 20 :: width fill :: height fill :: onDropAttributes)
         [ viewTitle
         , dropAndLoadArea draggingState
         ]

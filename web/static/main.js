@@ -5,8 +5,8 @@
 // Function returning the size of the container element for the app.
 // In our case, the full layout viewport.
 const layoutViewportSize = () => ({
-  width: document.documentElement.clientWidth,
-  height: document.documentElement.clientHeight,
+  width: window.innerWidth,
+  height: window.innerHeight,
 });
 
 // // Initialize the database with a "dependencies" store.
