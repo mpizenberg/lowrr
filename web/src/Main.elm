@@ -16,6 +16,10 @@ import Pivot exposing (Pivot)
 import Set exposing (Set)
 import Simple.Transition as Transition
 import Style
+import Svg exposing (Svg)
+import Svg.Attributes
+import Viewer
+import Viewer.Svg
 
 
 port resizes : (Device.Size -> msg) -> Sub msg
@@ -198,7 +202,7 @@ viewElmUI model =
             viewLoading loadData
 
         Config { images } ->
-            viewConfig images
+            viewConfig images model.device
 
         Processing { images } ->
             Element.none
@@ -207,9 +211,29 @@ viewElmUI model =
             Element.none
 
 
-viewConfig : Pivot Image -> Element Msg
-viewConfig images =
-    Element.text "TODO: viewConfig"
+viewConfig : Pivot Image -> Device -> Element Msg
+viewConfig images device =
+    let
+        img =
+            Pivot.getC images
+
+        imgSvgAttributes =
+            [ Svg.Attributes.xlinkHref img.url
+            , Svg.Attributes.width (String.fromInt img.width)
+            , Svg.Attributes.height (String.fromInt img.height)
+            ]
+
+        viewerAttributes =
+            Viewer.withSize ( device.size.width, device.size.height )
+                |> Viewer.fitImage 1.0 ( toFloat img.width, toFloat img.height )
+                |> Viewer.Svg.transform
+    in
+    Element.html <|
+        Svg.svg
+            [ Html.Attributes.width (floor device.size.width)
+            , Html.Attributes.height (floor device.size.height)
+            ]
+            [ Svg.g [ viewerAttributes ] [ Svg.image imgSvgAttributes [] ] ]
 
 
 viewHome : FileDraggingState -> Element Msg
