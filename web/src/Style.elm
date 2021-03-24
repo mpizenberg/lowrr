@@ -1,4 +1,4 @@
-module Style exposing (dropColor, font, green, lightGrey, white)
+module Style exposing (black, dropColor, font, green, lightGrey, white)
 
 import Element
 import Element.Font as Font

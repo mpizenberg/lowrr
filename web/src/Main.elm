@@ -429,10 +429,19 @@ intInput field msgTag label =
 
 intInputButton : Maybe msg -> String -> Element msg
 intInputButton maybeMsg label =
+    let
+        textColor =
+            if maybeMsg == Nothing then
+                Style.lightGrey
+
+            else
+                Style.black
+    in
     Element.Input.button
         [ height fill
         , width (Element.px 44)
         , Element.Font.center
+        , Element.Font.color textColor
         ]
         { onPress = maybeMsg, label = Element.text label }
 
