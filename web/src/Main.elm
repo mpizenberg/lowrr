@@ -102,6 +102,7 @@ type alias Crop =
 
 type alias ParametersForm =
     { maxIterations : NumberInput.Field Int NumberInput.IntError
+    , levels : NumberInput.Field Int NumberInput.IntError
     }
 
 
@@ -129,7 +130,7 @@ defaultParams : Parameters
 defaultParams =
     { crop = Nothing
     , equalize = True
-    , levels = 1
+    , levels = 4
     , sparse = 0.5
     , lambda = 1.5
     , rho = 0.1
@@ -145,6 +146,11 @@ defaultParamsForm =
             |> NumberInput.setMinBound (Just 0)
             |> NumberInput.setMaxBound (Just 1000)
             |> NumberInput.updateInt (String.fromInt defaultParams.maxIterations)
+    , levels =
+        NumberInput.intDefault
+            |> NumberInput.setMinBound (Just 1)
+            |> NumberInput.setMaxBound (Just 10)
+            |> NumberInput.updateInt (String.fromInt defaultParams.levels)
     }
 
 
@@ -170,6 +176,7 @@ type DragDropMsg
 type ParamsMsg
     = ToggleEqualize Bool
     | ChangeMaxIter String
+    | ChangeLevels String
 
 
 subscriptions : Model -> Sub Msg
@@ -289,6 +296,21 @@ updateParams msg ( params, paramsForm ) =
                 Err _ ->
                     ( params, updatedForm )
 
+        ChangeLevels str ->
+            let
+                updatedField =
+                    NumberInput.updateInt str paramsForm.levels
+
+                updatedForm =
+                    { paramsForm | levels = updatedField }
+            in
+            case updatedField.decodedInput of
+                Ok levels ->
+                    ( { params | levels = levels }, updatedForm )
+
+                Err _ ->
+                    ( params, updatedForm )
+
 
 
 -- View ##############################################################
@@ -348,8 +370,14 @@ viewConfig images params paramsForm device =
         -- Convergence threshold
         , Element.paragraph [] [ Element.text "Convergence threshold: TODO" ]
 
-        -- quality/speed
-        , Element.paragraph [] [ Element.text "Number of pyramid levels: TODO" ]
+        -- Multi-resolution pyramid levels
+        , Element.column [ spacing 10 ]
+            [ Element.text "Number of pyramid levels:"
+            , intInput paramsForm.levels (ParamsMsg << ChangeLevels) "Number of pyramid levels"
+            , displayIntErrors paramsForm.levels.decodedInput
+            ]
+
+        -- Sparse ratio threshold
         , Element.paragraph [] [ Element.text "Sparse ratio threshold to switch: TODO" ]
 
         -- optimization
