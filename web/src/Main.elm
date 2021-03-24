@@ -288,9 +288,9 @@ viewConfig images params device =
         , Element.column [ spacing 10 ]
             [ Element.text "Equalize mean intensities:"
             , Element.row [ spacing 10 ]
-                [ Element.text "Off"
+                [ Element.text "off"
                 , toggle (ParamsMsg << ToggleEqualize) params.equalize 20 "Toggle mean intensities equalization"
-                , Element.text "On"
+                , Element.text "on"
                 ]
             ]
 
