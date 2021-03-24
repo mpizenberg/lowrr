@@ -144,6 +144,7 @@ defaultParamsForm =
         NumberInput.intDefault
             |> NumberInput.setMinBound (Just 0)
             |> NumberInput.setMaxBound (Just 1000)
+            |> NumberInput.updateInt (String.fromInt defaultParams.maxIterations)
     }
 
 
