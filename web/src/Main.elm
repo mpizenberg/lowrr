@@ -15,7 +15,7 @@ import Html.Attributes
 import Icon
 import Json.Decode exposing (Value)
 import Keyboard exposing (RawKey)
-import NumericInput
+import NumberInput
 import Pivot exposing (Pivot)
 import Set exposing (Set)
 import Simple.Transition as Transition
@@ -101,11 +101,7 @@ type alias Crop =
 
 
 type alias ParametersForm =
-    { maxIterations :
-        { config : NumericInput.IntConfig
-        , value : String
-        , decodedValue : Result (List NumericInput.IntError) Int
-        }
+    { maxIterations : NumberInput.Field Int NumberInput.IntError
     }
 
 
@@ -145,13 +141,9 @@ defaultParams =
 defaultParamsForm : ParametersForm
 defaultParamsForm =
     { maxIterations =
-        { config =
-            NumericInput.defaultIntConfig
-                |> NumericInput.setIntConfigMin (Just 0)
-                |> NumericInput.setIntConfigMax (Just 1000)
-        , value = String.fromInt defaultParams.maxIterations
-        , decodedValue = Ok defaultParams.maxIterations
-        }
+        NumberInput.intDefault
+            |> NumberInput.setMinBound (Just 0)
+            |> NumberInput.setMaxBound (Just 1000)
     }
 
 
@@ -283,22 +275,18 @@ updateParams msg ( params, paramsForm ) =
 
         ChangeMaxIter str ->
             let
-                newForm =
-                    { config = paramsForm.maxIterations.config
-                    , value = str
-                    , decodedValue = Form.Decoder.run (NumericInput.intDecoder paramsForm.maxIterations.config) str
-                    }
+                updatedField =
+                    NumberInput.updateInt str paramsForm.maxIterations
+
+                updatedForm =
+                    { paramsForm | maxIterations = updatedField }
             in
-            case newForm.decodedValue of
+            case updatedField.decodedInput of
                 Ok maxIterations ->
-                    ( { params | maxIterations = maxIterations }
-                    , { paramsForm | maxIterations = newForm }
-                    )
+                    ( { params | maxIterations = maxIterations }, updatedForm )
 
                 Err _ ->
-                    ( params
-                    , { paramsForm | maxIterations = newForm }
-                    )
+                    ( params, updatedForm )
 
 
 
@@ -352,12 +340,8 @@ viewConfig images params paramsForm device =
         -- Maximum number of iterations
         , Element.column [ spacing 10 ]
             [ Element.text "Maximum number of iterations:"
-            , intInput
-                paramsForm.maxIterations.config
-                (ParamsMsg << ChangeMaxIter)
-                "Maximum number of iterations"
-                paramsForm.maxIterations.value
-            , displayIntErrors paramsForm.maxIterations.decodedValue
+            , intInput paramsForm.maxIterations (ParamsMsg << ChangeMaxIter) "Maximum number of iterations"
+            , displayIntErrors paramsForm.maxIterations.decodedInput
             ]
 
         -- Convergence threshold
@@ -373,7 +357,7 @@ viewConfig images params paramsForm device =
         ]
 
 
-displayIntErrors : Result (List NumericInput.IntError) a -> Element msg
+displayIntErrors : Result (List NumberInput.IntError) a -> Element msg
 displayIntErrors result =
     case result of
         Ok _ ->
@@ -385,19 +369,27 @@ displayIntErrors result =
                 |> Element.text
 
 
-intInput : NumericInput.IntConfig -> (String -> msg) -> String -> String -> Element msg
-intInput config msgTag label currentValue =
-    Element.row [ Element.Border.solid, Element.Border.width 1, padding 16, spacing 16 ]
-        [ Element.text "-"
-        , Element.text "|"
-        , Element.Input.text []
+intInput : NumberInput.Field Int NumberInput.IntError -> (String -> msg) -> String -> Element msg
+intInput field msgTag label =
+    Element.row [ Element.Border.solid, Element.Border.width 1, Element.Border.rounded 4 ]
+        [ Element.Input.button
+            [ height fill
+            , width (Element.px 44)
+            , Element.Font.center
+            ]
+            { onPress = Nothing, label = Element.text "−" }
+        , Element.Input.text [ Element.Border.width 0, Element.Font.center, width (Element.px 100) ]
             { onChange = msgTag
-            , text = currentValue
+            , text = field.input
             , placeholder = Nothing
             , label = Element.Input.labelHidden label
             }
-        , Element.text "|"
-        , Element.text "+"
+        , Element.Input.button
+            [ height fill
+            , width (Element.px 44)
+            , Element.Font.center
+            ]
+            { onPress = Nothing, label = Element.text "+" }
         ]
 
 
