@@ -1,4 +1,18 @@
-module NumberInput exposing (Field, IntError(..), intDefault, setMaxBound, setMinBound, updateInt)
+module NumberInput exposing
+    ( Field, setMinBound, setMaxBound
+    , IntError(..), intDefault, updateInt
+    , FloatError(..), floatDefault, updateFloat
+    )
+
+{-| Data for number form inputs
+
+@docs Field, setMinBound, setMaxBound
+
+@docs IntError, intDefault, updateInt
+
+@docs FloatError, floatDefault, updateFloat
+
+-}
 
 import Form.Decoder exposing (Decoder)
 
@@ -76,6 +90,60 @@ validateMaxInt maybeMax decoder =
 
         Just maxInt ->
             Form.Decoder.assert (maxBound IntTooBig maxInt) decoder
+
+
+
+-- Float
+
+
+type FloatError
+    = FloatParsingError
+    | FloatTooSmall { bound : Float, actual : Float }
+    | FloatTooBig { bound : Float, actual : Float }
+
+
+floatDefault : Field Float FloatError
+floatDefault =
+    { defaultValue = 0.0
+    , min = Nothing
+    , max = Nothing
+    , increase = \n -> n + 0.1
+    , decrease = \n -> n - 0.1
+    , input = "0.0"
+    , decodedInput = Ok 0.0
+    }
+
+
+updateFloat : String -> Field Float FloatError -> Field Float FloatError
+updateFloat input field =
+    { field | input = input, decodedInput = Form.Decoder.run (floatDecoder field.min field.max) input }
+
+
+floatDecoder : Maybe Float -> Maybe Float -> Decoder String FloatError Float
+floatDecoder maybeMin maybeMax =
+    Form.Decoder.float FloatParsingError
+        |> validateMinFloat maybeMin
+        |> validateMaxFloat maybeMax
+
+
+validateMinFloat : Maybe Float -> Decoder input FloatError Float -> Decoder input FloatError Float
+validateMinFloat maybeMin decoder =
+    case maybeMin of
+        Nothing ->
+            decoder
+
+        Just minFloat ->
+            Form.Decoder.assert (minBound FloatTooSmall minFloat) decoder
+
+
+validateMaxFloat : Maybe Float -> Decoder input FloatError Float -> Decoder input FloatError Float
+validateMaxFloat maybeMax decoder =
+    case maybeMax of
+        Nothing ->
+            decoder
+
+        Just maxFloat ->
+            Form.Decoder.assert (maxBound FloatTooBig maxFloat) decoder
 
 
 

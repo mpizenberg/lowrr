@@ -9,7 +9,6 @@ import Element.Border
 import Element.Font
 import Element.Input
 import FileValue as File exposing (File)
-import Form.Decoder
 import Html exposing (Html)
 import Html.Attributes
 import Icon
@@ -102,6 +101,7 @@ type alias Crop =
 
 type alias ParametersForm =
     { maxIterations : NumberInput.Field Int NumberInput.IntError
+    , convergenceThreshold : NumberInput.Field Float NumberInput.FloatError
     , levels : NumberInput.Field Int NumberInput.IntError
     }
 
@@ -141,15 +141,27 @@ defaultParams =
 
 defaultParamsForm : ParametersForm
 defaultParamsForm =
+    let
+        anyInt =
+            NumberInput.intDefault
+
+        anyFloat =
+            NumberInput.floatDefault
+    in
     { maxIterations =
-        NumberInput.intDefault
-            |> NumberInput.setMinBound (Just 0)
-            |> NumberInput.setMaxBound (Just 1000)
+        { anyInt | min = Just 1, max = Just 1000 }
             |> NumberInput.updateInt (String.fromInt defaultParams.maxIterations)
+    , convergenceThreshold =
+        { defaultValue = defaultParams.convergenceThreshold
+        , min = Just 0.0
+        , max = Nothing
+        , increase = \x -> x * sqrt 2
+        , decrease = \x -> x / sqrt 2
+        , input = String.fromFloat defaultParams.convergenceThreshold
+        , decodedInput = Ok defaultParams.convergenceThreshold
+        }
     , levels =
-        NumberInput.intDefault
-            |> NumberInput.setMinBound (Just 1)
-            |> NumberInput.setMaxBound (Just 10)
+        { anyInt | min = Just 1, max = Just 10 }
             |> NumberInput.updateInt (String.fromInt defaultParams.levels)
     }
 
@@ -176,6 +188,7 @@ type DragDropMsg
 type ParamsMsg
     = ToggleEqualize Bool
     | ChangeMaxIter String
+    | ChangeConvergenceThreshold String
     | ChangeLevels String
 
 
@@ -296,6 +309,21 @@ updateParams msg ( params, paramsForm ) =
                 Err _ ->
                     ( params, updatedForm )
 
+        ChangeConvergenceThreshold str ->
+            let
+                updatedField =
+                    NumberInput.updateFloat str paramsForm.convergenceThreshold
+
+                updatedForm =
+                    { paramsForm | convergenceThreshold = updatedField }
+            in
+            case updatedField.decodedInput of
+                Ok convergenceThreshold ->
+                    ( { params | convergenceThreshold = convergenceThreshold }, updatedForm )
+
+                Err _ ->
+                    ( params, updatedForm )
+
         ChangeLevels str ->
             let
                 updatedField =
@@ -368,7 +396,11 @@ viewConfig images params paramsForm device =
             ]
 
         -- Convergence threshold
-        , Element.paragraph [] [ Element.text "Convergence threshold: TODO" ]
+        , Element.column [ spacing 10 ]
+            [ Element.text "Convergence threshold:"
+            , floatInput paramsForm.convergenceThreshold (ParamsMsg << ChangeConvergenceThreshold) "Convergence threshold"
+            , displayFloatErrors paramsForm.convergenceThreshold.decodedInput
+            ]
 
         -- Multi-resolution pyramid levels
         , Element.column [ spacing 10 ]
@@ -384,6 +416,10 @@ viewConfig images params paramsForm device =
         , Element.paragraph [] [ Element.text "lambda: TODO" ]
         , Element.paragraph [] [ Element.text "rho: TODO" ]
         ]
+
+
+
+-- Int input
 
 
 displayIntErrors : Result (List NumberInput.IntError) a -> Element msg
@@ -412,9 +448,9 @@ intInput field msgTag label =
     case field.decodedInput of
         Err _ ->
             Element.row [ Element.Border.solid, Element.Border.width 1, Element.Border.rounded 4 ]
-                [ intInputButton Nothing "−"
+                [ numberSideButton Nothing "−"
                 , textField
-                , intInputButton Nothing "+"
+                , numberSideButton Nothing "+"
                 ]
 
         Ok current ->
@@ -450,14 +486,14 @@ intInput field msgTag label =
                                 Just (msgTag (String.fromInt <| min increased maxBound))
             in
             Element.row [ Element.Border.solid, Element.Border.width 1, Element.Border.rounded 4 ]
-                [ intInputButton decrementMsg "−"
+                [ numberSideButton decrementMsg "−"
                 , textField
-                , intInputButton incrementMsg "+"
+                , numberSideButton incrementMsg "+"
                 ]
 
 
-intInputButton : Maybe msg -> String -> Element msg
-intInputButton maybeMsg label =
+numberSideButton : Maybe msg -> String -> Element msg
+numberSideButton maybeMsg label =
     let
         textColor =
             if maybeMsg == Nothing then
@@ -473,6 +509,84 @@ intInputButton maybeMsg label =
         , Element.Font.color textColor
         ]
         { onPress = maybeMsg, label = Element.text label }
+
+
+
+-- Float input
+
+
+displayFloatErrors : Result (List NumberInput.FloatError) a -> Element msg
+displayFloatErrors result =
+    case result of
+        Ok _ ->
+            Element.none
+
+        Err errors ->
+            List.map Debug.toString errors
+                |> String.join ", "
+                |> Element.text
+
+
+floatInput : NumberInput.Field Float NumberInput.FloatError -> (String -> msg) -> String -> Element msg
+floatInput field msgTag label =
+    let
+        textField =
+            Element.Input.text [ Element.Border.width 0, Element.Font.center, width (Element.px 100) ]
+                { onChange = msgTag
+                , text = field.input
+                , placeholder = Nothing
+                , label = Element.Input.labelHidden label
+                }
+    in
+    case field.decodedInput of
+        Err _ ->
+            Element.row [ Element.Border.solid, Element.Border.width 1, Element.Border.rounded 4 ]
+                [ numberSideButton Nothing "−"
+                , textField
+                , numberSideButton Nothing "+"
+                ]
+
+        Ok current ->
+            let
+                increased =
+                    field.increase current
+
+                decreased =
+                    field.decrease current
+
+                decrementMsg =
+                    case field.min of
+                        Nothing ->
+                            Just (msgTag (String.fromFloat decreased))
+
+                        Just minBound ->
+                            if current <= minBound then
+                                Nothing
+
+                            else
+                                Just (msgTag (String.fromFloat <| max decreased minBound))
+
+                incrementMsg =
+                    case field.max of
+                        Nothing ->
+                            Just (msgTag (String.fromFloat increased))
+
+                        Just maxBound ->
+                            if current >= maxBound then
+                                Nothing
+
+                            else
+                                Just (msgTag (String.fromFloat <| min increased maxBound))
+            in
+            Element.row [ Element.Border.solid, Element.Border.width 1, Element.Border.rounded 4 ]
+                [ numberSideButton decrementMsg "−"
+                , textField
+                , numberSideButton incrementMsg "+"
+                ]
+
+
+
+-- toggle
 
 
 toggle : (Bool -> Msg) -> Bool -> Float -> String -> Element Msg
