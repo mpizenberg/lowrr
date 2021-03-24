@@ -9,11 +9,13 @@ import Element.Border
 import Element.Font
 import Element.Input
 import FileValue as File exposing (File)
+import Form.Decoder
 import Html exposing (Html)
 import Html.Attributes
 import Icon
 import Json.Decode exposing (Value)
 import Keyboard exposing (RawKey)
+import NumericInput
 import Pivot exposing (Pivot)
 import Set exposing (Set)
 import Simple.Transition as Transition
@@ -48,6 +50,7 @@ type alias Model =
     { state : State
     , device : Device
     , params : Parameters
+    , paramsForm : ParametersForm
     }
 
 
@@ -97,11 +100,26 @@ type alias Crop =
     }
 
 
+type alias ParametersForm =
+    { maxIterations :
+        { config : NumericInput.IntConfig
+        , value : String
+        , decodedValue : Result (List NumericInput.IntError) Int
+        }
+    }
+
+
 {-| Initialize the model.
 -}
 init : Device.Size -> ( Model, Cmd Msg )
 init size =
-    ( { state = initialState, device = Device.classify size, params = defaultParams }, Cmd.none )
+    ( { state = initialState
+      , device = Device.classify size
+      , params = defaultParams
+      , paramsForm = defaultParamsForm
+      }
+    , Cmd.none
+    )
 
 
 initialState : State
@@ -121,6 +139,19 @@ defaultParams =
     , rho = 0.1
     , maxIterations = 40
     , convergenceThreshold = 0.001
+    }
+
+
+defaultParamsForm : ParametersForm
+defaultParamsForm =
+    { maxIterations =
+        { config =
+            NumericInput.defaultIntConfig
+                |> NumericInput.setIntConfigMin (Just 0)
+                |> NumericInput.setIntConfigMax (Just 1000)
+        , value = String.fromInt defaultParams.maxIterations
+        , decodedValue = Ok defaultParams.maxIterations
+        }
     }
 
 
@@ -145,6 +176,7 @@ type DragDropMsg
 
 type ParamsMsg
     = ToggleEqualize Bool
+    | ChangeMaxIter String
 
 
 subscriptions : Model -> Sub Msg
@@ -233,17 +265,40 @@ update msg model =
                     ( model, Cmd.none )
 
         ( ParamsMsg paramsMsg, Config _ ) ->
-            ( { model | params = updateParams paramsMsg model.params }, Cmd.none )
+            let
+                ( newParams, newParamsForm ) =
+                    updateParams paramsMsg ( model.params, model.paramsForm )
+            in
+            ( { model | params = newParams, paramsForm = newParamsForm }, Cmd.none )
 
         _ ->
             ( model, Cmd.none )
 
 
-updateParams : ParamsMsg -> Parameters -> Parameters
-updateParams msg params =
+updateParams : ParamsMsg -> ( Parameters, ParametersForm ) -> ( Parameters, ParametersForm )
+updateParams msg ( params, paramsForm ) =
     case msg of
         ToggleEqualize equalize ->
-            { params | equalize = equalize }
+            ( { params | equalize = equalize }, paramsForm )
+
+        ChangeMaxIter str ->
+            let
+                newForm =
+                    { config = paramsForm.maxIterations.config
+                    , value = str
+                    , decodedValue = Form.Decoder.run (NumericInput.intDecoder paramsForm.maxIterations.config) str
+                    }
+            in
+            case newForm.decodedValue of
+                Ok maxIterations ->
+                    ( { params | maxIterations = maxIterations }
+                    , { paramsForm | maxIterations = newForm }
+                    )
+
+                Err _ ->
+                    ( params
+                    , { paramsForm | maxIterations = newForm }
+                    )
 
 
 
@@ -269,7 +324,7 @@ viewElmUI model =
             viewImgs images model.device
 
         Config { images } ->
-            viewConfig images model.params model.device
+            viewConfig images model.params model.paramsForm model.device
 
         Processing { images } ->
             Element.none
@@ -278,8 +333,8 @@ viewElmUI model =
             Element.none
 
 
-viewConfig : Pivot Image -> Parameters -> Device -> Element Msg
-viewConfig images params device =
+viewConfig : Pivot Image -> Parameters -> ParametersForm -> Device -> Element Msg
+viewConfig images params paramsForm device =
     Element.column [ padding 20, spacing 32 ]
         [ Element.el [ Element.Font.center, Element.Font.size 32 ] (Element.text "Algorithm parameters")
 
@@ -294,8 +349,18 @@ viewConfig images params device =
                 ]
             ]
 
-        -- stop criteria
-        , Element.paragraph [] [ Element.text "Maximum number of iterations: TODO" ]
+        -- Maximum number of iterations
+        , Element.column [ spacing 10 ]
+            [ Element.text "Maximum number of iterations:"
+            , intInput
+                paramsForm.maxIterations.config
+                (ParamsMsg << ChangeMaxIter)
+                "Maximum number of iterations"
+                paramsForm.maxIterations.value
+            , displayIntErrors paramsForm.maxIterations.decodedValue
+            ]
+
+        -- Convergence threshold
         , Element.paragraph [] [ Element.text "Convergence threshold: TODO" ]
 
         -- quality/speed
@@ -308,16 +373,32 @@ viewConfig images params device =
         ]
 
 
+displayIntErrors : Result (List NumericInput.IntError) a -> Element msg
+displayIntErrors result =
+    case result of
+        Ok _ ->
+            Element.none
 
--- type alias Parameters =
---     { crop : Maybe Crop
---     , levels : Int
---     , sparse : Float
---     , lambda : Float
---     , rho : Float
---     , maxIterations : Int
---     , convergenceThreshold : Float
---     }
+        Err errors ->
+            List.map Debug.toString errors
+                |> String.join ", "
+                |> Element.text
+
+
+intInput : NumericInput.IntConfig -> (String -> msg) -> String -> String -> Element msg
+intInput config msgTag label currentValue =
+    Element.row [ Element.Border.solid, Element.Border.width 1, padding 16, spacing 16 ]
+        [ Element.text "-"
+        , Element.text "|"
+        , Element.Input.text []
+            { onChange = msgTag
+            , text = currentValue
+            , placeholder = Nothing
+            , label = Element.Input.labelHidden label
+            }
+        , Element.text "|"
+        , Element.text "+"
+        ]
 
 
 toggle : (Bool -> Msg) -> Bool -> Float -> String -> Element Msg
