@@ -371,26 +371,70 @@ displayIntErrors result =
 
 intInput : NumberInput.Field Int NumberInput.IntError -> (String -> msg) -> String -> Element msg
 intInput field msgTag label =
-    Element.row [ Element.Border.solid, Element.Border.width 1, Element.Border.rounded 4 ]
-        [ Element.Input.button
-            [ height fill
-            , width (Element.px 44)
-            , Element.Font.center
-            ]
-            { onPress = Nothing, label = Element.text "−" }
-        , Element.Input.text [ Element.Border.width 0, Element.Font.center, width (Element.px 100) ]
-            { onChange = msgTag
-            , text = field.input
-            , placeholder = Nothing
-            , label = Element.Input.labelHidden label
-            }
-        , Element.Input.button
-            [ height fill
-            , width (Element.px 44)
-            , Element.Font.center
-            ]
-            { onPress = Nothing, label = Element.text "+" }
+    let
+        textField =
+            Element.Input.text [ Element.Border.width 0, Element.Font.center, width (Element.px 100) ]
+                { onChange = msgTag
+                , text = field.input
+                , placeholder = Nothing
+                , label = Element.Input.labelHidden label
+                }
+    in
+    case field.decodedInput of
+        Err _ ->
+            Element.row [ Element.Border.solid, Element.Border.width 1, Element.Border.rounded 4 ]
+                [ intInputButton Nothing "−"
+                , textField
+                , intInputButton Nothing "+"
+                ]
+
+        Ok current ->
+            let
+                increased =
+                    field.increase current
+
+                decreased =
+                    field.decrease current
+
+                decrementMsg =
+                    case field.min of
+                        Nothing ->
+                            Just (msgTag (String.fromInt decreased))
+
+                        Just minBound ->
+                            if current <= minBound then
+                                Nothing
+
+                            else
+                                Just (msgTag (String.fromInt <| max decreased minBound))
+
+                incrementMsg =
+                    case field.max of
+                        Nothing ->
+                            Just (msgTag (String.fromInt increased))
+
+                        Just maxBound ->
+                            if current >= maxBound then
+                                Nothing
+
+                            else
+                                Just (msgTag (String.fromInt <| min increased maxBound))
+            in
+            Element.row [ Element.Border.solid, Element.Border.width 1, Element.Border.rounded 4 ]
+                [ intInputButton decrementMsg "−"
+                , textField
+                , intInputButton incrementMsg "+"
+                ]
+
+
+intInputButton : Maybe msg -> String -> Element msg
+intInputButton maybeMsg label =
+    Element.Input.button
+        [ height fill
+        , width (Element.px 44)
+        , Element.Font.center
         ]
+        { onPress = maybeMsg, label = Element.text label }
 
 
 toggle : (Bool -> Msg) -> Bool -> Float -> String -> Element Msg
