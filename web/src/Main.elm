@@ -383,7 +383,7 @@ viewConfig images params paramsForm device =
             [ Element.text "Equalize mean intensities:"
             , Element.row [ spacing 10 ]
                 [ Element.text "off"
-                , toggle (ParamsMsg << ToggleEqualize) params.equalize 20 "Toggle mean intensities equalization"
+                , toggle (ParamsMsg << ToggleEqualize) params.equalize 30 "Toggle mean intensities equalization"
                 , Element.text "on"
                 ]
             ]
