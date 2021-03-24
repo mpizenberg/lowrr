@@ -14,6 +14,26 @@ type alias Field num err =
     }
 
 
+setMinBound : Maybe number -> Field number err -> Field number err
+setMinBound newMin field =
+    { field | min = newMin }
+
+
+setMaxBound : Maybe number -> Field number err -> Field number err
+setMaxBound newMax field =
+    { field | max = newMax }
+
+
+
+-- Int
+
+
+type IntError
+    = IntParsingError
+    | IntTooSmall { bound : Int, actual : Int }
+    | IntTooBig { bound : Int, actual : Int }
+
+
 intDefault : Field Int IntError
 intDefault =
     { defaultValue = 0
@@ -26,25 +46,9 @@ intDefault =
     }
 
 
-setMinBound : Maybe number -> Field number err -> Field number err
-setMinBound newMin field =
-    { field | min = newMin }
-
-
-setMaxBound : Maybe number -> Field number err -> Field number err
-setMaxBound newMax field =
-    { field | max = newMax }
-
-
 updateInt : String -> Field Int IntError -> Field Int IntError
 updateInt input field =
     { field | input = input, decodedInput = Form.Decoder.run (intDecoder field.min field.max) input }
-
-
-type IntError
-    = IntParsingError
-    | IntTooSmall { bound : Int, actual : Int }
-    | IntTooBig { bound : Int, actual : Int }
 
 
 intDecoder : Maybe Int -> Maybe Int -> Decoder String IntError Int
