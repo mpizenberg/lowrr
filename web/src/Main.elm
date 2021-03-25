@@ -100,12 +100,21 @@ type alias Crop =
 
 
 type alias ParametersForm =
-    { maxIterations : NumberInput.Field Int NumberInput.IntError
+    { crop : CropForm
+    , maxIterations : NumberInput.Field Int NumberInput.IntError
     , convergenceThreshold : NumberInput.Field Float NumberInput.FloatError
     , levels : NumberInput.Field Int NumberInput.IntError
     , sparse : NumberInput.Field Float NumberInput.FloatError
     , lambda : NumberInput.Field Float NumberInput.FloatError
     , rho : NumberInput.Field Float NumberInput.FloatError
+    }
+
+
+type alias CropForm =
+    { left : NumberInput.Field Int NumberInput.IntError
+    , top : NumberInput.Field Int NumberInput.IntError
+    , right : NumberInput.Field Int NumberInput.IntError
+    , bottom : NumberInput.Field Int NumberInput.IntError
     }
 
 
@@ -151,7 +160,8 @@ defaultParamsForm =
         anyFloat =
             NumberInput.floatDefault
     in
-    { maxIterations =
+    { crop = defaultCropForm 1920 1080
+    , maxIterations =
         { anyInt | min = Just 1, max = Just 1000 }
             |> NumberInput.setDefaultIntValue defaultParams.maxIterations
     , convergenceThreshold =
@@ -184,6 +194,27 @@ defaultParamsForm =
     }
 
 
+defaultCropForm : Int -> Int -> CropForm
+defaultCropForm width height =
+    let
+        anyInt =
+            NumberInput.intDefault
+    in
+    { left =
+        { anyInt | min = Just 0, max = Just height }
+            |> NumberInput.setDefaultIntValue 1000
+    , top =
+        { anyInt | min = Just 0, max = Just height }
+            |> NumberInput.setDefaultIntValue 0
+    , right =
+        { anyInt | min = Just 0, max = Just height }
+            |> NumberInput.setDefaultIntValue width
+    , bottom =
+        { anyInt | min = Just 0, max = Just height }
+            |> NumberInput.setDefaultIntValue height
+    }
+
+
 
 -- Update ############################################################
 
@@ -211,6 +242,7 @@ type ParamsMsg
     | ChangeSparse String
     | ChangeLambda String
     | ChangeRho String
+    | ChangeCropLeft String
 
 
 subscriptions : Model -> Sub Msg
@@ -405,6 +437,42 @@ updateParams msg ( params, paramsForm ) =
                 Err _ ->
                     ( params, updatedForm )
 
+        ChangeCropLeft str ->
+            let
+                _ =
+                    Debug.log "left" str
+
+                oldCropForm =
+                    paramsForm.crop
+
+                newLeft =
+                    NumberInput.updateInt str oldCropForm.left
+            in
+            case ( params.crop, newLeft.decodedInput ) of
+                ( Just oldCrop, Ok left ) ->
+                    let
+                        newRight =
+                            NumberInput.setMinBound (Just left) oldCropForm.right
+                                |> NumberInput.updateInt oldCropForm.right.input
+
+                        newCropForm =
+                            { oldCropForm | left = newLeft, right = newRight }
+
+                        newCrop =
+                            { oldCrop | left = left }
+                    in
+                    ( { params | crop = Just newCrop }
+                    , { paramsForm | crop = newCropForm }
+                    )
+
+                ( Just _, Err _ ) ->
+                    ( params
+                    , { paramsForm | crop = { oldCropForm | left = newLeft } }
+                    )
+
+                ( Nothing, _ ) ->
+                    ( params, paramsForm )
+
 
 
 -- View ##############################################################
@@ -446,7 +514,7 @@ viewConfig images params paramsForm device =
         -- Cropped working frame
         , Element.column []
             [ Element.text "Cropped working frame: TODO"
-            , cropBox { left = 0, top = 0, right = 1920, bottom = 1080 }
+            , cropBox { left = 0, top = 0, right = 1920, bottom = 1080 } paramsForm.crop
             ]
 
         -- Equalize mean intensities
@@ -511,8 +579,8 @@ viewConfig images params paramsForm device =
 -- Crop input
 
 
-cropBox : { left : Int, top : Int, right : Int, bottom : Int } -> Element msg
-cropBox { left, top, right, bottom } =
+cropBox : { left : Int, top : Int, right : Int, bottom : Int } -> CropForm -> Element Msg
+cropBox { left, top, right, bottom } cropForm =
     let
         cropWidth =
             right - left
@@ -527,7 +595,10 @@ cropBox { left, top, right, bottom } =
             , paddingXY 48 20
             , Element.Border.dashed
             , Element.Border.width 2
-            , Element.onLeft (Element.el (Element.moveRight 0 :: onBorderAttributes) (Element.text <| String.fromInt left))
+            , Element.onLeft
+                (Element.el (Element.moveRight 30 :: onBorderAttributes)
+                    (cropField "left" (ParamsMsg << ChangeCropLeft) cropForm.left)
+                )
             , Element.above (Element.el (Element.moveDown 8 :: onBorderAttributes) (Element.text <| String.fromInt top))
             , Element.onRight (Element.el (Element.moveLeft 16 :: onBorderAttributes) (Element.text <| String.fromInt right))
             , Element.below (Element.el (Element.moveUp 10 :: onBorderAttributes) (Element.text <| String.fromInt bottom))
@@ -540,6 +611,16 @@ cropBox { left, top, right, bottom } =
 onBorderAttributes : List (Element.Attribute msg)
 onBorderAttributes =
     [ centerX, centerY, Element.Background.color Style.white ]
+
+
+cropField : String -> (String -> msg) -> NumberInput.Field Int NumberInput.IntError -> Element msg
+cropField label msgTag field =
+    Element.Input.text [ paddingXY 0 4, Element.Border.width 0, Element.Font.center, width (Element.px 60) ]
+        { onChange = msgTag
+        , text = field.input
+        , placeholder = Nothing
+        , label = Element.Input.labelHidden label
+        }
 
 
 
