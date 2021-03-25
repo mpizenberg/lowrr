@@ -1,16 +1,16 @@
 module NumberInput exposing
     ( Field, setMinBound, setMaxBound
-    , IntError(..), intDefault, updateInt
-    , FloatError(..), floatDefault, updateFloat
+    , IntError(..), intDefault, setDefaultIntValue, updateInt
+    , FloatError(..), floatDefault, setDefaultFloatValue, updateFloat
     )
 
 {-| Data for number form inputs
 
 @docs Field, setMinBound, setMaxBound
 
-@docs IntError, intDefault, updateInt
+@docs IntError, intDefault, setDefaultIntValue, updateInt
 
-@docs FloatError, floatDefault, updateFloat
+@docs FloatError, floatDefault, setDefaultFloatValue, updateFloat
 
 -}
 
@@ -58,6 +58,11 @@ intDefault =
     , input = "0"
     , decodedInput = Ok 0
     }
+
+
+setDefaultIntValue : Int -> Field Int IntError -> Field Int IntError
+setDefaultIntValue int field =
+    { field | defaultValue = int, input = String.fromInt int, decodedInput = Ok int }
 
 
 updateInt : String -> Field Int IntError -> Field Int IntError
@@ -112,6 +117,11 @@ floatDefault =
     , input = "0.0"
     , decodedInput = Ok 0.0
     }
+
+
+setDefaultFloatValue : Float -> Field Float FloatError -> Field Float FloatError
+setDefaultFloatValue float field =
+    { field | defaultValue = float, input = String.fromFloat float, decodedInput = Ok float }
 
 
 updateFloat : String -> Field Float FloatError -> Field Float FloatError

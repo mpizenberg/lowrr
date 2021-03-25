@@ -150,7 +150,7 @@ defaultParamsForm =
     in
     { maxIterations =
         { anyInt | min = Just 1, max = Just 1000 }
-            |> NumberInput.updateInt (String.fromInt defaultParams.maxIterations)
+            |> NumberInput.setDefaultIntValue defaultParams.maxIterations
     , convergenceThreshold =
         { defaultValue = defaultParams.convergenceThreshold
         , min = Just 0.0
@@ -162,7 +162,7 @@ defaultParamsForm =
         }
     , levels =
         { anyInt | min = Just 1, max = Just 10 }
-            |> NumberInput.updateInt (String.fromInt defaultParams.levels)
+            |> NumberInput.setDefaultIntValue defaultParams.levels
     }
 
 
@@ -391,6 +391,7 @@ viewConfig images params paramsForm device =
         -- Maximum number of iterations
         , Element.column [ spacing 10 ]
             [ Element.text "Maximum number of iterations:"
+            , Element.text ("(default to " ++ String.fromInt defaultParams.maxIterations ++ ")")
             , intInput paramsForm.maxIterations (ParamsMsg << ChangeMaxIter) "Maximum number of iterations"
             , displayIntErrors paramsForm.maxIterations.decodedInput
             ]
@@ -398,6 +399,7 @@ viewConfig images params paramsForm device =
         -- Convergence threshold
         , Element.column [ spacing 10 ]
             [ Element.text "Convergence threshold:"
+            , Element.text ("(default to " ++ String.fromFloat defaultParams.convergenceThreshold ++ ")")
             , floatInput paramsForm.convergenceThreshold (ParamsMsg << ChangeConvergenceThreshold) "Convergence threshold"
             , displayFloatErrors paramsForm.convergenceThreshold.decodedInput
             ]
@@ -405,6 +407,7 @@ viewConfig images params paramsForm device =
         -- Multi-resolution pyramid levels
         , Element.column [ spacing 10 ]
             [ Element.text "Number of pyramid levels:"
+            , Element.text ("(default to " ++ String.fromInt defaultParams.levels ++ ")")
             , intInput paramsForm.levels (ParamsMsg << ChangeLevels) "Number of pyramid levels"
             , displayIntErrors paramsForm.levels.decodedInput
             ]
