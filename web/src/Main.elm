@@ -646,7 +646,7 @@ viewConfig images params paramsForm device =
 
         -- Cropped working frame
         , Element.column [ spacing 10 ]
-            [ Element.text "Cropped working frame: TODO"
+            [ Element.text "Cropped working frame:"
             , Element.row [ spacing 10 ]
                 [ Element.text "off"
                 , toggle (ParamsMsg << ToggleCrop) paramsForm.crop.active 30 "Toggle cropped working frame"
