@@ -105,6 +105,7 @@ type alias ParametersForm =
     , levels : NumberInput.Field Int NumberInput.IntError
     , sparse : NumberInput.Field Float NumberInput.FloatError
     , lambda : NumberInput.Field Float NumberInput.FloatError
+    , rho : NumberInput.Field Float NumberInput.FloatError
     }
 
 
@@ -171,6 +172,15 @@ defaultParamsForm =
     , lambda =
         { anyFloat | min = Just 0.0 }
             |> NumberInput.setDefaultFloatValue defaultParams.lambda
+    , rho =
+        { defaultValue = defaultParams.rho
+        , min = Just 0.0
+        , max = Nothing
+        , increase = \x -> x * sqrt 2
+        , decrease = \x -> x / sqrt 2
+        , input = String.fromFloat defaultParams.rho
+        , decodedInput = Ok defaultParams.rho
+        }
     }
 
 
@@ -200,6 +210,7 @@ type ParamsMsg
     | ChangeLevels String
     | ChangeSparse String
     | ChangeLambda String
+    | ChangeRho String
 
 
 subscriptions : Model -> Sub Msg
@@ -379,6 +390,21 @@ updateParams msg ( params, paramsForm ) =
                 Err _ ->
                     ( params, updatedForm )
 
+        ChangeRho str ->
+            let
+                updatedField =
+                    NumberInput.updateFloat str paramsForm.rho
+
+                updatedForm =
+                    { paramsForm | rho = updatedField }
+            in
+            case updatedField.decodedInput of
+                Ok rho ->
+                    ( { params | rho = rho }, updatedForm )
+
+                Err _ ->
+                    ( params, updatedForm )
+
 
 
 -- View ##############################################################
@@ -462,14 +488,17 @@ viewConfig images params paramsForm device =
 
         -- lambda
         , Element.column [ spacing 10 ]
-            [ Element.text "lambda:"
-            , Element.text ("(default to " ++ String.fromFloat defaultParams.lambda ++ ")")
+            [ Element.text ("lambda: (default to " ++ String.fromFloat defaultParams.lambda ++ ")")
             , floatInput paramsForm.lambda (ParamsMsg << ChangeLambda) "lambda"
             , displayFloatErrors paramsForm.lambda.decodedInput
             ]
 
         -- rho
-        , Element.paragraph [] [ Element.text "rho: TODO" ]
+        , Element.column [ spacing 10 ]
+            [ Element.text ("rho: (default to " ++ String.fromFloat defaultParams.rho ++ ")")
+            , floatInput paramsForm.rho (ParamsMsg << ChangeRho) "rho"
+            , displayFloatErrors paramsForm.rho.decodedInput
+            ]
         ]
 
 
