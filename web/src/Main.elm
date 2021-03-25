@@ -248,6 +248,7 @@ type ParamsMsg
     | ChangeCropLeft String
     | ChangeCropTop String
     | ChangeCropRight String
+    | ChangeCropBottom String
 
 
 subscriptions : Model -> Sub Msg
@@ -571,6 +572,40 @@ updateParams msg ( params, paramsForm ) =
                 ( False, _ ) ->
                     ( params, paramsForm )
 
+        ChangeCropBottom str ->
+            let
+                oldCropForm =
+                    paramsForm.crop
+
+                newBottom =
+                    NumberInput.updateInt str oldCropForm.bottom
+            in
+            case ( oldCropForm.active, newBottom.decodedInput ) of
+                ( True, Ok bottom ) ->
+                    let
+                        newCropForm =
+                            { oldCropForm | bottom = newBottom }
+
+                        newCrop =
+                            case ( oldCropForm.left.decodedInput, oldCropForm.top.decodedInput, oldCropForm.right.decodedInput ) of
+                                ( Ok left, Ok top, Ok right ) ->
+                                    Just (Crop left top right bottom)
+
+                                _ ->
+                                    Nothing
+                    in
+                    ( { params | crop = newCrop }
+                    , { paramsForm | crop = newCropForm }
+                    )
+
+                ( True, Err _ ) ->
+                    ( { params | crop = Nothing }
+                    , { paramsForm | crop = { oldCropForm | bottom = newBottom } }
+                    )
+
+                ( False, _ ) ->
+                    ( params, paramsForm )
+
 
 
 -- View ##############################################################
@@ -617,7 +652,7 @@ viewConfig images params paramsForm device =
                 , toggle (ParamsMsg << ToggleCrop) paramsForm.crop.active 30 "Toggle cropped working frame"
                 , Element.text "on"
                 ]
-            , cropBox { left = 0, top = 0, right = 1920, bottom = 1080 } paramsForm.crop
+            , cropBox paramsForm.crop
             ]
 
         -- Equalize mean intensities
@@ -682,8 +717,8 @@ viewConfig images params paramsForm device =
 -- Crop input
 
 
-cropBox : { left : Int, top : Int, right : Int, bottom : Int } -> CropForm -> Element Msg
-cropBox { left, top, right, bottom } cropForm =
+cropBox : CropForm -> Element Msg
+cropBox cropForm =
     if not cropForm.active then
         Element.none
 
@@ -707,7 +742,10 @@ cropBox { left, top, right, bottom } cropForm =
                     (Element.el (Element.moveLeft 30 :: onBorderAttributes)
                         (cropField "right" (ParamsMsg << ChangeCropRight) cropForm.right)
                     )
-                , Element.below (Element.el (Element.moveUp 10 :: onBorderAttributes) (Element.text <| String.fromInt bottom))
+                , Element.below
+                    (Element.el (Element.moveUp 14 :: onBorderAttributes)
+                        (cropField "bottom" (ParamsMsg << ChangeCropBottom) cropForm.bottom)
+                    )
                 ]
                 (Element.el [ Element.Font.size 12 ] <|
                     case ( decodedCropWidth cropForm, decodedCropHeight cropForm ) of
