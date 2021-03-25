@@ -204,7 +204,7 @@ defaultCropForm width height =
     { active = defaultParams.crop /= Nothing
     , left =
         { anyInt | min = Just 0, max = Just width }
-            |> NumberInput.setDefaultIntValue 1000
+            |> NumberInput.setDefaultIntValue 0
     , top =
         { anyInt | min = Just 0, max = Just height }
             |> NumberInput.setDefaultIntValue 0
@@ -247,6 +247,7 @@ type ParamsMsg
     | ToggleCrop Bool
     | ChangeCropLeft String
     | ChangeCropTop String
+    | ChangeCropRight String
 
 
 subscriptions : Model -> Sub Msg
@@ -500,9 +501,6 @@ updateParams msg ( params, paramsForm ) =
 
         ChangeCropTop str ->
             let
-                _ =
-                    Debug.log "top" str
-
                 oldCropForm =
                     paramsForm.crop
 
@@ -534,6 +532,40 @@ updateParams msg ( params, paramsForm ) =
                 ( True, Err _ ) ->
                     ( { params | crop = Nothing }
                     , { paramsForm | crop = { oldCropForm | top = newTop } }
+                    )
+
+                ( False, _ ) ->
+                    ( params, paramsForm )
+
+        ChangeCropRight str ->
+            let
+                oldCropForm =
+                    paramsForm.crop
+
+                newRight =
+                    NumberInput.updateInt str oldCropForm.right
+            in
+            case ( oldCropForm.active, newRight.decodedInput ) of
+                ( True, Ok right ) ->
+                    let
+                        newCropForm =
+                            { oldCropForm | right = newRight }
+
+                        newCrop =
+                            case ( oldCropForm.left.decodedInput, oldCropForm.top.decodedInput, oldCropForm.bottom.decodedInput ) of
+                                ( Ok left, Ok top, Ok bottom ) ->
+                                    Just (Crop left top right bottom)
+
+                                _ ->
+                                    Nothing
+                    in
+                    ( { params | crop = newCrop }
+                    , { paramsForm | crop = newCropForm }
+                    )
+
+                ( True, Err _ ) ->
+                    ( { params | crop = Nothing }
+                    , { paramsForm | crop = { oldCropForm | right = newRight } }
                     )
 
                 ( False, _ ) ->
@@ -671,7 +703,10 @@ cropBox { left, top, right, bottom } cropForm =
                     (Element.el (Element.moveDown 12 :: onBorderAttributes)
                         (cropField "top" (ParamsMsg << ChangeCropTop) cropForm.top)
                     )
-                , Element.onRight (Element.el (Element.moveLeft 16 :: onBorderAttributes) (Element.text <| String.fromInt right))
+                , Element.onRight
+                    (Element.el (Element.moveLeft 30 :: onBorderAttributes)
+                        (cropField "right" (ParamsMsg << ChangeCropRight) cropForm.right)
+                    )
                 , Element.below (Element.el (Element.moveUp 10 :: onBorderAttributes) (Element.text <| String.fromInt bottom))
                 ]
                 (Element.el [ Element.Font.size 12 ] <|
