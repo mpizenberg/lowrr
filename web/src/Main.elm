@@ -443,8 +443,13 @@ viewConfig images params paramsForm device =
     Element.column [ padding 20, spacing 32 ]
         [ Element.el [ Element.Font.center, Element.Font.size 32 ] (Element.text "Algorithm parameters")
 
-        -- preprocessing
-        , Element.paragraph [] [ Element.text "Cropped working frame: TODO" ]
+        -- Cropped working frame
+        , Element.column []
+            [ Element.text "Cropped working frame: TODO"
+            , cropBox { left = 0, top = 0, right = 1920, bottom = 1080 }
+            ]
+
+        -- Equalize mean intensities
         , Element.column [ spacing 10 ]
             [ Element.text "Equalize mean intensities:"
             , Element.row [ spacing 10 ]
@@ -500,6 +505,41 @@ viewConfig images params paramsForm device =
             , displayFloatErrors paramsForm.rho.decodedInput
             ]
         ]
+
+
+
+-- Crop input
+
+
+cropBox : { left : Int, top : Int, right : Int, bottom : Int } -> Element msg
+cropBox { left, top, right, bottom } =
+    let
+        cropWidth =
+            right - left
+
+        cropHeight =
+            bottom - top
+    in
+    Element.el [ width fill, padding 16 ] <|
+        Element.el
+            [ centerX
+            , centerY
+            , paddingXY 48 20
+            , Element.Border.dashed
+            , Element.Border.width 2
+            , Element.onLeft (Element.el (Element.moveRight 0 :: onBorderAttributes) (Element.text <| String.fromInt left))
+            , Element.above (Element.el (Element.moveDown 8 :: onBorderAttributes) (Element.text <| String.fromInt top))
+            , Element.onRight (Element.el (Element.moveLeft 16 :: onBorderAttributes) (Element.text <| String.fromInt right))
+            , Element.below (Element.el (Element.moveUp 10 :: onBorderAttributes) (Element.text <| String.fromInt bottom))
+            ]
+            (Element.el [ Element.Font.size 12 ] <|
+                Element.text (String.fromInt cropWidth ++ " x " ++ String.fromInt cropHeight)
+            )
+
+
+onBorderAttributes : List (Element.Attribute msg)
+onBorderAttributes =
+    [ centerX, centerY, Element.Background.color Style.white ]
 
 
 
