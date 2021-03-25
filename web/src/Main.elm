@@ -104,6 +104,7 @@ type alias ParametersForm =
     , convergenceThreshold : NumberInput.Field Float NumberInput.FloatError
     , levels : NumberInput.Field Int NumberInput.IntError
     , sparse : NumberInput.Field Float NumberInput.FloatError
+    , lambda : NumberInput.Field Float NumberInput.FloatError
     }
 
 
@@ -167,6 +168,9 @@ defaultParamsForm =
     , sparse =
         { anyFloat | min = Just 0.0, max = Just 1.0 }
             |> NumberInput.setDefaultFloatValue defaultParams.sparse
+    , lambda =
+        { anyFloat | min = Just 0.0 }
+            |> NumberInput.setDefaultFloatValue defaultParams.lambda
     }
 
 
@@ -195,6 +199,7 @@ type ParamsMsg
     | ChangeConvergenceThreshold String
     | ChangeLevels String
     | ChangeSparse String
+    | ChangeLambda String
 
 
 subscriptions : Model -> Sub Msg
@@ -359,6 +364,21 @@ updateParams msg ( params, paramsForm ) =
                 Err _ ->
                     ( params, updatedForm )
 
+        ChangeLambda str ->
+            let
+                updatedField =
+                    NumberInput.updateFloat str paramsForm.lambda
+
+                updatedForm =
+                    { paramsForm | lambda = updatedField }
+            in
+            case updatedField.decodedInput of
+                Ok lambda ->
+                    ( { params | lambda = lambda }, updatedForm )
+
+                Err _ ->
+                    ( params, updatedForm )
+
 
 
 -- View ##############################################################
@@ -440,8 +460,15 @@ viewConfig images params paramsForm device =
             , displayFloatErrors paramsForm.sparse.decodedInput
             ]
 
-        -- optimization
-        , Element.paragraph [] [ Element.text "lambda: TODO" ]
+        -- lambda
+        , Element.column [ spacing 10 ]
+            [ Element.text "lambda:"
+            , Element.text ("(default to " ++ String.fromFloat defaultParams.lambda ++ ")")
+            , floatInput paramsForm.lambda (ParamsMsg << ChangeLambda) "lambda"
+            , displayFloatErrors paramsForm.lambda.decodedInput
+            ]
+
+        -- rho
         , Element.paragraph [] [ Element.text "rho: TODO" ]
         ]
 
