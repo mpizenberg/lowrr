@@ -531,7 +531,7 @@ floatInput : NumberInput.Field Float NumberInput.FloatError -> (String -> msg) -
 floatInput field msgTag label =
     let
         textField =
-            Element.Input.text [ Element.Border.width 0, Element.Font.center, width (Element.px 100) ]
+            Element.Input.text [ Element.Border.width 0, Element.Font.center, width (Element.px 140) ]
                 { onChange = msgTag
                 , text = field.input
                 , placeholder = Nothing
