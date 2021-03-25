@@ -203,13 +203,13 @@ defaultCropForm width height =
     in
     { active = defaultParams.crop /= Nothing
     , left =
-        { anyInt | min = Just 0, max = Just height }
+        { anyInt | min = Just 0, max = Just width }
             |> NumberInput.setDefaultIntValue 1000
     , top =
         { anyInt | min = Just 0, max = Just height }
             |> NumberInput.setDefaultIntValue 0
     , right =
-        { anyInt | min = Just 0, max = Just height }
+        { anyInt | min = Just 0, max = Just width }
             |> NumberInput.setDefaultIntValue width
     , bottom =
         { anyInt | min = Just 0, max = Just height }
@@ -617,13 +617,6 @@ cropBox { left, top, right, bottom } cropForm =
         Element.none
 
     else
-        let
-            cropWidth =
-                right - left
-
-            cropHeight =
-                bottom - top
-        in
         Element.el [ width fill, padding 4 ] <|
             Element.el
                 [ centerX
@@ -640,8 +633,39 @@ cropBox { left, top, right, bottom } cropForm =
                 , Element.below (Element.el (Element.moveUp 10 :: onBorderAttributes) (Element.text <| String.fromInt bottom))
                 ]
                 (Element.el [ Element.Font.size 12 ] <|
-                    Element.text (String.fromInt cropWidth ++ " x " ++ String.fromInt cropHeight)
+                    case ( decodedCropWidth cropForm, decodedCropHeight cropForm ) of
+                        ( Just cropWidth, Just cropHeight ) ->
+                            Element.text (String.fromInt cropWidth ++ " x " ++ String.fromInt cropHeight)
+
+                        ( Nothing, Just cropHeight ) ->
+                            Element.text ("? x " ++ String.fromInt cropHeight)
+
+                        ( Just cropWidth, Nothing ) ->
+                            Element.text (String.fromInt cropWidth ++ " x ?")
+
+                        ( Nothing, Nothing ) ->
+                            Element.text "? x ?"
                 )
+
+
+decodedCropWidth : CropForm -> Maybe Int
+decodedCropWidth cropForm =
+    case ( cropForm.left.decodedInput, cropForm.right.decodedInput ) of
+        ( Ok left, Ok right ) ->
+            Just (right - left)
+
+        _ ->
+            Nothing
+
+
+decodedCropHeight : CropForm -> Maybe Int
+decodedCropHeight cropForm =
+    case ( cropForm.top.decodedInput, cropForm.bottom.decodedInput ) of
+        ( Ok top, Ok bottom ) ->
+            Just (bottom - top)
+
+        _ ->
+            Nothing
 
 
 onBorderAttributes : List (Element.Attribute msg)
