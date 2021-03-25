@@ -246,6 +246,7 @@ type ParamsMsg
     | ChangeRho String
     | ToggleCrop Bool
     | ChangeCropLeft String
+    | ChangeCropTop String
 
 
 subscriptions : Model -> Sub Msg
@@ -461,9 +462,6 @@ updateParams msg ( params, paramsForm ) =
 
         ChangeCropLeft str ->
             let
-                _ =
-                    Debug.log "left" str
-
                 oldCropForm =
                     paramsForm.crop
 
@@ -495,6 +493,47 @@ updateParams msg ( params, paramsForm ) =
                 ( True, Err _ ) ->
                     ( { params | crop = Nothing }
                     , { paramsForm | crop = { oldCropForm | left = newLeft } }
+                    )
+
+                ( False, _ ) ->
+                    ( params, paramsForm )
+
+        ChangeCropTop str ->
+            let
+                _ =
+                    Debug.log "top" str
+
+                oldCropForm =
+                    paramsForm.crop
+
+                newTop =
+                    NumberInput.updateInt str oldCropForm.top
+            in
+            case ( oldCropForm.active, newTop.decodedInput ) of
+                ( True, Ok top ) ->
+                    let
+                        newBottom =
+                            NumberInput.setMinBound (Just top) oldCropForm.bottom
+                                |> NumberInput.updateInt oldCropForm.bottom.input
+
+                        newCropForm =
+                            { oldCropForm | top = newTop, bottom = newBottom }
+
+                        newCrop =
+                            case ( newBottom.decodedInput, oldCropForm.left.decodedInput, oldCropForm.right.decodedInput ) of
+                                ( Ok bottom, Ok left, Ok right ) ->
+                                    Just (Crop left top right bottom)
+
+                                _ ->
+                                    Nothing
+                    in
+                    ( { params | crop = newCrop }
+                    , { paramsForm | crop = newCropForm }
+                    )
+
+                ( True, Err _ ) ->
+                    ( { params | crop = Nothing }
+                    , { paramsForm | crop = { oldCropForm | top = newTop } }
                     )
 
                 ( False, _ ) ->
@@ -628,7 +667,10 @@ cropBox { left, top, right, bottom } cropForm =
                     (Element.el (Element.moveRight 30 :: onBorderAttributes)
                         (cropField "left" (ParamsMsg << ChangeCropLeft) cropForm.left)
                     )
-                , Element.above (Element.el (Element.moveDown 8 :: onBorderAttributes) (Element.text <| String.fromInt top))
+                , Element.above
+                    (Element.el (Element.moveDown 12 :: onBorderAttributes)
+                        (cropField "top" (ParamsMsg << ChangeCropTop) cropForm.top)
+                    )
                 , Element.onRight (Element.el (Element.moveLeft 16 :: onBorderAttributes) (Element.text <| String.fromInt right))
                 , Element.below (Element.el (Element.moveUp 10 :: onBorderAttributes) (Element.text <| String.fromInt bottom))
                 ]
