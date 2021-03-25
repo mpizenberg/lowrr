@@ -103,6 +103,7 @@ type alias ParametersForm =
     { maxIterations : NumberInput.Field Int NumberInput.IntError
     , convergenceThreshold : NumberInput.Field Float NumberInput.FloatError
     , levels : NumberInput.Field Int NumberInput.IntError
+    , sparse : NumberInput.Field Float NumberInput.FloatError
     }
 
 
@@ -163,6 +164,9 @@ defaultParamsForm =
     , levels =
         { anyInt | min = Just 1, max = Just 10 }
             |> NumberInput.setDefaultIntValue defaultParams.levels
+    , sparse =
+        { anyFloat | min = Just 0.0, max = Just 1.0 }
+            |> NumberInput.setDefaultFloatValue defaultParams.sparse
     }
 
 
@@ -190,6 +194,7 @@ type ParamsMsg
     | ChangeMaxIter String
     | ChangeConvergenceThreshold String
     | ChangeLevels String
+    | ChangeSparse String
 
 
 subscriptions : Model -> Sub Msg
@@ -339,6 +344,21 @@ updateParams msg ( params, paramsForm ) =
                 Err _ ->
                     ( params, updatedForm )
 
+        ChangeSparse str ->
+            let
+                updatedField =
+                    NumberInput.updateFloat str paramsForm.sparse
+
+                updatedForm =
+                    { paramsForm | sparse = updatedField }
+            in
+            case updatedField.decodedInput of
+                Ok sparse ->
+                    ( { params | sparse = sparse }, updatedForm )
+
+                Err _ ->
+                    ( params, updatedForm )
+
 
 
 -- View ##############################################################
@@ -413,7 +433,12 @@ viewConfig images params paramsForm device =
             ]
 
         -- Sparse ratio threshold
-        , Element.paragraph [] [ Element.text "Sparse ratio threshold to switch: TODO" ]
+        , Element.column [ spacing 10 ]
+            [ Element.text "Sparse ratio threshold to switch:"
+            , Element.text ("(default to " ++ String.fromFloat defaultParams.sparse ++ ")")
+            , floatInput paramsForm.sparse (ParamsMsg << ChangeSparse) "Sparse ratio threshold to switch"
+            , displayFloatErrors paramsForm.sparse.decodedInput
+            ]
 
         -- optimization
         , Element.paragraph [] [ Element.text "lambda: TODO" ]
