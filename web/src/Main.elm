@@ -111,7 +111,8 @@ type alias ParametersForm =
 
 
 type alias CropForm =
-    { left : NumberInput.Field Int NumberInput.IntError
+    { active : Bool
+    , left : NumberInput.Field Int NumberInput.IntError
     , top : NumberInput.Field Int NumberInput.IntError
     , right : NumberInput.Field Int NumberInput.IntError
     , bottom : NumberInput.Field Int NumberInput.IntError
@@ -200,7 +201,8 @@ defaultCropForm width height =
         anyInt =
             NumberInput.intDefault
     in
-    { left =
+    { active = defaultParams.crop /= Nothing
+    , left =
         { anyInt | min = Just 0, max = Just height }
             |> NumberInput.setDefaultIntValue 1000
     , top =
@@ -242,6 +244,7 @@ type ParamsMsg
     | ChangeSparse String
     | ChangeLambda String
     | ChangeRho String
+    | ToggleCrop Bool
     | ChangeCropLeft String
 
 
@@ -437,6 +440,25 @@ updateParams msg ( params, paramsForm ) =
                 Err _ ->
                     ( params, updatedForm )
 
+        ToggleCrop activeCrop ->
+            let
+                oldCropForm =
+                    paramsForm.crop
+
+                newCropForm =
+                    { oldCropForm | active = activeCrop }
+            in
+            case ( activeCrop, ( newCropForm.left.decodedInput, newCropForm.right.decodedInput ), ( newCropForm.top.decodedInput, newCropForm.bottom.decodedInput ) ) of
+                ( True, ( Ok left, Ok right ), ( Ok top, Ok bottom ) ) ->
+                    ( { params | crop = Just (Crop left top right bottom) }
+                    , { paramsForm | crop = newCropForm }
+                    )
+
+                _ ->
+                    ( { params | crop = Nothing }
+                    , { paramsForm | crop = newCropForm }
+                    )
+
         ChangeCropLeft str ->
             let
                 _ =
@@ -448,8 +470,8 @@ updateParams msg ( params, paramsForm ) =
                 newLeft =
                     NumberInput.updateInt str oldCropForm.left
             in
-            case ( params.crop, newLeft.decodedInput ) of
-                ( Just oldCrop, Ok left ) ->
+            case ( oldCropForm.active, newLeft.decodedInput ) of
+                ( True, Ok left ) ->
                     let
                         newRight =
                             NumberInput.setMinBound (Just left) oldCropForm.right
@@ -459,18 +481,23 @@ updateParams msg ( params, paramsForm ) =
                             { oldCropForm | left = newLeft, right = newRight }
 
                         newCrop =
-                            { oldCrop | left = left }
+                            case ( newRight.decodedInput, oldCropForm.top.decodedInput, oldCropForm.bottom.decodedInput ) of
+                                ( Ok right, Ok top, Ok bottom ) ->
+                                    Just (Crop left top right bottom)
+
+                                _ ->
+                                    Nothing
                     in
-                    ( { params | crop = Just newCrop }
+                    ( { params | crop = newCrop }
                     , { paramsForm | crop = newCropForm }
                     )
 
-                ( Just _, Err _ ) ->
-                    ( params
+                ( True, Err _ ) ->
+                    ( { params | crop = Nothing }
                     , { paramsForm | crop = { oldCropForm | left = newLeft } }
                     )
 
-                ( Nothing, _ ) ->
+                ( False, _ ) ->
                     ( params, paramsForm )
 
 
@@ -512,8 +539,13 @@ viewConfig images params paramsForm device =
         [ Element.el [ Element.Font.center, Element.Font.size 32 ] (Element.text "Algorithm parameters")
 
         -- Cropped working frame
-        , Element.column []
+        , Element.column [ spacing 10 ]
             [ Element.text "Cropped working frame: TODO"
+            , Element.row [ spacing 10 ]
+                [ Element.text "off"
+                , toggle (ParamsMsg << ToggleCrop) paramsForm.crop.active 30 "Toggle cropped working frame"
+                , Element.text "on"
+                ]
             , cropBox { left = 0, top = 0, right = 1920, bottom = 1080 } paramsForm.crop
             ]
 
@@ -581,31 +613,35 @@ viewConfig images params paramsForm device =
 
 cropBox : { left : Int, top : Int, right : Int, bottom : Int } -> CropForm -> Element Msg
 cropBox { left, top, right, bottom } cropForm =
-    let
-        cropWidth =
-            right - left
+    if not cropForm.active then
+        Element.none
 
-        cropHeight =
-            bottom - top
-    in
-    Element.el [ width fill, padding 16 ] <|
-        Element.el
-            [ centerX
-            , centerY
-            , paddingXY 48 20
-            , Element.Border.dashed
-            , Element.Border.width 2
-            , Element.onLeft
-                (Element.el (Element.moveRight 30 :: onBorderAttributes)
-                    (cropField "left" (ParamsMsg << ChangeCropLeft) cropForm.left)
+    else
+        let
+            cropWidth =
+                right - left
+
+            cropHeight =
+                bottom - top
+        in
+        Element.el [ width fill, padding 4 ] <|
+            Element.el
+                [ centerX
+                , centerY
+                , paddingXY 48 20
+                , Element.Border.dashed
+                , Element.Border.width 2
+                , Element.onLeft
+                    (Element.el (Element.moveRight 30 :: onBorderAttributes)
+                        (cropField "left" (ParamsMsg << ChangeCropLeft) cropForm.left)
+                    )
+                , Element.above (Element.el (Element.moveDown 8 :: onBorderAttributes) (Element.text <| String.fromInt top))
+                , Element.onRight (Element.el (Element.moveLeft 16 :: onBorderAttributes) (Element.text <| String.fromInt right))
+                , Element.below (Element.el (Element.moveUp 10 :: onBorderAttributes) (Element.text <| String.fromInt bottom))
+                ]
+                (Element.el [ Element.Font.size 12 ] <|
+                    Element.text (String.fromInt cropWidth ++ " x " ++ String.fromInt cropHeight)
                 )
-            , Element.above (Element.el (Element.moveDown 8 :: onBorderAttributes) (Element.text <| String.fromInt top))
-            , Element.onRight (Element.el (Element.moveLeft 16 :: onBorderAttributes) (Element.text <| String.fromInt right))
-            , Element.below (Element.el (Element.moveUp 10 :: onBorderAttributes) (Element.text <| String.fromInt bottom))
-            ]
-            (Element.el [ Element.Font.size 12 ] <|
-                Element.text (String.fromInt cropWidth ++ " x " ++ String.fromInt cropHeight)
-            )
 
 
 onBorderAttributes : List (Element.Attribute msg)
