@@ -50,6 +50,7 @@ type alias Model =
     , device : Device
     , params : Parameters
     , paramsForm : ParametersForm
+    , paramsInfo : ParametersToggleInfo
     }
 
 
@@ -119,6 +120,17 @@ type alias CropForm =
     }
 
 
+type alias ParametersToggleInfo =
+    { crop : Bool
+    , maxIterations : Bool
+    , convergenceThreshold : Bool
+    , levels : Bool
+    , sparse : Bool
+    , lambda : Bool
+    , rho : Bool
+    }
+
+
 {-| Initialize the model.
 -}
 init : Device.Size -> ( Model, Cmd Msg )
@@ -127,6 +139,7 @@ init size =
       , device = Device.classify size
       , params = defaultParams
       , paramsForm = defaultParamsForm
+      , paramsInfo = defaultParamsInfo
       }
     , Cmd.none
     )
@@ -217,6 +230,18 @@ defaultCropForm width height =
     }
 
 
+defaultParamsInfo : ParametersToggleInfo
+defaultParamsInfo =
+    { crop = False
+    , maxIterations = False
+    , convergenceThreshold = False
+    , levels = False
+    , sparse = False
+    , lambda = False
+    , rho = False
+    }
+
+
 
 -- Update ############################################################
 
@@ -228,6 +253,7 @@ type Msg
     | ImageDecoded Image
     | KeyDown RawKey
     | ParamsMsg ParamsMsg
+    | ParamsInfoMsg ParamsInfoMsg
 
 
 type DragDropMsg
@@ -249,6 +275,10 @@ type ParamsMsg
     | ChangeCropTop String
     | ChangeCropRight String
     | ChangeCropBottom String
+
+
+type ParamsInfoMsg
+    = ToggleInfoCrop Bool
 
 
 subscriptions : Model -> Sub Msg
@@ -342,6 +372,9 @@ update msg model =
                     updateParams paramsMsg ( model.params, model.paramsForm )
             in
             ( { model | params = newParams, paramsForm = newParamsForm }, Cmd.none )
+
+        ( ParamsInfoMsg paramsInfoMsg, Config _ ) ->
+            ( { model | paramsInfo = updateParamsInfo paramsInfoMsg model.paramsInfo }, Cmd.none )
 
         _ ->
             ( model, Cmd.none )
@@ -607,6 +640,13 @@ updateParams msg ( params, paramsForm ) =
                     ( params, paramsForm )
 
 
+updateParamsInfo : ParamsInfoMsg -> ParametersToggleInfo -> ParametersToggleInfo
+updateParamsInfo msg toggleInfo =
+    case msg of
+        ToggleInfoCrop visible ->
+            { toggleInfo | crop = visible }
+
+
 
 -- View ##############################################################
 
@@ -630,7 +670,7 @@ viewElmUI model =
             viewImgs images model.device
 
         Config { images } ->
-            viewConfig model.params model.paramsForm
+            viewConfig model.params model.paramsForm model.paramsInfo
 
         Processing { images } ->
             Element.none
@@ -639,8 +679,8 @@ viewElmUI model =
             Element.none
 
 
-viewConfig : Parameters -> ParametersForm -> Element Msg
-viewConfig params paramsForm =
+viewConfig : Parameters -> ParametersForm -> ParametersToggleInfo -> Element Msg
+viewConfig params paramsForm paramsInfo =
     Element.column [ padding 20, spacing 32 ]
         [ runButton paramsForm
 
@@ -649,7 +689,15 @@ viewConfig params paramsForm =
 
         -- Cropped working frame
         , Element.column [ spacing 10 ]
-            [ Element.text "Cropped working frame:"
+            [ Element.row [ spacing 10 ]
+                [ Element.text "Cropped working frame:"
+                , Element.Input.checkbox []
+                    { onChange = ParamsInfoMsg << ToggleInfoCrop
+                    , icon = infoIcon
+                    , checked = paramsInfo.crop
+                    , label = Element.Input.labelHidden "Show detail info about cropped working frame"
+                    }
+                ]
             , Element.row [ spacing 10 ]
                 [ Element.text "off"
                 , toggle (ParamsMsg << ToggleCrop) paramsForm.crop.active 30 "Toggle cropped working frame"
@@ -715,6 +763,36 @@ viewConfig params paramsForm =
             , displayFloatErrors paramsForm.rho.decodedInput
             ]
         ]
+
+
+
+-- More info icon
+
+
+infoIcon : Bool -> Element msg
+infoIcon detailsVisible =
+    if detailsVisible then
+        Element.el
+            [ Element.Border.width 1
+            , Element.Border.rounded 4
+            , Element.Font.center
+            , width (Element.px 24)
+            , height (Element.px 24)
+            , Element.Border.solid
+            , Element.Background.color Style.almostWhite
+            ]
+            (Element.text "?")
+
+    else
+        Element.el
+            [ Element.Border.width 1
+            , Element.Border.rounded 4
+            , Element.Font.center
+            , width (Element.px 24)
+            , height (Element.px 24)
+            , Element.Border.dashed
+            ]
+            (Element.text "?")
 
 
 

@@ -1,7 +1,7 @@
 module Style exposing
     ( font
     , dropColor, errorColor
-    , black, white, lightGrey, green
+    , black, white, almostWhite, lightGrey, green
     )
 
 {-| Style of our application
@@ -10,7 +10,7 @@ module Style exposing
 
 @docs dropColor, errorColor
 
-@docs black, white, lightGrey, green
+@docs black, white, almostWhite, lightGrey, green
 
 -}
 
@@ -68,6 +68,11 @@ darkRed =
 white : Element.Color
 white =
     Element.rgb255 255 255 255
+
+
+almostWhite : Element.Color
+almostWhite =
+    Element.rgb255 235 235 235
 
 
 black : Element.Color
