@@ -52,7 +52,7 @@ intErrorToString : { valueName : String } -> IntError -> String
 intErrorToString { valueName } err =
     case err of
         IntParsingError ->
-            "The value of " ++ valueName ++ " is not a valid Int."
+            valueName ++ " is not a valid integer."
 
         IntTooSmall { bound, actual } ->
             valueName ++ " = " ++ String.fromInt actual ++ " but it should be >= " ++ String.fromInt bound ++ "."

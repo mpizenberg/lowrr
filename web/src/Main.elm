@@ -744,7 +744,7 @@ cropBoxErrors cropForm =
         Element.none
 
     else
-        Element.column [ spacing 10 ]
+        Element.column [ spacing 10, Element.Font.size 14, Element.Font.color Style.errorColor ]
             (List.map (\err -> Element.paragraph [] [ Element.text err ]) allErrors)
 
 

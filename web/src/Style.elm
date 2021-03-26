@@ -1,4 +1,18 @@
-module Style exposing (black, dropColor, font, green, lightGrey, white)
+module Style exposing
+    ( font
+    , dropColor, errorColor
+    , black, white, lightGrey, green
+    )
+
+{-| Style of our application
+
+@docs font
+
+@docs dropColor, errorColor
+
+@docs black, white, lightGrey, green
+
+-}
 
 import Element
 import Element.Font as Font
@@ -19,6 +33,11 @@ font =
 dropColor : Element.Color
 dropColor =
     Element.rgb255 50 50 250
+
+
+errorColor : Element.Color
+errorColor =
+    Element.rgb255 150 50 50
 
 
 lightGrey : Element.Color
