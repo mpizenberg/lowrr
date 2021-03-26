@@ -1,6 +1,6 @@
 module NumberInput exposing
     ( Field, setMinBound, setMaxBound
-    , IntError(..), intDefault, setDefaultIntValue, updateInt
+    , IntError(..), intErrorToString, intDefault, setDefaultIntValue, updateInt
     , FloatError(..), floatDefault, setDefaultFloatValue, updateFloat
     )
 
@@ -8,7 +8,7 @@ module NumberInput exposing
 
 @docs Field, setMinBound, setMaxBound
 
-@docs IntError, intDefault, setDefaultIntValue, updateInt
+@docs IntError, intErrorToString, intDefault, setDefaultIntValue, updateInt
 
 @docs FloatError, floatDefault, setDefaultFloatValue, updateFloat
 
@@ -46,6 +46,19 @@ type IntError
     = IntParsingError
     | IntTooSmall { bound : Int, actual : Int }
     | IntTooBig { bound : Int, actual : Int }
+
+
+intErrorToString : { valueName : String } -> IntError -> String
+intErrorToString { valueName } err =
+    case err of
+        IntParsingError ->
+            "The value of " ++ valueName ++ " is not a valid Int."
+
+        IntTooSmall { bound, actual } ->
+            valueName ++ " = " ++ String.fromInt actual ++ " but it should be >= " ++ String.fromInt bound ++ "."
+
+        IntTooBig { bound, actual } ->
+            valueName ++ " = " ++ String.fromInt actual ++ " but it should be <= " ++ String.fromInt bound ++ "."
 
 
 intDefault : Field Int IntError

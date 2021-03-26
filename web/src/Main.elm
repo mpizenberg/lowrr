@@ -653,6 +653,7 @@ viewConfig images params paramsForm device =
                 , Element.text "on"
                 ]
             , cropBox paramsForm.crop
+            , cropBoxErrors paramsForm.crop
             ]
 
         -- Equalize mean intensities
@@ -715,6 +716,46 @@ viewConfig images params paramsForm device =
 
 
 -- Crop input
+
+
+cropBoxErrors : CropForm -> Element Msg
+cropBoxErrors cropForm =
+    let
+        errorLeft =
+            errorsList cropForm.left.decodedInput
+                |> List.map (NumberInput.intErrorToString { valueName = "Left" })
+
+        errorTop =
+            errorsList cropForm.top.decodedInput
+                |> List.map (NumberInput.intErrorToString { valueName = "Top" })
+
+        errorRight =
+            errorsList cropForm.right.decodedInput
+                |> List.map (NumberInput.intErrorToString { valueName = "Right" })
+
+        errorBottom =
+            errorsList cropForm.bottom.decodedInput
+                |> List.map (NumberInput.intErrorToString { valueName = "Bottom" })
+
+        allErrors =
+            errorLeft ++ errorTop ++ errorRight ++ errorBottom
+    in
+    if List.isEmpty allErrors then
+        Element.none
+
+    else
+        Element.column [ spacing 10 ]
+            (List.map (\err -> Element.paragraph [] [ Element.text err ]) allErrors)
+
+
+errorsList : Result (List err) ok -> List err
+errorsList result =
+    case result of
+        Err list ->
+            list
+
+        Ok _ ->
+            []
 
 
 cropBox : CropForm -> Element Msg
