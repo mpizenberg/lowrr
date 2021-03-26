@@ -280,6 +280,7 @@ type ParamsMsg
 type ParamsInfoMsg
     = ToggleInfoCrop Bool
     | ToggleInfoMaxIterations Bool
+    | ToggleInfoConvergenceThreshold Bool
 
 
 subscriptions : Model -> Sub Msg
@@ -650,6 +651,9 @@ updateParamsInfo msg toggleInfo =
         ToggleInfoMaxIterations visible ->
             { toggleInfo | maxIterations = visible }
 
+        ToggleInfoConvergenceThreshold visible ->
+            { toggleInfo | convergenceThreshold = visible }
+
 
 
 -- View ##############################################################
@@ -741,7 +745,16 @@ viewConfig params paramsForm paramsInfo =
 
         -- Convergence threshold
         , Element.column [ spacing 10 ]
-            [ Element.text "Convergence threshold:"
+            [ Element.row [ spacing 10 ]
+                [ Element.text "Convergence threshold:"
+                , Element.Input.checkbox []
+                    { onChange = ParamsInfoMsg << ToggleInfoConvergenceThreshold
+                    , icon = infoIcon
+                    , checked = paramsInfo.convergenceThreshold
+                    , label = Element.Input.labelHidden "Show detail info about the convergence threshold parameter"
+                    }
+                ]
+            , moreInfo paramsInfo.convergenceThreshold "The algorithm stops when the relative error difference between to estimates falls below this value."
             , Element.text ("(default to " ++ String.fromFloat defaultParams.convergenceThreshold ++ ")")
             , floatInput paramsForm.convergenceThreshold (ParamsMsg << ChangeConvergenceThreshold) "Convergence threshold"
             , displayFloatErrors paramsForm.convergenceThreshold.decodedInput
