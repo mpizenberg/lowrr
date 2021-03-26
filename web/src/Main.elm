@@ -281,6 +281,7 @@ type ParamsInfoMsg
     = ToggleInfoCrop Bool
     | ToggleInfoMaxIterations Bool
     | ToggleInfoConvergenceThreshold Bool
+    | ToggleInfoLevels Bool
 
 
 subscriptions : Model -> Sub Msg
@@ -654,6 +655,9 @@ updateParamsInfo msg toggleInfo =
         ToggleInfoConvergenceThreshold visible ->
             { toggleInfo | convergenceThreshold = visible }
 
+        ToggleInfoLevels visible ->
+            { toggleInfo | levels = visible }
+
 
 
 -- View ##############################################################
@@ -762,7 +766,16 @@ viewConfig params paramsForm paramsInfo =
 
         -- Multi-resolution pyramid levels
         , Element.column [ spacing 10 ]
-            [ Element.text "Number of pyramid levels:"
+            [ Element.row [ spacing 10 ]
+                [ Element.text "Number of pyramid levels:"
+                , Element.Input.checkbox []
+                    { onChange = ParamsInfoMsg << ToggleInfoLevels
+                    , icon = infoIcon
+                    , checked = paramsInfo.levels
+                    , label = Element.Input.labelHidden "Show detail info about the levels parameter"
+                    }
+                ]
+            , moreInfo paramsInfo.levels "The number of levels for the multi-resolution approach. Each level halves/doubles the resolution of the previous one. The algorithm starts at the lowest resolution and transfers the converged parameters at one resolution to the initialization of the next. Increasing the number of levels enables better convergence for bigger movements but too many levels might make it definitively drift away. Targetting a lowest resolution of about 100x100 is generally good enough. The number of levels also has a joint interaction with the sparse threshold parameter so keep that in mind while changing this parameter."
             , Element.text ("(default to " ++ String.fromInt defaultParams.levels ++ ")")
             , intInput paramsForm.levels (ParamsMsg << ChangeLevels) "Number of pyramid levels"
             , displayIntErrors paramsForm.levels.decodedInput
