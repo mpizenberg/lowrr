@@ -836,7 +836,22 @@ onBorderAttributes =
 
 cropField : String -> (String -> msg) -> NumberInput.Field Int NumberInput.IntError -> Element msg
 cropField label msgTag field =
-    Element.Input.text [ paddingXY 0 4, Element.Border.width 0, Element.Font.center, width (Element.px 60) ]
+    let
+        fontColor =
+            case field.decodedInput of
+                Ok _ ->
+                    Style.black
+
+                Err _ ->
+                    Style.errorColor
+    in
+    Element.Input.text
+        [ paddingXY 0 4
+        , width (Element.px 60)
+        , Element.Border.width 0
+        , Element.Font.center
+        , Element.Font.color fontColor
+        ]
         { onChange = msgTag
         , text = field.input
         , placeholder = Nothing
@@ -871,7 +886,12 @@ intInput field msgTag label =
     in
     case field.decodedInput of
         Err _ ->
-            Element.row [ Element.Border.solid, Element.Border.width 1, Element.Border.rounded 4 ]
+            Element.row
+                [ Element.Border.solid
+                , Element.Border.width 1
+                , Element.Border.rounded 4
+                , Element.Font.color Style.errorColor
+                ]
                 [ numberSideButton Nothing "−"
                 , textField
                 , numberSideButton Nothing "+"
@@ -962,7 +982,12 @@ floatInput field msgTag label =
     in
     case field.decodedInput of
         Err _ ->
-            Element.row [ Element.Border.solid, Element.Border.width 1, Element.Border.rounded 4 ]
+            Element.row
+                [ Element.Border.solid
+                , Element.Border.width 1
+                , Element.Border.rounded 4
+                , Element.Font.color Style.errorColor
+                ]
                 [ numberSideButton Nothing "−"
                 , textField
                 , numberSideButton Nothing "+"
