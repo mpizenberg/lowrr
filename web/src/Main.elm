@@ -698,6 +698,7 @@ viewConfig params paramsForm paramsInfo =
                     , label = Element.Input.labelHidden "Show detail info about cropped working frame"
                     }
                 ]
+            , moreInfo paramsInfo.crop "Instead of using the whole image to estimate the registration, it is often faster and as accurate to focus the algorithm attention on a smaller frame in the image. The parameters here are the left, top, right and bottom coordinates of that cropped frame on which we want the algorithm to focus when estimating the alignment parameters."
             , Element.row [ spacing 10 ]
                 [ Element.text "off"
                 , toggle (ParamsMsg << ToggleCrop) paramsForm.crop.active 30 "Toggle cropped working frame"
@@ -766,7 +767,22 @@ viewConfig params paramsForm paramsInfo =
 
 
 
--- More info icon
+-- More info
+
+
+moreInfo : Bool -> String -> Element msg
+moreInfo visible message =
+    if not visible then
+        Element.none
+
+    else
+        Element.paragraph
+            [ Element.Background.color Style.almostWhite
+            , padding 10
+            , Element.Font.size 14
+            , width (Element.maximum 400 fill)
+            ]
+            [ Element.text message ]
 
 
 infoIcon : Bool -> Element msg
