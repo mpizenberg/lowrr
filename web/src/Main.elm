@@ -740,12 +740,17 @@ cropBoxErrors cropForm =
         allErrors =
             errorLeft ++ errorTop ++ errorRight ++ errorBottom
     in
-    if List.isEmpty allErrors then
+    displayErrors allErrors
+
+
+displayErrors : List String -> Element msg
+displayErrors errors =
+    if List.isEmpty errors then
         Element.none
 
     else
         Element.column [ spacing 10, Element.Font.size 14, Element.Font.color Style.errorColor ]
-            (List.map (\err -> Element.paragraph [] [ Element.text err ]) allErrors)
+            (List.map (\err -> Element.paragraph [] [ Element.text err ]) errors)
 
 
 errorsList : Result (List err) ok -> List err
@@ -850,9 +855,7 @@ displayIntErrors result =
             Element.none
 
         Err errors ->
-            List.map Debug.toString errors
-                |> String.join ", "
-                |> Element.text
+            displayErrors (List.map (NumberInput.intErrorToString { valueName = "Value" }) errors)
 
 
 intInput : NumberInput.Field Int NumberInput.IntError -> (String -> msg) -> String -> Element msg
@@ -943,9 +946,7 @@ displayFloatErrors result =
             Element.none
 
         Err errors ->
-            List.map Debug.toString errors
-                |> String.join ", "
-                |> Element.text
+            displayErrors (List.map (NumberInput.floatErrorToString { valueName = "Value" }) errors)
 
 
 floatInput : NumberInput.Field Float NumberInput.FloatError -> (String -> msg) -> String -> Element msg

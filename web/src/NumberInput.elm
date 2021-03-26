@@ -1,7 +1,7 @@
 module NumberInput exposing
     ( Field, setMinBound, setMaxBound
     , IntError(..), intErrorToString, intDefault, setDefaultIntValue, updateInt
-    , FloatError(..), floatDefault, setDefaultFloatValue, updateFloat
+    , FloatError(..), floatErrorToString, floatDefault, setDefaultFloatValue, updateFloat
     )
 
 {-| Data for number form inputs
@@ -10,7 +10,7 @@ module NumberInput exposing
 
 @docs IntError, intErrorToString, intDefault, setDefaultIntValue, updateInt
 
-@docs FloatError, floatDefault, setDefaultFloatValue, updateFloat
+@docs FloatError, floatErrorToString, floatDefault, setDefaultFloatValue, updateFloat
 
 -}
 
@@ -118,6 +118,19 @@ type FloatError
     = FloatParsingError
     | FloatTooSmall { bound : Float, actual : Float }
     | FloatTooBig { bound : Float, actual : Float }
+
+
+floatErrorToString : { valueName : String } -> FloatError -> String
+floatErrorToString { valueName } err =
+    case err of
+        FloatParsingError ->
+            valueName ++ " is not a valid number."
+
+        FloatTooSmall { bound, actual } ->
+            valueName ++ " = " ++ String.fromFloat actual ++ " but it should be >= " ++ String.fromFloat bound ++ "."
+
+        FloatTooBig { bound, actual } ->
+            valueName ++ " = " ++ String.fromFloat actual ++ " but it should be <= " ++ String.fromFloat bound ++ "."
 
 
 floatDefault : Field Float FloatError
