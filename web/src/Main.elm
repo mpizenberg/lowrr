@@ -642,7 +642,10 @@ viewElmUI model =
 viewConfig : Pivot Image -> Parameters -> ParametersForm -> Device -> Element Msg
 viewConfig images params paramsForm device =
     Element.column [ padding 20, spacing 32 ]
-        [ Element.el [ Element.Font.center, Element.Font.size 32 ] (Element.text "Algorithm parameters")
+        [ runButton paramsForm
+
+        -- Title
+        , Element.el [ Element.Font.center, Element.Font.size 32 ] (Element.text "Algorithm parameters")
 
         -- Cropped working frame
         , Element.column [ spacing 10 ]
@@ -715,32 +718,86 @@ viewConfig images params paramsForm device =
 
 
 
+-- Run button
+
+
+runButton : ParametersForm -> Element Msg
+runButton paramsForm =
+    let
+        hasNoError =
+            List.isEmpty (allCropErrors paramsForm.crop)
+                && isOk paramsForm.maxIterations.decodedInput
+                && isOk paramsForm.convergenceThreshold.decodedInput
+                && isOk paramsForm.levels.decodedInput
+                && isOk paramsForm.sparse.decodedInput
+                && isOk paramsForm.lambda.decodedInput
+                && isOk paramsForm.rho.decodedInput
+    in
+    if hasNoError then
+        Element.Input.button
+            [ centerX
+            , padding 12
+            , Element.Border.solid
+            , Element.Border.width 1
+            , Element.Border.rounded 4
+            ]
+            { onPress = Nothing, label = Element.text "Run ▶" }
+
+    else
+        Element.Input.button
+            [ centerX
+            , padding 12
+            , Element.Border.solid
+            , Element.Border.width 1
+            , Element.Border.rounded 4
+            , Element.Font.color Style.lightGrey
+            ]
+            { onPress = Nothing, label = Element.text "Run ▶" }
+
+
+isOk : Result err ok -> Bool
+isOk result =
+    case result of
+        Err _ ->
+            False
+
+        Ok _ ->
+            True
+
+
+
 -- Crop input
 
 
 cropBoxErrors : CropForm -> Element Msg
 cropBoxErrors cropForm =
-    let
-        errorLeft =
-            errorsList cropForm.left.decodedInput
-                |> List.map (NumberInput.intErrorToString { valueName = "Left" })
+    displayErrors (allCropErrors cropForm)
 
-        errorTop =
-            errorsList cropForm.top.decodedInput
-                |> List.map (NumberInput.intErrorToString { valueName = "Top" })
 
-        errorRight =
-            errorsList cropForm.right.decodedInput
-                |> List.map (NumberInput.intErrorToString { valueName = "Right" })
+allCropErrors : CropForm -> List String
+allCropErrors cropForm =
+    if not cropForm.active then
+        []
 
-        errorBottom =
-            errorsList cropForm.bottom.decodedInput
-                |> List.map (NumberInput.intErrorToString { valueName = "Bottom" })
+    else
+        let
+            errorLeft =
+                errorsList cropForm.left.decodedInput
+                    |> List.map (NumberInput.intErrorToString { valueName = "Left" })
 
-        allErrors =
-            errorLeft ++ errorTop ++ errorRight ++ errorBottom
-    in
-    displayErrors allErrors
+            errorTop =
+                errorsList cropForm.top.decodedInput
+                    |> List.map (NumberInput.intErrorToString { valueName = "Top" })
+
+            errorRight =
+                errorsList cropForm.right.decodedInput
+                    |> List.map (NumberInput.intErrorToString { valueName = "Right" })
+
+            errorBottom =
+                errorsList cropForm.bottom.decodedInput
+                    |> List.map (NumberInput.intErrorToString { valueName = "Bottom" })
+        in
+        errorLeft ++ errorTop ++ errorRight ++ errorBottom
 
 
 displayErrors : List String -> Element msg
