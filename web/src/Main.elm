@@ -630,7 +630,7 @@ viewElmUI model =
             viewImgs images model.device
 
         Config { images } ->
-            viewConfig images model.params model.paramsForm model.device
+            viewConfig model.params model.paramsForm
 
         Processing { images } ->
             Element.none
@@ -639,8 +639,8 @@ viewElmUI model =
             Element.none
 
 
-viewConfig : Pivot Image -> Parameters -> ParametersForm -> Device -> Element Msg
-viewConfig images params paramsForm device =
+viewConfig : Parameters -> ParametersForm -> Element Msg
+viewConfig params paramsForm =
     Element.column [ padding 20, spacing 32 ]
         [ runButton paramsForm
 
