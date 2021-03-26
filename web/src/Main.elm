@@ -279,6 +279,7 @@ type ParamsMsg
 
 type ParamsInfoMsg
     = ToggleInfoCrop Bool
+    | ToggleInfoMaxIterations Bool
 
 
 subscriptions : Model -> Sub Msg
@@ -646,6 +647,9 @@ updateParamsInfo msg toggleInfo =
         ToggleInfoCrop visible ->
             { toggleInfo | crop = visible }
 
+        ToggleInfoMaxIterations visible ->
+            { toggleInfo | maxIterations = visible }
+
 
 
 -- View ##############################################################
@@ -720,7 +724,16 @@ viewConfig params paramsForm paramsInfo =
 
         -- Maximum number of iterations
         , Element.column [ spacing 10 ]
-            [ Element.text "Maximum number of iterations:"
+            [ Element.row [ spacing 10 ]
+                [ Element.text "Maximum number of iterations:"
+                , Element.Input.checkbox []
+                    { onChange = ParamsInfoMsg << ToggleInfoMaxIterations
+                    , icon = infoIcon
+                    , checked = paramsInfo.maxIterations
+                    , label = Element.Input.labelHidden "Show detail info about the maximum number of iterations"
+                    }
+                ]
+            , moreInfo paramsInfo.maxIterations "This is the maximum number of iterations allowed per level. If this is reached, the algorithm stops whether it converged or not."
             , Element.text ("(default to " ++ String.fromInt defaultParams.maxIterations ++ ")")
             , intInput paramsForm.maxIterations (ParamsMsg << ChangeMaxIter) "Maximum number of iterations"
             , displayIntErrors paramsForm.maxIterations.decodedInput
