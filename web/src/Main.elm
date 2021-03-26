@@ -282,6 +282,7 @@ type ParamsInfoMsg
     | ToggleInfoMaxIterations Bool
     | ToggleInfoConvergenceThreshold Bool
     | ToggleInfoLevels Bool
+    | ToggleInfoSparse Bool
 
 
 subscriptions : Model -> Sub Msg
@@ -658,6 +659,9 @@ updateParamsInfo msg toggleInfo =
         ToggleInfoLevels visible ->
             { toggleInfo | levels = visible }
 
+        ToggleInfoSparse visible ->
+            { toggleInfo | sparse = visible }
+
 
 
 -- View ##############################################################
@@ -783,7 +787,16 @@ viewConfig params paramsForm paramsInfo =
 
         -- Sparse ratio threshold
         , Element.column [ spacing 10 ]
-            [ Element.text "Sparse ratio threshold to switch:"
+            [ Element.row [ spacing 10 ]
+                [ Element.text "Sparse ratio threshold to switch:"
+                , Element.Input.checkbox []
+                    { onChange = ParamsInfoMsg << ToggleInfoSparse
+                    , icon = infoIcon
+                    , checked = paramsInfo.sparse
+                    , label = Element.Input.labelHidden "Show detail info about the sparse parameter"
+                    }
+                ]
+            , moreInfo paramsInfo.sparse "Sparse ratio threshold to switch between dense and sparse registration. At each pyramid level only the pixels with the highest gradient intensities are kept, making each level sparser than the previous one. Once the ratio of selected pixels goes below this sparse ratio parameter, the algorithm performs a sparse registration, using only the selected points at that level. If you want to use a dense registration at every level, you can set this parameter to 0."
             , Element.text ("(default to " ++ String.fromFloat defaultParams.sparse ++ ")")
             , floatInput paramsForm.sparse (ParamsMsg << ChangeSparse) "Sparse ratio threshold to switch"
             , displayFloatErrors paramsForm.sparse.decodedInput
