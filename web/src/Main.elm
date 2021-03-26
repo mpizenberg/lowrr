@@ -283,6 +283,8 @@ type ParamsInfoMsg
     | ToggleInfoConvergenceThreshold Bool
     | ToggleInfoLevels Bool
     | ToggleInfoSparse Bool
+    | ToggleInfoLambda Bool
+    | ToggleInfoRho Bool
 
 
 subscriptions : Model -> Sub Msg
@@ -662,6 +664,12 @@ updateParamsInfo msg toggleInfo =
         ToggleInfoSparse visible ->
             { toggleInfo | sparse = visible }
 
+        ToggleInfoLambda visible ->
+            { toggleInfo | lambda = visible }
+
+        ToggleInfoRho visible ->
+            { toggleInfo | rho = visible }
+
 
 
 -- View ##############################################################
@@ -804,14 +812,32 @@ viewConfig params paramsForm paramsInfo =
 
         -- lambda
         , Element.column [ spacing 10 ]
-            [ Element.text ("lambda: (default to " ++ String.fromFloat defaultParams.lambda ++ ")")
+            [ Element.row [ spacing 10 ]
+                [ Element.text ("lambda: (default to " ++ String.fromFloat defaultParams.lambda ++ ")")
+                , Element.Input.checkbox []
+                    { onChange = ParamsInfoMsg << ToggleInfoLambda
+                    , icon = infoIcon
+                    , checked = paramsInfo.lambda
+                    , label = Element.Input.labelHidden "Show detail info about the lambda parameter"
+                    }
+                ]
+            , moreInfo paramsInfo.lambda "Weight of the L1 term (high means no correction)."
             , floatInput paramsForm.lambda (ParamsMsg << ChangeLambda) "lambda"
             , displayFloatErrors paramsForm.lambda.decodedInput
             ]
 
         -- rho
         , Element.column [ spacing 10 ]
-            [ Element.text ("rho: (default to " ++ String.fromFloat defaultParams.rho ++ ")")
+            [ Element.row [ spacing 10 ]
+                [ Element.text ("rho: (default to " ++ String.fromFloat defaultParams.rho ++ ")")
+                , Element.Input.checkbox []
+                    { onChange = ParamsInfoMsg << ToggleInfoRho
+                    , icon = infoIcon
+                    , checked = paramsInfo.rho
+                    , label = Element.Input.labelHidden "Show detail info about the rho parameter"
+                    }
+                ]
+            , moreInfo paramsInfo.rho "Lagrangian penalty."
             , floatInput paramsForm.rho (ParamsMsg << ChangeRho) "rho"
             , displayFloatErrors paramsForm.rho.decodedInput
             ]
