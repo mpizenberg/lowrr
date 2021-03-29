@@ -1527,6 +1527,7 @@ viewImgs images device =
             [ Svg.Attributes.xlinkHref img.url
             , Svg.Attributes.width (String.fromInt img.width)
             , Svg.Attributes.height (String.fromInt img.height)
+            , Svg.Attributes.class "pixelated"
             ]
 
         viewerHeight =
@@ -1552,6 +1553,10 @@ viewImgs images device =
             , ( PageRegistration, False )
             , ( PageLogs, False )
             ]
+        , Element.html <|
+            Html.node "style"
+                []
+                [ Html.text ".pixelated { image-rendering: pixelated; image-rendering: crisp-edges; }" ]
         , svgViewer
         ]
 
