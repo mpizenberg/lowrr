@@ -59,8 +59,8 @@ type State
     | Loading { names : Set String, loaded : Dict String Image }
     | ViewImgs { images : Pivot Image }
     | Config { images : Pivot Image }
-    | Processing { images : Images }
-    | Results { images : Images }
+    | Registration { images : Pivot Image }
+    | Logs { images : Pivot Image }
 
 
 type FileDraggingState
@@ -148,8 +148,8 @@ init size =
 initialState : State
 initialState =
     -- Home Idle
-    -- ViewImgs { images = Pivot.fromCons (Image "ferris" "https://opensource.com/sites/default/files/styles/teaser-wide/public/lead-images/rust_programming_crab_sea.png?itok=Nq53PhmO" 249 140) [] }
-    Config { images = Pivot.fromCons (Image "ferris" "https://opensource.com/sites/default/files/styles/teaser-wide/public/lead-images/rust_programming_crab_sea.png?itok=Nq53PhmO" 249 140) [] }
+    -- Config { images = Pivot.fromCons (Image "ferris" "https://opensource.com/sites/default/files/styles/teaser-wide/public/lead-images/rust_programming_crab_sea.png?itok=Nq53PhmO" 249 140) [] }
+    ViewImgs { images = Pivot.fromCons (Image "ferris" "https://opensource.com/sites/default/files/styles/teaser-wide/public/lead-images/rust_programming_crab_sea.png?itok=Nq53PhmO" 249 140) [] }
 
 
 defaultParams : Parameters
@@ -254,6 +254,7 @@ type Msg
     | KeyDown RawKey
     | ParamsMsg ParamsMsg
     | ParamsInfoMsg ParamsInfoMsg
+    | NavigationMsg NavigationMsg
 
 
 type DragDropMsg
@@ -287,6 +288,13 @@ type ParamsInfoMsg
     | ToggleInfoRho Bool
 
 
+type NavigationMsg
+    = GoToPageImages
+    | GoToPageConfig
+    | GoToPageRegistration
+    | GoToPageLogs
+
+
 subscriptions : Model -> Sub Msg
 subscriptions model =
     case model.state of
@@ -302,10 +310,10 @@ subscriptions model =
         Config _ ->
             Sub.batch [ resizes WindowResizes ]
 
-        Processing _ ->
+        Registration _ ->
             Sub.batch [ resizes WindowResizes ]
 
-        Results _ ->
+        Logs _ ->
             Sub.batch [ resizes WindowResizes ]
 
 
@@ -382,8 +390,36 @@ update msg model =
         ( ParamsInfoMsg paramsInfoMsg, Config _ ) ->
             ( { model | paramsInfo = updateParamsInfo paramsInfoMsg model.paramsInfo }, Cmd.none )
 
+        ( NavigationMsg navMsg, ViewImgs data ) ->
+            ( goTo navMsg model data, Cmd.none )
+
+        ( NavigationMsg navMsg, Config data ) ->
+            ( goTo navMsg model data, Cmd.none )
+
+        ( NavigationMsg navMsg, Registration data ) ->
+            ( goTo navMsg model data, Cmd.none )
+
+        ( NavigationMsg navMsg, Logs data ) ->
+            ( goTo navMsg model data, Cmd.none )
+
         _ ->
             ( model, Cmd.none )
+
+
+goTo : NavigationMsg -> Model -> { images : Pivot Image } -> Model
+goTo msg model data =
+    case msg of
+        GoToPageImages ->
+            { model | state = ViewImgs data }
+
+        GoToPageConfig ->
+            { model | state = Config data }
+
+        GoToPageRegistration ->
+            { model | state = Registration data }
+
+        GoToPageLogs ->
+            { model | state = Logs data }
 
 
 updateParams : ParamsMsg -> ( Parameters, ParametersForm ) -> ( Parameters, ParametersForm )
@@ -696,10 +732,10 @@ viewElmUI model =
         Config { images } ->
             viewConfig model.params model.paramsForm model.paramsInfo
 
-        Processing { images } ->
+        Registration { images } ->
             Element.none
 
-        Results { images } ->
+        Logs { images } ->
             Element.none
 
 
@@ -1328,9 +1364,97 @@ toggleCheckboxWidget { offColor, onColor, sliderColor, toggleWidth, toggleHeight
         (Element.text "")
 
 
+
+-- Header
+
+
+type PageHeader
+    = PageImages
+    | PageConfig
+    | PageRegistration
+    | PageLogs
+
+
+pageHeaderElement : Int -> Bool -> PageHeader -> Element Msg
+pageHeaderElement headerHeight current page =
+    let
+        bgColor =
+            if current then
+                Style.almostWhite
+
+            else
+                Style.white
+
+        attributes =
+            [ Element.Background.color bgColor
+            , padding 10
+            , height (Element.px headerHeight)
+            ]
+    in
+    case page of
+        PageImages ->
+            Element.Input.button attributes
+                { onPress =
+                    if current then
+                        Nothing
+
+                    else
+                        Just (NavigationMsg GoToPageImages)
+                , label = Element.text "Images"
+                }
+
+        PageConfig ->
+            Element.Input.button attributes
+                { onPress =
+                    if current then
+                        Nothing
+
+                    else
+                        Just (NavigationMsg GoToPageConfig)
+                , label = Element.text "Config"
+                }
+
+        PageRegistration ->
+            Element.Input.button attributes
+                { onPress =
+                    if current then
+                        Nothing
+
+                    else
+                        Just (NavigationMsg GoToPageRegistration)
+                , label = Element.text "Registration"
+                }
+
+        PageLogs ->
+            Element.Input.button attributes
+                { onPress =
+                    if current then
+                        Nothing
+
+                    else
+                        Just (NavigationMsg GoToPageLogs)
+                , label = Element.text "Logs"
+                }
+
+
 viewImgs : Pivot Image -> Device -> Element Msg
 viewImgs images device =
     let
+        -- WARNING: this has to be kept consistent with
+        -- the text size in the header
+        headerHeight =
+            40
+
+        header =
+            Element.row
+                [ height (Element.px headerHeight)
+                ]
+                [ pageHeaderElement headerHeight True PageImages
+                , pageHeaderElement headerHeight False PageConfig
+                , pageHeaderElement headerHeight False PageRegistration
+                , pageHeaderElement headerHeight False PageLogs
+                ]
+
         img =
             Pivot.getC images
 
@@ -1340,17 +1464,26 @@ viewImgs images device =
             , Svg.Attributes.height (String.fromInt img.height)
             ]
 
+        viewerHeight =
+            device.size.height - headerHeight
+
         viewerAttributes =
-            Viewer.withSize ( device.size.width, device.size.height )
+            Viewer.withSize ( device.size.width, viewerHeight )
                 |> Viewer.fitImage 1.0 ( toFloat img.width, toFloat img.height )
                 |> Viewer.Svg.transform
+
+        svgViewer =
+            Element.html <|
+                Svg.svg
+                    [ Html.Attributes.width (floor device.size.width)
+                    , Html.Attributes.height (floor viewerHeight)
+                    ]
+                    [ Svg.g [ viewerAttributes ] [ Svg.image imgSvgAttributes [] ] ]
     in
-    Element.html <|
-        Svg.svg
-            [ Html.Attributes.width (floor device.size.width)
-            , Html.Attributes.height (floor device.size.height)
-            ]
-            [ Svg.g [ viewerAttributes ] [ Svg.image imgSvgAttributes [] ] ]
+    Element.column []
+        [ header
+        , svgViewer
+        ]
 
 
 viewHome : FileDraggingState -> Element Msg
