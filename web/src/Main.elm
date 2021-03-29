@@ -793,6 +793,7 @@ pageHeaderElement current page =
 
         attributes =
             [ Element.Background.color bgColor
+            , Element.htmlAttribute <| Html.Attributes.style "box-shadow" "none"
             , padding 10
             , height (Element.px headerHeight)
             ]
@@ -1364,6 +1365,7 @@ numberSideButton maybeMsg label =
         , width (Element.px 44)
         , Element.Font.center
         , Element.Font.color textColor
+        , Element.htmlAttribute <| Html.Attributes.style "box-shadow" "none"
         ]
         { onPress = maybeMsg, label = Element.text label }
 
