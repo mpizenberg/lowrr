@@ -739,143 +739,243 @@ viewElmUI model =
             Element.none
 
 
+
+-- Header
+
+
+type PageHeader
+    = PageImages
+    | PageConfig
+    | PageRegistration
+    | PageLogs
+
+
+headerBar : Int -> List ( PageHeader, Bool ) -> Element Msg
+headerBar headerHeight pages =
+    Element.row
+        [ height (Element.px headerHeight)
+        , centerX
+        ]
+        (List.map (\( page, current ) -> pageHeaderElement headerHeight current page) pages)
+
+
+pageHeaderElement : Int -> Bool -> PageHeader -> Element Msg
+pageHeaderElement headerHeight current page =
+    let
+        bgColor =
+            if current then
+                Style.almostWhite
+
+            else
+                Style.white
+
+        attributes =
+            [ Element.Background.color bgColor
+            , padding 10
+            , height (Element.px headerHeight)
+            ]
+    in
+    case page of
+        PageImages ->
+            Element.Input.button attributes
+                { onPress =
+                    if current then
+                        Nothing
+
+                    else
+                        Just (NavigationMsg GoToPageImages)
+                , label = Element.text "Images"
+                }
+
+        PageConfig ->
+            Element.Input.button attributes
+                { onPress =
+                    if current then
+                        Nothing
+
+                    else
+                        Just (NavigationMsg GoToPageConfig)
+                , label = Element.text "Config"
+                }
+
+        PageRegistration ->
+            Element.Input.button attributes
+                { onPress =
+                    if current then
+                        Nothing
+
+                    else
+                        Just (NavigationMsg GoToPageRegistration)
+                , label = Element.text "Registration"
+                }
+
+        PageLogs ->
+            Element.Input.button attributes
+                { onPress =
+                    if current then
+                        Nothing
+
+                    else
+                        Just (NavigationMsg GoToPageLogs)
+                , label = Element.text "Logs"
+                }
+
+
+
+-- Parameters config
+
+
 viewConfig : Parameters -> ParametersForm -> ParametersToggleInfo -> Element Msg
 viewConfig params paramsForm paramsInfo =
-    Element.column [ padding 20, spacing 32 ]
-        [ runButton paramsForm
-
-        -- Title
-        , Element.el [ Element.Font.center, Element.Font.size 32 ] (Element.text "Algorithm parameters")
-
-        -- Cropped working frame
-        , Element.column [ spacing 10 ]
-            [ Element.row [ spacing 10 ]
-                [ Element.text "Cropped working frame:"
-                , Element.Input.checkbox []
-                    { onChange = ParamsInfoMsg << ToggleInfoCrop
-                    , icon = infoIcon
-                    , checked = paramsInfo.crop
-                    , label = Element.Input.labelHidden "Show detail info about cropped working frame"
-                    }
-                ]
-            , moreInfo paramsInfo.crop "Instead of using the whole image to estimate the registration, it is often faster and as accurate to focus the algorithm attention on a smaller frame in the image. The parameters here are the left, top, right and bottom coordinates of that cropped frame on which we want the algorithm to focus when estimating the alignment parameters."
-            , Element.row [ spacing 10 ]
-                [ Element.text "off"
-                , toggle (ParamsMsg << ToggleCrop) paramsForm.crop.active 30 "Toggle cropped working frame"
-                , Element.text "on"
-                ]
-            , cropBox paramsForm.crop
-            , cropBoxErrors paramsForm.crop
+    let
+        -- WARNING: this has to be kept consistent with
+        -- the text size in the header
+        headerHeight =
+            40
+    in
+    Element.column [ width fill ]
+        [ headerBar headerHeight
+            [ ( PageImages, False )
+            , ( PageConfig, True )
+            , ( PageRegistration, False )
+            , ( PageLogs, False )
             ]
+        , Element.column [ paddingXY 20 32, spacing 32 ]
+            [ runButton paramsForm
 
-        -- Equalize mean intensities
-        , Element.column [ spacing 10 ]
-            [ Element.text "Equalize mean intensities:"
-            , Element.row [ spacing 10 ]
-                [ Element.text "off"
-                , toggle (ParamsMsg << ToggleEqualize) params.equalize 30 "Toggle mean intensities equalization"
-                , Element.text "on"
-                ]
-            ]
+            -- Title
+            , Element.el [ Element.Font.center, Element.Font.size 32 ] (Element.text "Algorithm parameters")
 
-        -- Maximum number of iterations
-        , Element.column [ spacing 10 ]
-            [ Element.row [ spacing 10 ]
-                [ Element.text "Maximum number of iterations:"
-                , Element.Input.checkbox []
-                    { onChange = ParamsInfoMsg << ToggleInfoMaxIterations
-                    , icon = infoIcon
-                    , checked = paramsInfo.maxIterations
-                    , label = Element.Input.labelHidden "Show detail info about the maximum number of iterations"
-                    }
+            -- Cropped working frame
+            , Element.column [ spacing 10 ]
+                [ Element.row [ spacing 10 ]
+                    [ Element.text "Cropped working frame:"
+                    , Element.Input.checkbox []
+                        { onChange = ParamsInfoMsg << ToggleInfoCrop
+                        , icon = infoIcon
+                        , checked = paramsInfo.crop
+                        , label = Element.Input.labelHidden "Show detail info about cropped working frame"
+                        }
+                    ]
+                , moreInfo paramsInfo.crop "Instead of using the whole image to estimate the registration, it is often faster and as accurate to focus the algorithm attention on a smaller frame in the image. The parameters here are the left, top, right and bottom coordinates of that cropped frame on which we want the algorithm to focus when estimating the alignment parameters."
+                , Element.row [ spacing 10 ]
+                    [ Element.text "off"
+                    , toggle (ParamsMsg << ToggleCrop) paramsForm.crop.active 30 "Toggle cropped working frame"
+                    , Element.text "on"
+                    ]
+                , cropBox paramsForm.crop
+                , cropBoxErrors paramsForm.crop
                 ]
-            , moreInfo paramsInfo.maxIterations "This is the maximum number of iterations allowed per level. If this is reached, the algorithm stops whether it converged or not."
-            , Element.text ("(default to " ++ String.fromInt defaultParams.maxIterations ++ ")")
-            , intInput paramsForm.maxIterations (ParamsMsg << ChangeMaxIter) "Maximum number of iterations"
-            , displayIntErrors paramsForm.maxIterations.decodedInput
-            ]
 
-        -- Convergence threshold
-        , Element.column [ spacing 10 ]
-            [ Element.row [ spacing 10 ]
-                [ Element.text "Convergence threshold:"
-                , Element.Input.checkbox []
-                    { onChange = ParamsInfoMsg << ToggleInfoConvergenceThreshold
-                    , icon = infoIcon
-                    , checked = paramsInfo.convergenceThreshold
-                    , label = Element.Input.labelHidden "Show detail info about the convergence threshold parameter"
-                    }
+            -- Equalize mean intensities
+            , Element.column [ spacing 10 ]
+                [ Element.text "Equalize mean intensities:"
+                , Element.row [ spacing 10 ]
+                    [ Element.text "off"
+                    , toggle (ParamsMsg << ToggleEqualize) params.equalize 30 "Toggle mean intensities equalization"
+                    , Element.text "on"
+                    ]
                 ]
-            , moreInfo paramsInfo.convergenceThreshold "The algorithm stops when the relative error difference between to estimates falls below this value."
-            , Element.text ("(default to " ++ String.fromFloat defaultParams.convergenceThreshold ++ ")")
-            , floatInput paramsForm.convergenceThreshold (ParamsMsg << ChangeConvergenceThreshold) "Convergence threshold"
-            , displayFloatErrors paramsForm.convergenceThreshold.decodedInput
-            ]
 
-        -- Multi-resolution pyramid levels
-        , Element.column [ spacing 10 ]
-            [ Element.row [ spacing 10 ]
-                [ Element.text "Number of pyramid levels:"
-                , Element.Input.checkbox []
-                    { onChange = ParamsInfoMsg << ToggleInfoLevels
-                    , icon = infoIcon
-                    , checked = paramsInfo.levels
-                    , label = Element.Input.labelHidden "Show detail info about the levels parameter"
-                    }
+            -- Maximum number of iterations
+            , Element.column [ spacing 10 ]
+                [ Element.row [ spacing 10 ]
+                    [ Element.text "Maximum number of iterations:"
+                    , Element.Input.checkbox []
+                        { onChange = ParamsInfoMsg << ToggleInfoMaxIterations
+                        , icon = infoIcon
+                        , checked = paramsInfo.maxIterations
+                        , label = Element.Input.labelHidden "Show detail info about the maximum number of iterations"
+                        }
+                    ]
+                , moreInfo paramsInfo.maxIterations "This is the maximum number of iterations allowed per level. If this is reached, the algorithm stops whether it converged or not."
+                , Element.text ("(default to " ++ String.fromInt defaultParams.maxIterations ++ ")")
+                , intInput paramsForm.maxIterations (ParamsMsg << ChangeMaxIter) "Maximum number of iterations"
+                , displayIntErrors paramsForm.maxIterations.decodedInput
                 ]
-            , moreInfo paramsInfo.levels "The number of levels for the multi-resolution approach. Each level halves/doubles the resolution of the previous one. The algorithm starts at the lowest resolution and transfers the converged parameters at one resolution to the initialization of the next. Increasing the number of levels enables better convergence for bigger movements but too many levels might make it definitively drift away. Targetting a lowest resolution of about 100x100 is generally good enough. The number of levels also has a joint interaction with the sparse threshold parameter so keep that in mind while changing this parameter."
-            , Element.text ("(default to " ++ String.fromInt defaultParams.levels ++ ")")
-            , intInput paramsForm.levels (ParamsMsg << ChangeLevels) "Number of pyramid levels"
-            , displayIntErrors paramsForm.levels.decodedInput
-            ]
 
-        -- Sparse ratio threshold
-        , Element.column [ spacing 10 ]
-            [ Element.row [ spacing 10 ]
-                [ Element.text "Sparse ratio threshold to switch:"
-                , Element.Input.checkbox []
-                    { onChange = ParamsInfoMsg << ToggleInfoSparse
-                    , icon = infoIcon
-                    , checked = paramsInfo.sparse
-                    , label = Element.Input.labelHidden "Show detail info about the sparse parameter"
-                    }
+            -- Convergence threshold
+            , Element.column [ spacing 10 ]
+                [ Element.row [ spacing 10 ]
+                    [ Element.text "Convergence threshold:"
+                    , Element.Input.checkbox []
+                        { onChange = ParamsInfoMsg << ToggleInfoConvergenceThreshold
+                        , icon = infoIcon
+                        , checked = paramsInfo.convergenceThreshold
+                        , label = Element.Input.labelHidden "Show detail info about the convergence threshold parameter"
+                        }
+                    ]
+                , moreInfo paramsInfo.convergenceThreshold "The algorithm stops when the relative error difference between to estimates falls below this value."
+                , Element.text ("(default to " ++ String.fromFloat defaultParams.convergenceThreshold ++ ")")
+                , floatInput paramsForm.convergenceThreshold (ParamsMsg << ChangeConvergenceThreshold) "Convergence threshold"
+                , displayFloatErrors paramsForm.convergenceThreshold.decodedInput
                 ]
-            , moreInfo paramsInfo.sparse "Sparse ratio threshold to switch between dense and sparse registration. At each pyramid level only the pixels with the highest gradient intensities are kept, making each level sparser than the previous one. Once the ratio of selected pixels goes below this sparse ratio parameter, the algorithm performs a sparse registration, using only the selected points at that level. If you want to use a dense registration at every level, you can set this parameter to 0."
-            , Element.text ("(default to " ++ String.fromFloat defaultParams.sparse ++ ")")
-            , floatInput paramsForm.sparse (ParamsMsg << ChangeSparse) "Sparse ratio threshold to switch"
-            , displayFloatErrors paramsForm.sparse.decodedInput
-            ]
 
-        -- lambda
-        , Element.column [ spacing 10 ]
-            [ Element.row [ spacing 10 ]
-                [ Element.text ("lambda: (default to " ++ String.fromFloat defaultParams.lambda ++ ")")
-                , Element.Input.checkbox []
-                    { onChange = ParamsInfoMsg << ToggleInfoLambda
-                    , icon = infoIcon
-                    , checked = paramsInfo.lambda
-                    , label = Element.Input.labelHidden "Show detail info about the lambda parameter"
-                    }
+            -- Multi-resolution pyramid levels
+            , Element.column [ spacing 10 ]
+                [ Element.row [ spacing 10 ]
+                    [ Element.text "Number of pyramid levels:"
+                    , Element.Input.checkbox []
+                        { onChange = ParamsInfoMsg << ToggleInfoLevels
+                        , icon = infoIcon
+                        , checked = paramsInfo.levels
+                        , label = Element.Input.labelHidden "Show detail info about the levels parameter"
+                        }
+                    ]
+                , moreInfo paramsInfo.levels "The number of levels for the multi-resolution approach. Each level halves/doubles the resolution of the previous one. The algorithm starts at the lowest resolution and transfers the converged parameters at one resolution to the initialization of the next. Increasing the number of levels enables better convergence for bigger movements but too many levels might make it definitively drift away. Targetting a lowest resolution of about 100x100 is generally good enough. The number of levels also has a joint interaction with the sparse threshold parameter so keep that in mind while changing this parameter."
+                , Element.text ("(default to " ++ String.fromInt defaultParams.levels ++ ")")
+                , intInput paramsForm.levels (ParamsMsg << ChangeLevels) "Number of pyramid levels"
+                , displayIntErrors paramsForm.levels.decodedInput
                 ]
-            , moreInfo paramsInfo.lambda "Weight of the L1 term (high means no correction)."
-            , floatInput paramsForm.lambda (ParamsMsg << ChangeLambda) "lambda"
-            , displayFloatErrors paramsForm.lambda.decodedInput
-            ]
 
-        -- rho
-        , Element.column [ spacing 10 ]
-            [ Element.row [ spacing 10 ]
-                [ Element.text ("rho: (default to " ++ String.fromFloat defaultParams.rho ++ ")")
-                , Element.Input.checkbox []
-                    { onChange = ParamsInfoMsg << ToggleInfoRho
-                    , icon = infoIcon
-                    , checked = paramsInfo.rho
-                    , label = Element.Input.labelHidden "Show detail info about the rho parameter"
-                    }
+            -- Sparse ratio threshold
+            , Element.column [ spacing 10 ]
+                [ Element.row [ spacing 10 ]
+                    [ Element.text "Sparse ratio threshold to switch:"
+                    , Element.Input.checkbox []
+                        { onChange = ParamsInfoMsg << ToggleInfoSparse
+                        , icon = infoIcon
+                        , checked = paramsInfo.sparse
+                        , label = Element.Input.labelHidden "Show detail info about the sparse parameter"
+                        }
+                    ]
+                , moreInfo paramsInfo.sparse "Sparse ratio threshold to switch between dense and sparse registration. At each pyramid level only the pixels with the highest gradient intensities are kept, making each level sparser than the previous one. Once the ratio of selected pixels goes below this sparse ratio parameter, the algorithm performs a sparse registration, using only the selected points at that level. If you want to use a dense registration at every level, you can set this parameter to 0."
+                , Element.text ("(default to " ++ String.fromFloat defaultParams.sparse ++ ")")
+                , floatInput paramsForm.sparse (ParamsMsg << ChangeSparse) "Sparse ratio threshold to switch"
+                , displayFloatErrors paramsForm.sparse.decodedInput
                 ]
-            , moreInfo paramsInfo.rho "Lagrangian penalty."
-            , floatInput paramsForm.rho (ParamsMsg << ChangeRho) "rho"
-            , displayFloatErrors paramsForm.rho.decodedInput
+
+            -- lambda
+            , Element.column [ spacing 10 ]
+                [ Element.row [ spacing 10 ]
+                    [ Element.text ("lambda: (default to " ++ String.fromFloat defaultParams.lambda ++ ")")
+                    , Element.Input.checkbox []
+                        { onChange = ParamsInfoMsg << ToggleInfoLambda
+                        , icon = infoIcon
+                        , checked = paramsInfo.lambda
+                        , label = Element.Input.labelHidden "Show detail info about the lambda parameter"
+                        }
+                    ]
+                , moreInfo paramsInfo.lambda "Weight of the L1 term (high means no correction)."
+                , floatInput paramsForm.lambda (ParamsMsg << ChangeLambda) "lambda"
+                , displayFloatErrors paramsForm.lambda.decodedInput
+                ]
+
+            -- rho
+            , Element.column [ spacing 10 ]
+                [ Element.row [ spacing 10 ]
+                    [ Element.text ("rho: (default to " ++ String.fromFloat defaultParams.rho ++ ")")
+                    , Element.Input.checkbox []
+                        { onChange = ParamsInfoMsg << ToggleInfoRho
+                        , icon = infoIcon
+                        , checked = paramsInfo.rho
+                        , label = Element.Input.labelHidden "Show detail info about the rho parameter"
+                        }
+                    ]
+                , moreInfo paramsInfo.rho "Lagrangian penalty."
+                , floatInput paramsForm.rho (ParamsMsg << ChangeRho) "rho"
+                , displayFloatErrors paramsForm.rho.decodedInput
+                ]
             ]
         ]
 
@@ -1365,76 +1465,7 @@ toggleCheckboxWidget { offColor, onColor, sliderColor, toggleWidth, toggleHeight
 
 
 
--- Header
-
-
-type PageHeader
-    = PageImages
-    | PageConfig
-    | PageRegistration
-    | PageLogs
-
-
-pageHeaderElement : Int -> Bool -> PageHeader -> Element Msg
-pageHeaderElement headerHeight current page =
-    let
-        bgColor =
-            if current then
-                Style.almostWhite
-
-            else
-                Style.white
-
-        attributes =
-            [ Element.Background.color bgColor
-            , padding 10
-            , height (Element.px headerHeight)
-            ]
-    in
-    case page of
-        PageImages ->
-            Element.Input.button attributes
-                { onPress =
-                    if current then
-                        Nothing
-
-                    else
-                        Just (NavigationMsg GoToPageImages)
-                , label = Element.text "Images"
-                }
-
-        PageConfig ->
-            Element.Input.button attributes
-                { onPress =
-                    if current then
-                        Nothing
-
-                    else
-                        Just (NavigationMsg GoToPageConfig)
-                , label = Element.text "Config"
-                }
-
-        PageRegistration ->
-            Element.Input.button attributes
-                { onPress =
-                    if current then
-                        Nothing
-
-                    else
-                        Just (NavigationMsg GoToPageRegistration)
-                , label = Element.text "Registration"
-                }
-
-        PageLogs ->
-            Element.Input.button attributes
-                { onPress =
-                    if current then
-                        Nothing
-
-                    else
-                        Just (NavigationMsg GoToPageLogs)
-                , label = Element.text "Logs"
-                }
+-- View Images
 
 
 viewImgs : Pivot Image -> Device -> Element Msg
@@ -1444,16 +1475,6 @@ viewImgs images device =
         -- the text size in the header
         headerHeight =
             40
-
-        header =
-            Element.row
-                [ height (Element.px headerHeight)
-                ]
-                [ pageHeaderElement headerHeight True PageImages
-                , pageHeaderElement headerHeight False PageConfig
-                , pageHeaderElement headerHeight False PageRegistration
-                , pageHeaderElement headerHeight False PageLogs
-                ]
 
         img =
             Pivot.getC images
@@ -1481,7 +1502,12 @@ viewImgs images device =
                     [ Svg.g [ viewerAttributes ] [ Svg.image imgSvgAttributes [] ] ]
     in
     Element.column []
-        [ header
+        [ headerBar headerHeight
+            [ ( PageImages, True )
+            , ( PageConfig, False )
+            , ( PageRegistration, False )
+            , ( PageLogs, False )
+            ]
         , svgViewer
         ]
 
