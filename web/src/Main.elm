@@ -21,7 +21,7 @@ import Simple.Transition as Transition
 import Style
 import Svg
 import Svg.Attributes
-import Viewer
+import Viewer exposing (Viewer)
 import Viewer.Svg
 
 
@@ -51,6 +51,7 @@ type alias Model =
     , params : Parameters
     , paramsForm : ParametersForm
     , paramsInfo : ParametersToggleInfo
+    , viewer : Viewer
     }
 
 
@@ -74,10 +75,6 @@ type alias Image =
     , width : Int
     , height : Int
     }
-
-
-type alias Images =
-    List String
 
 
 type alias Parameters =
@@ -140,6 +137,7 @@ init size =
       , params = defaultParams
       , paramsForm = defaultParamsForm
       , paramsInfo = defaultParamsInfo
+      , viewer = Viewer.withSize ( size.width, size.height - toFloat headerHeight )
       }
     , Cmd.none
     )
@@ -324,7 +322,16 @@ update msg model =
             ( model, Cmd.none )
 
         ( WindowResizes size, _ ) ->
-            ( { model | device = Device.classify size }, Cmd.none )
+            let
+                viewer =
+                    model.viewer
+            in
+            ( { model
+                | device = Device.classify size
+                , viewer = { viewer | size = ( size.width, size.height - toFloat headerHeight ) }
+              }
+            , Cmd.none
+            )
 
         ( DragDropMsg (DragOver _ _), Home _ ) ->
             ( { model | state = Home DraggingSomeFiles }, Cmd.none )
@@ -358,7 +365,10 @@ update msg model =
                         ( { model | state = Home Idle }, Cmd.none )
 
                     firstImage :: otherImages ->
-                        ( { model | state = ViewImgs { images = Pivot.fromCons firstImage otherImages } }
+                        ( { model
+                            | state = ViewImgs { images = Pivot.fromCons firstImage otherImages }
+                            , viewer = Viewer.fitImage 1.0 ( toFloat firstImage.width, toFloat firstImage.height ) model.viewer
+                          }
                         , Cmd.none
                         )
 
@@ -727,7 +737,7 @@ viewElmUI model =
             viewLoading loadData
 
         ViewImgs { images } ->
-            viewImgs images model.device
+            viewImgs model.device model.viewer images
 
         Config { images } ->
             viewConfig model.params model.paramsForm model.paramsInfo
@@ -750,17 +760,24 @@ type PageHeader
     | PageLogs
 
 
-headerBar : Int -> List ( PageHeader, Bool ) -> Element Msg
-headerBar headerHeight pages =
+{-| WARNING: this has to be kept consistent with the text size in the header
+-}
+headerHeight : Int
+headerHeight =
+    40
+
+
+headerBar : List ( PageHeader, Bool ) -> Element Msg
+headerBar pages =
     Element.row
         [ height (Element.px headerHeight)
         , centerX
         ]
-        (List.map (\( page, current ) -> pageHeaderElement headerHeight current page) pages)
+        (List.map (\( page, current ) -> pageHeaderElement current page) pages)
 
 
-pageHeaderElement : Int -> Bool -> PageHeader -> Element Msg
-pageHeaderElement headerHeight current page =
+pageHeaderElement : Bool -> PageHeader -> Element Msg
+pageHeaderElement current page =
     let
         bgColor =
             if current then
@@ -827,14 +844,8 @@ pageHeaderElement headerHeight current page =
 
 viewLogs : Element Msg
 viewLogs =
-    let
-        -- WARNING: this has to be kept consistent with
-        -- the text size in the header
-        headerHeight =
-            40
-    in
     Element.column [ width fill ]
-        [ headerBar headerHeight
+        [ headerBar
             [ ( PageImages, False )
             , ( PageConfig, False )
             , ( PageRegistration, False )
@@ -849,14 +860,8 @@ viewLogs =
 
 viewRegistration : Element Msg
 viewRegistration =
-    let
-        -- WARNING: this has to be kept consistent with
-        -- the text size in the header
-        headerHeight =
-            40
-    in
     Element.column [ width fill ]
-        [ headerBar headerHeight
+        [ headerBar
             [ ( PageImages, False )
             , ( PageConfig, False )
             , ( PageRegistration, True )
@@ -871,14 +876,8 @@ viewRegistration =
 
 viewConfig : Parameters -> ParametersForm -> ParametersToggleInfo -> Element Msg
 viewConfig params paramsForm paramsInfo =
-    let
-        -- WARNING: this has to be kept consistent with
-        -- the text size in the header
-        headerHeight =
-            40
-    in
     Element.column [ width fill ]
-        [ headerBar headerHeight
+        [ headerBar
             [ ( PageImages, False )
             , ( PageConfig, True )
             , ( PageRegistration, False )
@@ -1512,14 +1511,9 @@ toggleCheckboxWidget { offColor, onColor, sliderColor, toggleWidth, toggleHeight
 -- View Images
 
 
-viewImgs : Pivot Image -> Device -> Element Msg
-viewImgs images device =
+viewImgs : Device -> Viewer -> Pivot Image -> Element Msg
+viewImgs device viewer images =
     let
-        -- WARNING: this has to be kept consistent with
-        -- the text size in the header
-        headerHeight =
-            40
-
         img =
             Pivot.getC images
 
@@ -1531,12 +1525,10 @@ viewImgs images device =
             ]
 
         viewerHeight =
-            device.size.height - headerHeight
+            device.size.height - toFloat headerHeight
 
         viewerAttributes =
-            Viewer.withSize ( device.size.width, viewerHeight )
-                |> Viewer.fitImage 1.0 ( toFloat img.width, toFloat img.height )
-                |> Viewer.Svg.transform
+            Viewer.Svg.transform viewer
 
         svgViewer =
             Element.html <|
@@ -1547,7 +1539,7 @@ viewImgs images device =
                     [ Svg.g [ viewerAttributes ] [ Svg.image imgSvgAttributes [] ] ]
     in
     Element.column []
-        [ headerBar headerHeight
+        [ headerBar
             [ ( PageImages, True )
             , ( PageConfig, False )
             , ( PageRegistration, False )
