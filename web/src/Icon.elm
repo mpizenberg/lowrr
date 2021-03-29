@@ -1,13 +1,50 @@
-module Icon exposing (arrowDown, fileText, github)
+module Icon exposing (arrowDown, boundingBox, download, fileText, github, image, move, save, settings, trash, zoomFit, zoomIn, zoomOut)
 
 import Element exposing (Element)
 import FeatherIcons
+import Svg exposing (Svg, svg)
+import Svg.Attributes exposing (..)
 
 
 
--- import Html exposing (Html)
--- import Svg exposing (Svg, svg)
--- import Svg.Attributes exposing (..)
+-- Designed by Matthieu ####################################
+
+
+toElement : List (Svg msg) -> Float -> Element msg
+toElement icon size =
+    svg (width (String.fromFloat size) :: height (String.fromFloat size) :: defaultAttributes) icon
+        |> Element.html
+
+
+defaultAttributes : List (Svg.Attribute msg)
+defaultAttributes =
+    [ fill "none"
+    , stroke "currentColor"
+    , strokeLinecap "round"
+    , strokeLinejoin "round"
+    , strokeWidth "2"
+    , viewBox "0 0 24 24"
+    ]
+
+
+zoomFit : Float -> Element msg
+zoomFit =
+    toElement
+        [ Svg.circle [ cx "11", cy "11", r "8" ] []
+        , Svg.line [ x1 "21", y1 "21", x2 "16.65", y2 "16.65" ] []
+        , Svg.path [ d "M 6 8 v 6 h 10 v -6 h -10" ] []
+        ]
+
+
+boundingBox : Float -> Element msg
+boundingBox =
+    toElement
+        [ Svg.path [ d "M 23 17 h -6 m -3 0 H 4 V 7 H 20 V 11 m 0 3 v 6" ] []
+        ]
+
+
+
+-- Feather icons
 
 
 featherIcon : FeatherIcons.Icon -> Float -> Element msg
@@ -28,3 +65,43 @@ fileText =
 arrowDown : Float -> Element msg
 arrowDown =
     featherIcon FeatherIcons.arrowDown
+
+
+move : Float -> Element msg
+move =
+    featherIcon FeatherIcons.move
+
+
+image : Float -> Element msg
+image =
+    featherIcon FeatherIcons.image
+
+
+settings : Float -> Element msg
+settings =
+    featherIcon FeatherIcons.settings
+
+
+download : Float -> Element msg
+download =
+    featherIcon FeatherIcons.download
+
+
+save : Float -> Element msg
+save =
+    featherIcon FeatherIcons.save
+
+
+trash : Float -> Element msg
+trash =
+    featherIcon FeatherIcons.trash2
+
+
+zoomIn : Float -> Element msg
+zoomIn =
+    featherIcon FeatherIcons.zoomIn
+
+
+zoomOut : Float -> Element msg
+zoomOut =
+    featherIcon FeatherIcons.zoomOut
