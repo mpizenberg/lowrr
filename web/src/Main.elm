@@ -1507,9 +1507,9 @@ toggleCheckboxWidget { offColor, onColor, sliderColor, toggleWidth, toggleHeight
                         else
                             Html.Attributes.class ""
                     ]
-                    (Element.text "")
+                    Element.none
         ]
-        (Element.text "")
+        Element.none
 
 
 
