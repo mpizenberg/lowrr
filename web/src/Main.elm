@@ -733,10 +733,10 @@ viewElmUI model =
             viewConfig model.params model.paramsForm model.paramsInfo
 
         Registration { images } ->
-            Element.none
+            viewRegistration
 
         Logs { images } ->
-            Element.none
+            viewLogs
 
 
 
@@ -819,6 +819,50 @@ pageHeaderElement headerHeight current page =
                         Just (NavigationMsg GoToPageLogs)
                 , label = Element.text "Logs"
                 }
+
+
+
+-- Logs
+
+
+viewLogs : Element Msg
+viewLogs =
+    let
+        -- WARNING: this has to be kept consistent with
+        -- the text size in the header
+        headerHeight =
+            40
+    in
+    Element.column [ width fill ]
+        [ headerBar headerHeight
+            [ ( PageImages, False )
+            , ( PageConfig, False )
+            , ( PageRegistration, False )
+            , ( PageLogs, True )
+            ]
+        ]
+
+
+
+-- Registration
+
+
+viewRegistration : Element Msg
+viewRegistration =
+    let
+        -- WARNING: this has to be kept consistent with
+        -- the text size in the header
+        headerHeight =
+            40
+    in
+    Element.column [ width fill ]
+        [ headerBar headerHeight
+            [ ( PageImages, False )
+            , ( PageConfig, False )
+            , ( PageRegistration, True )
+            , ( PageLogs, False )
+            ]
+        ]
 
 
 
