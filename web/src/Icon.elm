@@ -1,4 +1,4 @@
-module Icon exposing (arrowDown, boundingBox, download, fileText, github, image, move, save, settings, trash, zoomFit, zoomIn, zoomOut)
+module Icon exposing (arrowDown, boundingBox, download, fileText, github, image, maximize, move, save, settings, trash, zoomFit, zoomIn, zoomOut)
 
 import Element exposing (Element)
 import FeatherIcons
@@ -105,3 +105,8 @@ zoomIn =
 zoomOut : Float -> Element msg
 zoomOut =
     featherIcon FeatherIcons.zoomOut
+
+
+maximize : Float -> Element msg
+maximize =
+    featherIcon FeatherIcons.maximize

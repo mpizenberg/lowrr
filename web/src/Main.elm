@@ -250,6 +250,7 @@ type Msg
     | DragDropMsg DragDropMsg
     | ImageDecoded Image
     | KeyDown RawKey
+    | ViewImgMsg ViewImgMsg
     | ParamsMsg ParamsMsg
     | ParamsInfoMsg ParamsInfoMsg
     | NavigationMsg NavigationMsg
@@ -259,6 +260,10 @@ type DragDropMsg
     = DragOver File (List File)
     | Drop File (List File)
     | DragLeave
+
+
+type ViewImgMsg
+    = TODO
 
 
 type ParamsMsg
@@ -1544,6 +1549,15 @@ viewImgs device viewer images =
             , ( PageConfig, False )
             , ( PageRegistration, False )
             , ( PageLogs, False )
+            ]
+        , Element.row [ spacing 12 ]
+            [ Element.el [] (Icon.zoomFit 32)
+            , Element.el [] (Icon.zoomOut 32)
+            , Element.el [] (Icon.zoomIn 32)
+            , Element.el [] (Icon.move 32)
+            , Element.el [] (Icon.boundingBox 32)
+            , Element.el [] (Icon.maximize 32)
+            , Element.el [] (Icon.trash 32)
             ]
         , Element.html <|
             Html.node "style"
