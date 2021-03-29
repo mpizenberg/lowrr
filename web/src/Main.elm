@@ -840,7 +840,7 @@ viewConfig params paramsForm paramsInfo =
             , ( PageRegistration, False )
             , ( PageLogs, False )
             ]
-        , Element.column [ paddingXY 20 32, spacing 32 ]
+        , Element.column [ paddingXY 20 32, spacing 32, centerX ]
             [ runButton paramsForm
 
             -- Title
