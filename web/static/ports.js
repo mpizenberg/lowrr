@@ -29,6 +29,11 @@ export function activatePorts(app, containerSize) {
     }
   });
 
+  // Capture pointer events to detect a pointerup even outside the area.
+  app.ports.capture.subscribe((event) => {
+    event.target.setPointerCapture(event.pointerId);
+  });
+
   // Replace elm Browser.onAnimationFrameDelta that seems to have timing issues.
   // startAnimationFrameLoop(app.ports.animationFrame);
 

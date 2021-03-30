@@ -11,9 +11,11 @@ import Element.Input
 import FileValue as File exposing (File)
 import Html exposing (Html)
 import Html.Attributes
+import Html.Events
+import Html.Events.Extra.Pointer as Pointer
 import Html.Events.Extra.Wheel as Wheel
 import Icon
-import Json.Decode exposing (Value)
+import Json.Decode exposing (Decoder, Value)
 import Keyboard exposing (RawKey)
 import NumberInput
 import Pivot exposing (Pivot)
@@ -35,6 +37,9 @@ port decodeImages : List Value -> Cmd msg
 port imageDecoded : (Image -> msg) -> Sub msg
 
 
+port capture : Value -> Cmd msg
+
+
 main : Program Device.Size Model Msg
 main =
     Browser.element
@@ -53,6 +58,7 @@ type alias Model =
     , paramsForm : ParametersForm
     , paramsInfo : ParametersToggleInfo
     , viewer : Viewer
+    , pointerMode : PointerMode
     }
 
 
@@ -129,6 +135,11 @@ type alias ParametersToggleInfo =
     }
 
 
+type PointerMode
+    = WaitingMove
+    | PointerMoving
+
+
 {-| Initialize the model.
 -}
 init : Device.Size -> ( Model, Cmd Msg )
@@ -139,6 +150,7 @@ init size =
       , paramsForm = defaultParamsForm
       , paramsInfo = defaultParamsInfo
       , viewer = Viewer.withSize ( size.width, size.height - toFloat headerHeight )
+      , pointerMode = WaitingMove
       }
     , Cmd.none
     )
@@ -256,6 +268,7 @@ type Msg
     | ParamsMsg ParamsMsg
     | ParamsInfoMsg ParamsInfoMsg
     | NavigationMsg NavigationMsg
+    | PointerMsg PointerMsg
 
 
 type DragDropMsg
@@ -270,6 +283,13 @@ type ZoomMsg
     | ZoomOut
     | ZoomToward ( Float, Float )
     | ZoomAwayFrom ( Float, Float )
+
+
+type PointerMsg
+    = PointerDownRaw Value
+      -- = PointerDown ( Float, Float )
+    | PointerMove ( Float, Float )
+    | PointerUp ( Float, Float )
 
 
 type ViewImgMsg
@@ -429,6 +449,20 @@ update msg model =
 
         ( ZoomMsg zoomMsg, ViewImgs _ ) ->
             ( { model | viewer = zoomViewer zoomMsg model.viewer }, Cmd.none )
+
+        ( PointerMsg pointerMsg, ViewImgs _ ) ->
+            case ( pointerMsg, model.pointerMode ) of
+                ( PointerDownRaw event, WaitingMove ) ->
+                    ( { model | pointerMode = PointerMoving }, capture event )
+
+                ( PointerMove movement, PointerMoving ) ->
+                    ( { model | viewer = Viewer.pan movement model.viewer }, Cmd.none )
+
+                ( PointerUp _, _ ) ->
+                    ( { model | pointerMode = WaitingMove }, Cmd.none )
+
+                _ ->
+                    ( model, Cmd.none )
 
         _ ->
             ( model, Cmd.none )
@@ -1646,10 +1680,23 @@ viewImgs device viewer images =
             [ Element.inFront buttonsRow
             , Element.clip
             , height fill
-            , Element.htmlAttribute <| Wheel.onWheel (zoomWheelMsg viewer)
+            , Element.htmlAttribute <|
+                Wheel.onWheel (zoomWheelMsg viewer)
+            , Element.htmlAttribute <|
+                msgOn "pointerdown" (Json.Decode.map (PointerMsg << PointerDownRaw) Json.Decode.value)
+            , Element.htmlAttribute <|
+                Pointer.onUp (\e -> PointerMsg (PointerUp e.pointer.offsetPos))
+            , Element.htmlAttribute <|
+                Html.Attributes.style "touch-action" "none"
             ]
             svgViewer
         ]
+
+
+msgOn : String -> Decoder msg -> Html.Attribute msg
+msgOn event =
+    Json.Decode.map (\msg -> { message = msg, stopPropagation = True, preventDefault = True })
+        >> Html.Events.custom event
 
 
 zoomWheelMsg : Viewer -> Wheel.Event -> Msg
