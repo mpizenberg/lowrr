@@ -1542,14 +1542,34 @@ viewImgs device viewer images =
                 , label = icon 32
                 }
 
+        modeButton selected msg title icon =
+            let
+                ( bgColor, action ) =
+                    if selected then
+                        ( Style.lightGrey, Nothing )
+
+                    else
+                        ( Element.rgba 255 255 255 0.8, Just (ViewImgMsg msg) )
+            in
+            Element.Input.button
+                [ padding 6
+                , centerX
+                , Element.Background.color bgColor
+                , Element.htmlAttribute <| Html.Attributes.style "box-shadow" "none"
+                , Element.htmlAttribute <| Html.Attributes.title title
+                ]
+                { onPress = action
+                , label = icon 32
+                }
+
         buttonsRow =
             Element.row [ width fill ]
                 [ clickButton True TODO "Fit zoom to image" Icon.zoomFit
                 , clickButton True TODO "Zoom out" Icon.zoomOut
                 , clickButton True TODO "Zoom in" Icon.zoomIn
-                , clickButton True TODO "Move mode" Icon.move
+                , modeButton True TODO "Move mode" Icon.move
                 , Element.el [ width (Element.maximum 100 fill) ] Element.none
-                , clickButton True TODO "Draw the cropped working area as a bounding box" Icon.boundingBox
+                , modeButton False TODO "Draw the cropped working area as a bounding box" Icon.boundingBox
                 , clickButton True TODO "Set the cropped working area to the current frame" Icon.maximize
                 , clickButton False TODO "Delete cropped working area" Icon.trash
                 ]
@@ -1578,7 +1598,7 @@ viewImgs device viewer images =
                     ]
                     [ Svg.g [ viewerAttributes ] [ Svg.image imgSvgAttributes [] ] ]
     in
-    Element.column []
+    Element.column [ height fill ]
         [ headerBar
             [ ( PageImages, True )
             , ( PageConfig, False )
@@ -1589,7 +1609,7 @@ viewImgs device viewer images =
             Html.node "style"
                 []
                 [ Html.text ".pixelated { image-rendering: pixelated; image-rendering: crisp-edges; }" ]
-        , Element.el [ Element.inFront buttonsRow ] svgViewer
+        , Element.el [ Element.inFront buttonsRow, height fill, Element.clip ] svgViewer
         ]
 
 
