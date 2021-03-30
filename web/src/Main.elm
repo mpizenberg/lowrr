@@ -250,6 +250,7 @@ type Msg
     | DragDropMsg DragDropMsg
     | ImageDecoded Image
     | KeyDown RawKey
+    | ZoomMsg ZoomMsg
     | ViewImgMsg ViewImgMsg
     | ParamsMsg ParamsMsg
     | ParamsInfoMsg ParamsInfoMsg
@@ -260,6 +261,12 @@ type DragDropMsg
     = DragOver File (List File)
     | Drop File (List File)
     | DragLeave
+
+
+type ZoomMsg
+    = ZoomFit Image
+    | ZoomIn
+    | ZoomOut
 
 
 type ViewImgMsg
@@ -417,8 +424,24 @@ update msg model =
         ( NavigationMsg navMsg, Logs data ) ->
             ( goTo navMsg model data, Cmd.none )
 
+        ( ZoomMsg zoomMsg, ViewImgs _ ) ->
+            ( { model | viewer = zoomViewer zoomMsg model.viewer }, Cmd.none )
+
         _ ->
             ( model, Cmd.none )
+
+
+zoomViewer : ZoomMsg -> Viewer -> Viewer
+zoomViewer msg viewer =
+    case msg of
+        ZoomFit img ->
+            Viewer.fitImage 1.1 ( toFloat img.width, toFloat img.height ) viewer
+
+        ZoomIn ->
+            Viewer.zoomIn viewer
+
+        ZoomOut ->
+            Viewer.zoomOut viewer
 
 
 goTo : NavigationMsg -> Model -> { images : Pivot Image } -> Model
@@ -1521,6 +1544,9 @@ toggleCheckboxWidget { offColor, onColor, sliderColor, toggleWidth, toggleHeight
 viewImgs : Device -> Viewer -> Pivot Image -> Element Msg
 viewImgs device viewer images =
     let
+        img =
+            Pivot.getC images
+
         clickButton abled msg title icon =
             let
                 strokeColor =
@@ -1538,7 +1564,7 @@ viewImgs device viewer images =
                 , Element.htmlAttribute <| Html.Attributes.style "box-shadow" "none"
                 , Element.htmlAttribute <| Html.Attributes.title title
                 ]
-                { onPress = Just (ViewImgMsg msg)
+                { onPress = Just msg
                 , label = icon 32
                 }
 
@@ -1549,7 +1575,7 @@ viewImgs device viewer images =
                         ( Style.lightGrey, Nothing )
 
                     else
-                        ( Element.rgba 255 255 255 0.8, Just (ViewImgMsg msg) )
+                        ( Element.rgba 255 255 255 0.8, Just msg )
             in
             Element.Input.button
                 [ padding 6
@@ -1564,18 +1590,15 @@ viewImgs device viewer images =
 
         buttonsRow =
             Element.row [ width fill ]
-                [ clickButton True TODO "Fit zoom to image" Icon.zoomFit
-                , clickButton True TODO "Zoom out" Icon.zoomOut
-                , clickButton True TODO "Zoom in" Icon.zoomIn
-                , modeButton True TODO "Move mode" Icon.move
+                [ clickButton True (ZoomMsg (ZoomFit img)) "Fit zoom to image" Icon.zoomFit
+                , clickButton True (ZoomMsg ZoomOut) "Zoom out" Icon.zoomOut
+                , clickButton True (ZoomMsg ZoomIn) "Zoom in" Icon.zoomIn
+                , modeButton True NoMsg "Move mode" Icon.move
                 , Element.el [ width (Element.maximum 100 fill) ] Element.none
-                , modeButton False TODO "Draw the cropped working area as a bounding box" Icon.boundingBox
-                , clickButton True TODO "Set the cropped working area to the current frame" Icon.maximize
-                , clickButton False TODO "Delete cropped working area" Icon.trash
+                , modeButton False NoMsg "Draw the cropped working area as a bounding box" Icon.boundingBox
+                , clickButton True NoMsg "Set the cropped working area to the current frame" Icon.maximize
+                , clickButton False NoMsg "Delete cropped working area" Icon.trash
                 ]
-
-        img =
-            Pivot.getC images
 
         imgSvgAttributes =
             [ Svg.Attributes.xlinkHref img.url
