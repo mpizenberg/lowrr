@@ -1521,6 +1521,38 @@ toggleCheckboxWidget { offColor, onColor, sliderColor, toggleWidth, toggleHeight
 viewImgs : Device -> Viewer -> Pivot Image -> Element Msg
 viewImgs device viewer images =
     let
+        clickButton abled msg icon =
+            let
+                strokeColor =
+                    if abled then
+                        Style.black
+
+                    else
+                        Style.lightGrey
+            in
+            Element.Input.button
+                [ padding 6
+                , centerX
+                , Element.Background.color (Element.rgba255 255 255 255 0.8)
+                , Element.htmlAttribute <| Html.Attributes.style "box-shadow" "none"
+                , Element.Font.color strokeColor
+                ]
+                { onPress = Just (ViewImgMsg msg)
+                , label = icon 32
+                }
+
+        buttonsRow =
+            Element.row [ width fill ]
+                [ clickButton True TODO Icon.zoomFit
+                , clickButton True TODO Icon.zoomOut
+                , clickButton True TODO Icon.zoomIn
+                , clickButton True TODO Icon.move
+                , Element.el [ width (Element.maximum 100 fill) ] Element.none
+                , clickButton True TODO Icon.boundingBox
+                , clickButton True TODO Icon.maximize
+                , clickButton False TODO Icon.trash
+                ]
+
         img =
             Pivot.getC images
 
@@ -1552,20 +1584,11 @@ viewImgs device viewer images =
             , ( PageRegistration, False )
             , ( PageLogs, False )
             ]
-        , Element.row [ spacing 12 ]
-            [ Element.el [] (Icon.zoomFit 32)
-            , Element.el [] (Icon.zoomOut 32)
-            , Element.el [] (Icon.zoomIn 32)
-            , Element.el [] (Icon.move 32)
-            , Element.el [] (Icon.boundingBox 32)
-            , Element.el [] (Icon.maximize 32)
-            , Element.el [] (Icon.trash 32)
-            ]
         , Element.html <|
             Html.node "style"
                 []
                 [ Html.text ".pixelated { image-rendering: pixelated; image-rendering: crisp-edges; }" ]
-        , svgViewer
+        , Element.el [ Element.inFront buttonsRow ] svgViewer
         ]
 
 
