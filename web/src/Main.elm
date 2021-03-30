@@ -1521,7 +1521,7 @@ toggleCheckboxWidget { offColor, onColor, sliderColor, toggleWidth, toggleHeight
 viewImgs : Device -> Viewer -> Pivot Image -> Element Msg
 viewImgs device viewer images =
     let
-        clickButton abled msg icon =
+        clickButton abled msg title icon =
             let
                 strokeColor =
                     if abled then
@@ -1534,8 +1534,9 @@ viewImgs device viewer images =
                 [ padding 6
                 , centerX
                 , Element.Background.color (Element.rgba255 255 255 255 0.8)
-                , Element.htmlAttribute <| Html.Attributes.style "box-shadow" "none"
                 , Element.Font.color strokeColor
+                , Element.htmlAttribute <| Html.Attributes.style "box-shadow" "none"
+                , Element.htmlAttribute <| Html.Attributes.title title
                 ]
                 { onPress = Just (ViewImgMsg msg)
                 , label = icon 32
@@ -1543,14 +1544,14 @@ viewImgs device viewer images =
 
         buttonsRow =
             Element.row [ width fill ]
-                [ clickButton True TODO Icon.zoomFit
-                , clickButton True TODO Icon.zoomOut
-                , clickButton True TODO Icon.zoomIn
-                , clickButton True TODO Icon.move
+                [ clickButton True TODO "Fit zoom to image" Icon.zoomFit
+                , clickButton True TODO "Zoom out" Icon.zoomOut
+                , clickButton True TODO "Zoom in" Icon.zoomIn
+                , clickButton True TODO "Move mode" Icon.move
                 , Element.el [ width (Element.maximum 100 fill) ] Element.none
-                , clickButton True TODO Icon.boundingBox
-                , clickButton True TODO Icon.maximize
-                , clickButton False TODO Icon.trash
+                , clickButton True TODO "Draw the cropped working area as a bounding box" Icon.boundingBox
+                , clickButton True TODO "Set the cropped working area to the current frame" Icon.maximize
+                , clickButton False TODO "Delete cropped working area" Icon.trash
                 ]
 
         img =
