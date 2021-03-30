@@ -11,6 +11,7 @@ import Element.Input
 import FileValue as File exposing (File)
 import Html exposing (Html)
 import Html.Attributes
+import Html.Events.Extra.Wheel as Wheel
 import Icon
 import Json.Decode exposing (Value)
 import Keyboard exposing (RawKey)
@@ -267,6 +268,8 @@ type ZoomMsg
     = ZoomFit Image
     | ZoomIn
     | ZoomOut
+    | ZoomToward ( Float, Float )
+    | ZoomAwayFrom ( Float, Float )
 
 
 type ViewImgMsg
@@ -442,6 +445,12 @@ zoomViewer msg viewer =
 
         ZoomOut ->
             Viewer.zoomOut viewer
+
+        ZoomToward coordinates ->
+            Viewer.zoomToward coordinates viewer
+
+        ZoomAwayFrom coordinates ->
+            Viewer.zoomAwayFrom coordinates viewer
 
 
 goTo : NavigationMsg -> Model -> { images : Pivot Image } -> Model
@@ -1607,8 +1616,8 @@ viewImgs device viewer images =
             , Svg.Attributes.class "pixelated"
             ]
 
-        viewerHeight =
-            device.size.height - toFloat headerHeight
+        ( viewerWidth, viewerHeight ) =
+            viewer.size
 
         viewerAttributes =
             Viewer.Svg.transform viewer
@@ -1616,8 +1625,9 @@ viewImgs device viewer images =
         svgViewer =
             Element.html <|
                 Svg.svg
-                    [ Html.Attributes.width (floor device.size.width)
+                    [ Html.Attributes.width (floor viewerWidth)
                     , Html.Attributes.height (floor viewerHeight)
+                    , Html.Attributes.style "pointer-events" "none"
                     ]
                     [ Svg.g [ viewerAttributes ] [ Svg.image imgSvgAttributes [] ] ]
     in
@@ -1632,8 +1642,27 @@ viewImgs device viewer images =
             Html.node "style"
                 []
                 [ Html.text ".pixelated { image-rendering: pixelated; image-rendering: crisp-edges; }" ]
-        , Element.el [ Element.inFront buttonsRow, height fill, Element.clip ] svgViewer
+        , Element.el
+            [ Element.inFront buttonsRow
+            , Element.clip
+            , height fill
+            , Element.htmlAttribute <| Wheel.onWheel (zoomWheelMsg viewer)
+            ]
+            svgViewer
         ]
+
+
+zoomWheelMsg : Viewer -> Wheel.Event -> Msg
+zoomWheelMsg viewer event =
+    let
+        coordinates =
+            Viewer.coordinatesAt event.mouseEvent.offsetPos viewer
+    in
+    if event.deltaY > 0 then
+        ZoomMsg (ZoomAwayFrom coordinates)
+
+    else
+        ZoomMsg (ZoomToward coordinates)
 
 
 viewHome : FileDraggingState -> Element Msg
