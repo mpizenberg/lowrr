@@ -137,7 +137,7 @@ type alias ParametersToggleInfo =
 
 type PointerMode
     = WaitingMove
-    | PointerMoving
+    | PointerMovingFromClientCoords ( Float, Float )
 
 
 {-| Initialize the model.
@@ -453,10 +453,20 @@ update msg model =
         ( PointerMsg pointerMsg, ViewImgs _ ) ->
             case ( pointerMsg, model.pointerMode ) of
                 ( PointerDownRaw event, WaitingMove ) ->
-                    ( { model | pointerMode = PointerMoving }, capture event )
+                    case Json.Decode.decodeValue Pointer.eventDecoder event of
+                        Err _ ->
+                            ( model, Cmd.none )
 
-                ( PointerMove movement, PointerMoving ) ->
-                    ( { model | viewer = Viewer.pan movement model.viewer }, Cmd.none )
+                        Ok { pointer } ->
+                            ( { model | pointerMode = PointerMovingFromClientCoords pointer.clientPos }, capture event )
+
+                ( PointerMove ( newX, newY ), PointerMovingFromClientCoords ( x, y ) ) ->
+                    ( { model
+                        | viewer = Viewer.pan ( newX - x, newY - y ) model.viewer
+                        , pointerMode = PointerMovingFromClientCoords ( newX, newY )
+                      }
+                    , Cmd.none
+                    )
 
                 ( PointerUp _, _ ) ->
                     ( { model | pointerMode = WaitingMove }, Cmd.none )
@@ -1688,6 +1698,12 @@ viewImgs device viewer images =
                 Pointer.onUp (\e -> PointerMsg (PointerUp e.pointer.offsetPos))
             , Element.htmlAttribute <|
                 Html.Attributes.style "touch-action" "none"
+            , Element.htmlAttribute <|
+                Html.Events.preventDefaultOn "pointermove" <|
+                    Json.Decode.map (\coords -> ( PointerMsg (PointerMove coords), True )) <|
+                        Json.Decode.map2 Tuple.pair
+                            (Json.Decode.field "clientX" Json.Decode.float)
+                            (Json.Decode.field "clientY" Json.Decode.float)
             ]
             svgViewer
         ]
