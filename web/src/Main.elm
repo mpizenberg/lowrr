@@ -441,11 +441,7 @@ update msg model =
                     ( model, Cmd.none )
 
         ( ParamsMsg paramsMsg, Config _ ) ->
-            let
-                ( newParams, newParamsForm ) =
-                    updateParams paramsMsg ( model.params, model.paramsForm )
-            in
-            ( { model | params = newParams, paramsForm = newParamsForm }, Cmd.none )
+            ( updateParams paramsMsg model, Cmd.none )
 
         ( ParamsInfoMsg paramsInfoMsg, Config _ ) ->
             ( { model | paramsInfo = updateParamsInfo paramsInfoMsg model.paramsInfo }, Cmd.none )
@@ -746,11 +742,11 @@ goTo msg model data =
             { model | state = Logs data }
 
 
-updateParams : ParamsMsg -> ( Parameters, ParametersForm ) -> ( Parameters, ParametersForm )
-updateParams msg ( params, paramsForm ) =
+updateParams : ParamsMsg -> Model -> Model
+updateParams msg ({ params, paramsForm } as model) =
     case msg of
         ToggleEqualize equalize ->
-            ( { params | equalize = equalize }, paramsForm )
+            { model | params = { params | equalize = equalize } }
 
         ChangeMaxIter str ->
             let
@@ -762,10 +758,13 @@ updateParams msg ( params, paramsForm ) =
             in
             case updatedField.decodedInput of
                 Ok maxIterations ->
-                    ( { params | maxIterations = maxIterations }, updatedForm )
+                    { model
+                        | params = { params | maxIterations = maxIterations }
+                        , paramsForm = updatedForm
+                    }
 
                 Err _ ->
-                    ( params, updatedForm )
+                    { model | paramsForm = updatedForm }
 
         ChangeConvergenceThreshold str ->
             let
@@ -777,10 +776,13 @@ updateParams msg ( params, paramsForm ) =
             in
             case updatedField.decodedInput of
                 Ok convergenceThreshold ->
-                    ( { params | convergenceThreshold = convergenceThreshold }, updatedForm )
+                    { model
+                        | params = { params | convergenceThreshold = convergenceThreshold }
+                        , paramsForm = updatedForm
+                    }
 
                 Err _ ->
-                    ( params, updatedForm )
+                    { model | paramsForm = updatedForm }
 
         ChangeLevels str ->
             let
@@ -792,10 +794,13 @@ updateParams msg ( params, paramsForm ) =
             in
             case updatedField.decodedInput of
                 Ok levels ->
-                    ( { params | levels = levels }, updatedForm )
+                    { model
+                        | params = { params | levels = levels }
+                        , paramsForm = updatedForm
+                    }
 
                 Err _ ->
-                    ( params, updatedForm )
+                    { model | paramsForm = updatedForm }
 
         ChangeSparse str ->
             let
@@ -807,10 +812,13 @@ updateParams msg ( params, paramsForm ) =
             in
             case updatedField.decodedInput of
                 Ok sparse ->
-                    ( { params | sparse = sparse }, updatedForm )
+                    { model
+                        | params = { params | sparse = sparse }
+                        , paramsForm = updatedForm
+                    }
 
                 Err _ ->
-                    ( params, updatedForm )
+                    { model | paramsForm = updatedForm }
 
         ChangeLambda str ->
             let
@@ -822,10 +830,13 @@ updateParams msg ( params, paramsForm ) =
             in
             case updatedField.decodedInput of
                 Ok lambda ->
-                    ( { params | lambda = lambda }, updatedForm )
+                    { model
+                        | params = { params | lambda = lambda }
+                        , paramsForm = updatedForm
+                    }
 
                 Err _ ->
-                    ( params, updatedForm )
+                    { model | paramsForm = updatedForm }
 
         ChangeRho str ->
             let
@@ -837,10 +848,13 @@ updateParams msg ( params, paramsForm ) =
             in
             case updatedField.decodedInput of
                 Ok rho ->
-                    ( { params | rho = rho }, updatedForm )
+                    { model
+                        | params = { params | rho = rho }
+                        , paramsForm = updatedForm
+                    }
 
                 Err _ ->
-                    ( params, updatedForm )
+                    { model | paramsForm = updatedForm }
 
         ToggleCrop activeCrop ->
             let
@@ -852,14 +866,16 @@ updateParams msg ( params, paramsForm ) =
             in
             case ( activeCrop, ( newCropForm.left.decodedInput, newCropForm.right.decodedInput ), ( newCropForm.top.decodedInput, newCropForm.bottom.decodedInput ) ) of
                 ( True, ( Ok left, Ok right ), ( Ok top, Ok bottom ) ) ->
-                    ( { params | crop = Just (Crop left top right bottom) }
-                    , { paramsForm | crop = newCropForm }
-                    )
+                    { model
+                        | params = { params | crop = Just (Crop left top right bottom) }
+                        , paramsForm = { paramsForm | crop = newCropForm }
+                    }
 
                 _ ->
-                    ( { params | crop = Nothing }
-                    , { paramsForm | crop = newCropForm }
-                    )
+                    { model
+                        | params = { params | crop = Nothing }
+                        , paramsForm = { paramsForm | crop = newCropForm }
+                    }
 
         ChangeCropLeft str ->
             let
@@ -887,17 +903,19 @@ updateParams msg ( params, paramsForm ) =
                                 _ ->
                                     Nothing
                     in
-                    ( { params | crop = newCrop }
-                    , { paramsForm | crop = newCropForm }
-                    )
+                    { model
+                        | params = { params | crop = newCrop }
+                        , paramsForm = { paramsForm | crop = newCropForm }
+                    }
 
                 ( True, Err _ ) ->
-                    ( { params | crop = Nothing }
-                    , { paramsForm | crop = { oldCropForm | left = newLeft } }
-                    )
+                    { model
+                        | params = { params | crop = Nothing }
+                        , paramsForm = { paramsForm | crop = { oldCropForm | left = newLeft } }
+                    }
 
                 ( False, _ ) ->
-                    ( params, paramsForm )
+                    model
 
         ChangeCropTop str ->
             let
@@ -925,17 +943,19 @@ updateParams msg ( params, paramsForm ) =
                                 _ ->
                                     Nothing
                     in
-                    ( { params | crop = newCrop }
-                    , { paramsForm | crop = newCropForm }
-                    )
+                    { model
+                        | params = { params | crop = newCrop }
+                        , paramsForm = { paramsForm | crop = newCropForm }
+                    }
 
                 ( True, Err _ ) ->
-                    ( { params | crop = Nothing }
-                    , { paramsForm | crop = { oldCropForm | top = newTop } }
-                    )
+                    { model
+                        | params = { params | crop = Nothing }
+                        , paramsForm = { paramsForm | crop = { oldCropForm | top = newTop } }
+                    }
 
                 ( False, _ ) ->
-                    ( params, paramsForm )
+                    model
 
         ChangeCropRight str ->
             let
@@ -959,17 +979,19 @@ updateParams msg ( params, paramsForm ) =
                                 _ ->
                                     Nothing
                     in
-                    ( { params | crop = newCrop }
-                    , { paramsForm | crop = newCropForm }
-                    )
+                    { model
+                        | params = { params | crop = newCrop }
+                        , paramsForm = { paramsForm | crop = newCropForm }
+                    }
 
                 ( True, Err _ ) ->
-                    ( { params | crop = Nothing }
-                    , { paramsForm | crop = { oldCropForm | right = newRight } }
-                    )
+                    { model
+                        | params = { params | crop = Nothing }
+                        , paramsForm = { paramsForm | crop = { oldCropForm | right = newRight } }
+                    }
 
                 ( False, _ ) ->
-                    ( params, paramsForm )
+                    model
 
         ChangeCropBottom str ->
             let
@@ -993,17 +1015,19 @@ updateParams msg ( params, paramsForm ) =
                                 _ ->
                                     Nothing
                     in
-                    ( { params | crop = newCrop }
-                    , { paramsForm | crop = newCropForm }
-                    )
+                    { model
+                        | params = { params | crop = newCrop }
+                        , paramsForm = { paramsForm | crop = newCropForm }
+                    }
 
                 ( True, Err _ ) ->
-                    ( { params | crop = Nothing }
-                    , { paramsForm | crop = { oldCropForm | bottom = newBottom } }
-                    )
+                    { model
+                        | params = { params | crop = Nothing }
+                        , paramsForm = { paramsForm | crop = { oldCropForm | bottom = newBottom } }
+                    }
 
                 ( False, _ ) ->
-                    ( params, paramsForm )
+                    model
 
 
 updateParamsInfo : ParamsInfoMsg -> ParametersToggleInfo -> ParametersToggleInfo
