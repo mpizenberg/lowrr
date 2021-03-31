@@ -494,35 +494,35 @@ update msg model =
 
                         Ok { pointer } ->
                             let
-                                ( oX, oY ) =
-                                    pointer.offsetPos
+                                ( x, y ) =
+                                    Viewer.coordinatesAt pointer.offsetPos model.viewer
                             in
                             ( { model
                                 | pointerMode = PointerDrawFromOffsetAndClient pointer.offsetPos pointer.clientPos
-                                , bboxDrawn = Just { left = oX, top = oY, right = oX, bottom = oY }
+                                , bboxDrawn = Just { left = x, top = y, right = x, bottom = y }
                               }
                             , capture event
                             )
 
                 ( PointerMove ( newX, newY ), PointerDrawFromOffsetAndClient ( oX, oY ) ( cX, cY ) ) ->
                     let
-                        x =
-                            oX + newX - cX
+                        ( x1, y1 ) =
+                            Viewer.coordinatesAt ( oX, oY ) model.viewer
 
-                        y =
-                            oY + newY - cY
+                        ( x2, y2 ) =
+                            Viewer.coordinatesAt ( oX + newX - cX, oY + newY - cY ) model.viewer
 
                         left =
-                            min oX x
+                            min x1 x2
 
                         top =
-                            min oY y
+                            min y1 y2
 
                         right =
-                            max oX x
+                            max x1 x2
 
                         bottom =
-                            max oY y
+                            max y1 y2
                     in
                     ( { model | bboxDrawn = Just { left = left, top = top, right = right, bottom = bottom } }
                     , Cmd.none
@@ -531,7 +531,7 @@ update msg model =
                 ( PointerUp _, PointerDrawFromOffsetAndClient _ _ ) ->
                     case model.bboxDrawn of
                         Just { left, right, top, bottom } ->
-                            if right - left > 10 && bottom - top > 10 then
+                            if (right - left) / model.viewer.scale > 10 && (bottom - top) / model.viewer.scale > 10 then
                                 ( { model
                                     | pointerMode = WaitingDraw
                                   }
@@ -1762,32 +1762,31 @@ viewImgs pointerMode bboxDrawn viewer images =
             viewer.size
 
         viewerAttributes =
-            Viewer.Svg.transform viewer
+            [ Html.Attributes.style "pointer-events" "none"
+            , Viewer.Svg.transform viewer
+            ]
 
         svgContent =
             case bboxDrawn of
                 Nothing ->
-                    Svg.g [ viewerAttributes ] [ Svg.image imgSvgAttributes [] ]
+                    Svg.g viewerAttributes [ Svg.image imgSvgAttributes [] ]
 
                 Just { left, top, right, bottom } ->
                     let
-                        ( bboxX, bboxY ) =
-                            Viewer.coordinatesAt ( left, top ) viewer
-
                         bboxWidth =
-                            viewer.scale * (right - left)
+                            right - left
 
                         bboxHeight =
-                            viewer.scale * (bottom - top)
+                            bottom - top
 
                         strokeWidth =
                             viewer.scale * 2
                     in
-                    Svg.g [ viewerAttributes ]
+                    Svg.g viewerAttributes
                         [ Svg.image imgSvgAttributes []
                         , Svg.rect
-                            [ Svg.Attributes.x (String.fromFloat bboxX)
-                            , Svg.Attributes.y (String.fromFloat bboxY)
+                            [ Svg.Attributes.x (String.fromFloat left)
+                            , Svg.Attributes.y (String.fromFloat top)
                             , Svg.Attributes.width (String.fromFloat bboxWidth)
                             , Svg.Attributes.height (String.fromFloat bboxHeight)
                             , Svg.Attributes.fill "white"
@@ -1803,7 +1802,15 @@ viewImgs pointerMode bboxDrawn viewer images =
                 Svg.svg
                     [ Html.Attributes.width (floor viewerWidth)
                     , Html.Attributes.height (floor viewerHeight)
-                    , Html.Attributes.style "pointer-events" "none"
+                    , Wheel.onWheel (zoomWheelMsg viewer)
+                    , msgOn "pointerdown" (Json.Decode.map (PointerMsg << PointerDownRaw) Json.Decode.value)
+                    , Pointer.onUp (\e -> PointerMsg (PointerUp e.pointer.offsetPos))
+                    , Html.Attributes.style "touch-action" "none"
+                    , Html.Events.preventDefaultOn "pointermove" <|
+                        Json.Decode.map (\coords -> ( PointerMsg (PointerMove coords), True )) <|
+                            Json.Decode.map2 Tuple.pair
+                                (Json.Decode.field "clientX" Json.Decode.float)
+                                (Json.Decode.field "clientY" Json.Decode.float)
                     ]
                     [ svgContent ]
     in
@@ -1822,20 +1829,6 @@ viewImgs pointerMode bboxDrawn viewer images =
             [ Element.inFront buttonsRow
             , Element.clip
             , height fill
-            , Element.htmlAttribute <|
-                Wheel.onWheel (zoomWheelMsg viewer)
-            , Element.htmlAttribute <|
-                msgOn "pointerdown" (Json.Decode.map (PointerMsg << PointerDownRaw) Json.Decode.value)
-            , Element.htmlAttribute <|
-                Pointer.onUp (\e -> PointerMsg (PointerUp e.pointer.offsetPos))
-            , Element.htmlAttribute <|
-                Html.Attributes.style "touch-action" "none"
-            , Element.htmlAttribute <|
-                Html.Events.preventDefaultOn "pointermove" <|
-                    Json.Decode.map (\coords -> ( PointerMsg (PointerMove coords), True )) <|
-                        Json.Decode.map2 Tuple.pair
-                            (Json.Decode.field "clientX" Json.Decode.float)
-                            (Json.Decode.field "clientY" Json.Decode.float)
             ]
             svgViewer
         ]
