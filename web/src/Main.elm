@@ -535,6 +535,12 @@ update msg model =
                             let
                                 img =
                                     Pivot.getC images
+
+                                oldParams =
+                                    model.params
+
+                                oldParamsForm =
+                                    model.paramsForm
                             in
                             if
                                 -- sufficient width
@@ -547,25 +553,59 @@ update msg model =
                                     && (bottom > 0)
                                     && (top < toFloat img.height)
                             then
+                                let
+                                    leftCrop =
+                                        max 0 left
+
+                                    topCrop =
+                                        max 0 top
+
+                                    rightCrop =
+                                        min (toFloat img.width) right
+
+                                    bottomCrop =
+                                        min (toFloat img.height) bottom
+
+                                    newCropParams =
+                                        { left = round leftCrop
+                                        , top = round topCrop
+                                        , right = round rightCrop
+                                        , bottom = round bottomCrop
+                                        }
+
+                                    newCropForm =
+                                        { active = True
+                                        , left = NumberInput.updateInt (String.fromInt newCropParams.left) model.paramsForm.crop.left
+                                        , top = NumberInput.updateInt (String.fromInt newCropParams.top) model.paramsForm.crop.top
+                                        , right = NumberInput.updateInt (String.fromInt newCropParams.right) model.paramsForm.crop.right
+                                        , bottom = NumberInput.updateInt (String.fromInt newCropParams.bottom) model.paramsForm.crop.bottom
+                                        }
+                                in
                                 ( { model
                                     | pointerMode = WaitingDraw
                                     , bboxDrawn =
                                         Just
-                                            { left = max 0 left
-                                            , top = max 0 top
-                                            , right = min (toFloat img.width) right
-                                            , bottom = min (toFloat img.height) bottom
+                                            { left = leftCrop
+                                            , top = topCrop
+                                            , right = rightCrop
+                                            , bottom = bottomCrop
                                             }
+                                    , params = { oldParams | crop = Just newCropParams }
+                                    , paramsForm = { oldParamsForm | crop = newCropForm }
                                   }
                                 , Cmd.none
                                 )
 
                             else
+                                let
+                                    cropForm =
+                                        oldParamsForm.crop
+                                in
                                 ( { model
                                     | pointerMode = WaitingDraw
                                     , bboxDrawn = Nothing
-
-                                    -- TODO: remove crop in parameters
+                                    , params = { oldParams | crop = Nothing }
+                                    , paramsForm = { oldParamsForm | crop = { cropForm | active = False } }
                                   }
                                 , Cmd.none
                                 )
@@ -598,6 +638,12 @@ update msg model =
 
                 bottom =
                     top + model.viewer.scale * height
+
+                oldParams =
+                    model.params
+
+                oldParamsForm =
+                    model.paramsForm
             in
             if
                 -- at least one corner inside the image
@@ -606,21 +652,60 @@ update msg model =
                     && (bottom > 0)
                     && (top < toFloat img.height)
             then
+                let
+                    leftCrop =
+                        max 0 left
+
+                    topCrop =
+                        max 0 top
+
+                    rightCrop =
+                        min (toFloat img.width) right
+
+                    bottomCrop =
+                        min (toFloat img.height) bottom
+
+                    newCropParams =
+                        { left = round leftCrop
+                        , top = round topCrop
+                        , right = round rightCrop
+                        , bottom = round bottomCrop
+                        }
+
+                    newCropForm =
+                        { active = True
+                        , left = NumberInput.updateInt (String.fromInt newCropParams.left) model.paramsForm.crop.left
+                        , top = NumberInput.updateInt (String.fromInt newCropParams.top) model.paramsForm.crop.top
+                        , right = NumberInput.updateInt (String.fromInt newCropParams.right) model.paramsForm.crop.right
+                        , bottom = NumberInput.updateInt (String.fromInt newCropParams.bottom) model.paramsForm.crop.bottom
+                        }
+                in
                 ( { model
                     | bboxDrawn =
                         Just
-                            { left = max 0 left
-                            , top = max 0 top
-                            , right = min (toFloat img.width) right
-                            , bottom = min (toFloat img.height) bottom
+                            { left = leftCrop
+                            , top = topCrop
+                            , right = rightCrop
+                            , bottom = bottomCrop
                             }
+                    , params = { oldParams | crop = Just newCropParams }
+                    , paramsForm = { oldParamsForm | crop = newCropForm }
                   }
                 , Cmd.none
                 )
 
             else
-                -- TODO: update parameters
-                ( { model | bboxDrawn = Nothing }, Cmd.none )
+                let
+                    cropForm =
+                        oldParamsForm.crop
+                in
+                ( { model
+                    | bboxDrawn = Nothing
+                    , params = { oldParams | crop = Nothing }
+                    , paramsForm = { oldParamsForm | crop = { cropForm | active = False } }
+                  }
+                , Cmd.none
+                )
 
         _ ->
             ( model, Cmd.none )
