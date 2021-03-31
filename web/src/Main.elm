@@ -308,6 +308,7 @@ type PointerMsg
 type ViewImgMsg
     = SelectMovingMode
     | SelectDrawingMode
+    | CropCurrentFrame
 
 
 type ParamsMsg
@@ -580,6 +581,46 @@ update msg model =
 
         ( ViewImgMsg SelectDrawingMode, ViewImgs _ ) ->
             ( { model | pointerMode = WaitingDraw }, Cmd.none )
+
+        ( ViewImgMsg CropCurrentFrame, ViewImgs { images } ) ->
+            let
+                img =
+                    Pivot.getC images
+
+                ( left, top ) =
+                    model.viewer.origin
+
+                ( width, height ) =
+                    model.viewer.size
+
+                right =
+                    left + model.viewer.scale * width
+
+                bottom =
+                    top + model.viewer.scale * height
+            in
+            if
+                -- at least one corner inside the image
+                (right > 0)
+                    && (left < toFloat img.width)
+                    && (bottom > 0)
+                    && (top < toFloat img.height)
+            then
+                ( { model
+                    | bboxDrawn =
+                        Just
+                            { left = max 0 left
+                            , top = max 0 top
+                            , right = min (toFloat img.width) right
+                            , bottom = min (toFloat img.height) bottom
+                            }
+                  }
+                , Cmd.none
+                )
+
+            else
+                -- TODO: update parameters
+                ( { model | bboxDrawn = Nothing }, Cmd.none )
 
         _ ->
             ( model, Cmd.none )
@@ -1770,7 +1811,7 @@ viewImgs pointerMode bboxDrawn viewer images =
                 , modeButton isMovingMode (ViewImgMsg SelectMovingMode) "Move mode" Icon.move
                 , Element.el [ width (Element.maximum 100 fill) ] Element.none
                 , modeButton (not isMovingMode) (ViewImgMsg SelectDrawingMode) "Draw the cropped working area as a bounding box" Icon.boundingBox
-                , clickButton True NoMsg "Set the cropped working area to the current frame" Icon.maximize
+                , clickButton True (ViewImgMsg CropCurrentFrame) "Set the cropped working area to the current frame" Icon.maximize
                 ]
 
         imgSvgAttributes =
