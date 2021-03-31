@@ -59,6 +59,15 @@ type alias Model =
     , paramsInfo : ParametersToggleInfo
     , viewer : Viewer
     , pointerMode : PointerMode
+    , bboxDrawn : Maybe BBox
+    }
+
+
+type alias BBox =
+    { left : Float
+    , top : Float
+    , right : Float
+    , bottom : Float
     }
 
 
@@ -153,6 +162,7 @@ init size =
       , paramsInfo = defaultParamsInfo
       , viewer = Viewer.withSize ( size.width, size.height - toFloat headerHeight )
       , pointerMode = WaitingMove
+      , bboxDrawn = Nothing
       }
     , Cmd.none
     )
@@ -456,6 +466,7 @@ update msg model =
 
         ( PointerMsg pointerMsg, ViewImgs _ ) ->
             case ( pointerMsg, model.pointerMode ) of
+                -- Moving the viewer
                 ( PointerDownRaw event, WaitingMove ) ->
                     case Json.Decode.decodeValue Pointer.eventDecoder event of
                         Err _ ->
@@ -474,6 +485,69 @@ update msg model =
 
                 ( PointerUp _, PointerMovingFromClientCoords _ ) ->
                     ( { model | pointerMode = WaitingMove }, Cmd.none )
+
+                -- Drawing the cropped area
+                ( PointerDownRaw event, WaitingDraw ) ->
+                    case Json.Decode.decodeValue Pointer.eventDecoder event of
+                        Err _ ->
+                            ( model, Cmd.none )
+
+                        Ok { pointer } ->
+                            let
+                                ( oX, oY ) =
+                                    pointer.offsetPos
+                            in
+                            ( { model
+                                | pointerMode = PointerDrawFromOffsetAndClient pointer.offsetPos pointer.clientPos
+                                , bboxDrawn = Just { left = oX, top = oY, right = oX, bottom = oY }
+                              }
+                            , capture event
+                            )
+
+                ( PointerMove ( newX, newY ), PointerDrawFromOffsetAndClient ( oX, oY ) ( cX, cY ) ) ->
+                    let
+                        x =
+                            oX + newX - cX
+
+                        y =
+                            oY + newY - cY
+
+                        left =
+                            min oX x
+
+                        top =
+                            min oY y
+
+                        right =
+                            max oX x
+
+                        bottom =
+                            max oY y
+                    in
+                    ( { model | bboxDrawn = Just { left = left, top = top, right = right, bottom = bottom } }
+                    , Cmd.none
+                    )
+
+                ( PointerUp _, PointerDrawFromOffsetAndClient _ _ ) ->
+                    case model.bboxDrawn of
+                        Just { left, right, top, bottom } ->
+                            if right - left > 10 && bottom - top > 10 then
+                                ( { model
+                                    | pointerMode = WaitingDraw
+                                  }
+                                , Cmd.none
+                                )
+
+                            else
+                                ( { model
+                                    | pointerMode = WaitingDraw
+                                    , bboxDrawn = Nothing
+                                  }
+                                , Cmd.none
+                                )
+
+                        Nothing ->
+                            ( model, Cmd.none )
 
                 _ ->
                     ( model, Cmd.none )
@@ -828,7 +902,7 @@ viewElmUI model =
             viewLoading loadData
 
         ViewImgs { images } ->
-            viewImgs model.pointerMode model.viewer images
+            viewImgs model.pointerMode model.bboxDrawn model.viewer images
 
         Config { images } ->
             viewConfig model.params model.paramsForm model.paramsInfo
@@ -1604,8 +1678,8 @@ toggleCheckboxWidget { offColor, onColor, sliderColor, toggleWidth, toggleHeight
 -- View Images
 
 
-viewImgs : PointerMode -> Viewer -> Pivot Image -> Element Msg
-viewImgs pointerMode viewer images =
+viewImgs : PointerMode -> Maybe BBox -> Viewer -> Pivot Image -> Element Msg
+viewImgs pointerMode bboxDrawn viewer images =
     let
         img =
             Pivot.getC images
@@ -1690,6 +1764,40 @@ viewImgs pointerMode viewer images =
         viewerAttributes =
             Viewer.Svg.transform viewer
 
+        svgContent =
+            case bboxDrawn of
+                Nothing ->
+                    Svg.g [ viewerAttributes ] [ Svg.image imgSvgAttributes [] ]
+
+                Just { left, top, right, bottom } ->
+                    let
+                        ( bboxX, bboxY ) =
+                            Viewer.coordinatesAt ( left, top ) viewer
+
+                        bboxWidth =
+                            viewer.scale * (right - left)
+
+                        bboxHeight =
+                            viewer.scale * (bottom - top)
+
+                        strokeWidth =
+                            viewer.scale * 2
+                    in
+                    Svg.g [ viewerAttributes ]
+                        [ Svg.image imgSvgAttributes []
+                        , Svg.rect
+                            [ Svg.Attributes.x (String.fromFloat bboxX)
+                            , Svg.Attributes.y (String.fromFloat bboxY)
+                            , Svg.Attributes.width (String.fromFloat bboxWidth)
+                            , Svg.Attributes.height (String.fromFloat bboxHeight)
+                            , Svg.Attributes.fill "white"
+                            , Svg.Attributes.fillOpacity "0.3"
+                            , Svg.Attributes.stroke "red"
+                            , Svg.Attributes.strokeWidth (String.fromFloat strokeWidth)
+                            ]
+                            []
+                        ]
+
         svgViewer =
             Element.html <|
                 Svg.svg
@@ -1697,7 +1805,7 @@ viewImgs pointerMode viewer images =
                     , Html.Attributes.height (floor viewerHeight)
                     , Html.Attributes.style "pointer-events" "none"
                     ]
-                    [ Svg.g [ viewerAttributes ] [ Svg.image imgSvgAttributes [] ] ]
+                    [ svgContent ]
     in
     Element.column [ height fill ]
         [ headerBar
