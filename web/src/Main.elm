@@ -138,6 +138,8 @@ type alias ParametersToggleInfo =
 type PointerMode
     = WaitingMove
     | PointerMovingFromClientCoords ( Float, Float )
+    | WaitingDraw
+    | PointerDrawFromOffsetAndClient ( Float, Float ) ( Float, Float )
 
 
 {-| Initialize the model.
@@ -160,7 +162,8 @@ initialState : State
 initialState =
     -- Home Idle
     -- Config { images = Pivot.fromCons (Image "ferris" "https://opensource.com/sites/default/files/styles/teaser-wide/public/lead-images/rust_programming_crab_sea.png?itok=Nq53PhmO" 249 140) [] }
-    ViewImgs { images = Pivot.fromCons (Image "ferris" "https://opensource.com/sites/default/files/styles/teaser-wide/public/lead-images/rust_programming_crab_sea.png?itok=Nq53PhmO" 249 140) [] }
+    -- ViewImgs { images = Pivot.fromCons (Image "ferris" "https://opensource.com/sites/default/files/styles/teaser-wide/public/lead-images/rust_programming_crab_sea.png?itok=Nq53PhmO" 249 140) [] }
+    ViewImgs { images = Pivot.fromCons (Image "header" "/img/pano_bayeux.jpg" 2000 225) [] }
 
 
 defaultParams : Parameters
@@ -293,7 +296,8 @@ type PointerMsg
 
 
 type ViewImgMsg
-    = TODO
+    = SelectMovingMode
+    | SelectDrawingMode
 
 
 type ParamsMsg
@@ -468,11 +472,17 @@ update msg model =
                     , Cmd.none
                     )
 
-                ( PointerUp _, _ ) ->
+                ( PointerUp _, PointerMovingFromClientCoords _ ) ->
                     ( { model | pointerMode = WaitingMove }, Cmd.none )
 
                 _ ->
                     ( model, Cmd.none )
+
+        ( ViewImgMsg SelectMovingMode, ViewImgs _ ) ->
+            ( { model | pointerMode = WaitingMove }, Cmd.none )
+
+        ( ViewImgMsg SelectDrawingMode, ViewImgs _ ) ->
+            ( { model | pointerMode = WaitingDraw }, Cmd.none )
 
         _ ->
             ( model, Cmd.none )
@@ -818,7 +828,7 @@ viewElmUI model =
             viewLoading loadData
 
         ViewImgs { images } ->
-            viewImgs model.device model.viewer images
+            viewImgs model.pointerMode model.viewer images
 
         Config { images } ->
             viewConfig model.params model.paramsForm model.paramsInfo
@@ -1594,8 +1604,8 @@ toggleCheckboxWidget { offColor, onColor, sliderColor, toggleWidth, toggleHeight
 -- View Images
 
 
-viewImgs : Device -> Viewer -> Pivot Image -> Element Msg
-viewImgs device viewer images =
+viewImgs : PointerMode -> Viewer -> Pivot Image -> Element Msg
+viewImgs pointerMode viewer images =
     let
         img =
             Pivot.getC images
@@ -1641,14 +1651,28 @@ viewImgs device viewer images =
                 , label = icon 32
                 }
 
+        isMovingMode =
+            case pointerMode of
+                WaitingMove ->
+                    True
+
+                PointerMovingFromClientCoords _ ->
+                    True
+
+                WaitingDraw ->
+                    False
+
+                PointerDrawFromOffsetAndClient _ _ ->
+                    False
+
         buttonsRow =
             Element.row [ width fill ]
                 [ clickButton True (ZoomMsg (ZoomFit img)) "Fit zoom to image" Icon.zoomFit
                 , clickButton True (ZoomMsg ZoomOut) "Zoom out" Icon.zoomOut
                 , clickButton True (ZoomMsg ZoomIn) "Zoom in" Icon.zoomIn
-                , modeButton True NoMsg "Move mode" Icon.move
+                , modeButton isMovingMode (ViewImgMsg SelectMovingMode) "Move mode" Icon.move
                 , Element.el [ width (Element.maximum 100 fill) ] Element.none
-                , modeButton False NoMsg "Draw the cropped working area as a bounding box" Icon.boundingBox
+                , modeButton (not isMovingMode) (ViewImgMsg SelectDrawingMode) "Draw the cropped working area as a bounding box" Icon.boundingBox
                 , clickButton True NoMsg "Set the cropped working area to the current frame" Icon.maximize
                 , clickButton False NoMsg "Delete cropped working area" Icon.trash
                 ]
