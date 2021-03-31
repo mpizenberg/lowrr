@@ -464,7 +464,7 @@ update msg model =
         ( ZoomMsg zoomMsg, ViewImgs _ ) ->
             ( { model | viewer = zoomViewer zoomMsg model.viewer }, Cmd.none )
 
-        ( PointerMsg pointerMsg, ViewImgs _ ) ->
+        ( PointerMsg pointerMsg, ViewImgs { images } ) ->
             case ( pointerMsg, model.pointerMode ) of
                 -- Moving the viewer
                 ( PointerDownRaw event, WaitingMove ) ->
@@ -531,9 +531,30 @@ update msg model =
                 ( PointerUp _, PointerDrawFromOffsetAndClient _ _ ) ->
                     case model.bboxDrawn of
                         Just { left, right, top, bottom } ->
-                            if (right - left) / model.viewer.scale > 10 && (bottom - top) / model.viewer.scale > 10 then
+                            let
+                                img =
+                                    Pivot.getC images
+                            in
+                            if
+                                -- sufficient width
+                                ((right - left) / model.viewer.scale > 10)
+                                    -- sufficient height
+                                    && ((bottom - top) / model.viewer.scale > 10)
+                                    -- at least one corner inside the image
+                                    && (right > 0)
+                                    && (left < toFloat img.width)
+                                    && (bottom > 0)
+                                    && (top < toFloat img.height)
+                            then
                                 ( { model
                                     | pointerMode = WaitingDraw
+                                    , bboxDrawn =
+                                        Just
+                                            { left = max 0 left
+                                            , top = max 0 top
+                                            , right = min (toFloat img.width) right
+                                            , bottom = min (toFloat img.height) bottom
+                                            }
                                   }
                                 , Cmd.none
                                 )
@@ -542,6 +563,8 @@ update msg model =
                                 ( { model
                                     | pointerMode = WaitingDraw
                                     , bboxDrawn = Nothing
+
+                                    -- TODO: remove crop in parameters
                                   }
                                 , Cmd.none
                                 )
