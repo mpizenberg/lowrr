@@ -1748,7 +1748,6 @@ viewImgs pointerMode bboxDrawn viewer images =
                 , Element.el [ width (Element.maximum 100 fill) ] Element.none
                 , modeButton (not isMovingMode) (ViewImgMsg SelectDrawingMode) "Draw the cropped working area as a bounding box" Icon.boundingBox
                 , clickButton True NoMsg "Set the cropped working area to the current frame" Icon.maximize
-                , clickButton False NoMsg "Delete cropped working area" Icon.trash
                 ]
 
         imgSvgAttributes =
