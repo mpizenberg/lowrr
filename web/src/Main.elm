@@ -147,25 +147,25 @@ type PointerMode
 -}
 init : Device.Size -> ( Model, Cmd Msg )
 init size =
-    ( { state = initialState
-      , device = Device.classify size
-      , params = defaultParams
-      , paramsForm = defaultParamsForm
-      , paramsInfo = defaultParamsInfo
-      , viewer = Viewer.withSize ( size.width, size.height - toFloat headerHeight )
-      , pointerMode = WaitingMove
-      , bboxDrawn = Nothing
-      }
-    , Cmd.none
-    )
+    -- ( initialModel size
+    -- , Cmd.none
+    -- )
+    initialModel size
+        |> (\m -> { m | state = Loading { names = Set.singleton "img", loaded = Dict.empty } })
+        |> update (ImageDecoded { id = "img", url = "/img/pano_bayeux.jpg", width = 2000, height = 225 })
 
 
-initialState : State
-initialState =
-    -- Home Idle
-    -- Config { images = Pivot.fromCons (Image "ferris" "https://opensource.com/sites/default/files/styles/teaser-wide/public/lead-images/rust_programming_crab_sea.png?itok=Nq53PhmO" 249 140) [] }
-    -- ViewImgs { images = Pivot.fromCons (Image "ferris" "https://opensource.com/sites/default/files/styles/teaser-wide/public/lead-images/rust_programming_crab_sea.png?itok=Nq53PhmO" 249 140) [] }
-    ViewImgs { images = Pivot.fromCons (Image "header" "/img/pano_bayeux.jpg" 2000 225) [] }
+initialModel : Device.Size -> Model
+initialModel size =
+    { state = Home Idle
+    , device = Device.classify size
+    , params = defaultParams
+    , paramsForm = defaultParamsForm
+    , paramsInfo = defaultParamsInfo
+    , viewer = Viewer.withSize ( size.width, size.height - toFloat headerHeight )
+    , pointerMode = WaitingMove
+    , bboxDrawn = Nothing
+    }
 
 
 defaultParams : Parameters
@@ -377,6 +377,9 @@ update msg model =
                     { names = names
                     , loaded = Dict.insert img.id img loaded
                     }
+
+                oldParamsForm =
+                    model.paramsForm
             in
             if Set.size names == Dict.size updatedLoadingState.loaded then
                 case Dict.values updatedLoadingState.loaded of
@@ -388,6 +391,7 @@ update msg model =
                         ( { model
                             | state = ViewImgs { images = Pivot.fromCons firstImage otherImages }
                             , viewer = Viewer.fitImage 1.0 ( toFloat firstImage.width, toFloat firstImage.height ) model.viewer
+                            , paramsForm = { oldParamsForm | crop = CropForm.withSize firstImage.width firstImage.height }
                           }
                         , Cmd.none
                         )
@@ -520,42 +524,16 @@ update msg model =
                                     && (top < toFloat img.height)
                             then
                                 let
-                                    leftCrop =
-                                        max 0 left
-
-                                    topCrop =
-                                        max 0 top
-
-                                    rightCrop =
-                                        min (toFloat img.width) right
-
-                                    bottomCrop =
-                                        min (toFloat img.height) bottom
-
-                                    newCropParams =
-                                        { left = round leftCrop
-                                        , top = round topCrop
-                                        , right = round rightCrop
-                                        , bottom = round bottomCrop
-                                        }
-
                                     newCropForm =
-                                        CropForm.toggle True oldParamsForm.crop
-                                            |> CropForm.updateLeft (String.fromInt newCropParams.left)
-                                            |> CropForm.updateTop (String.fromInt newCropParams.top)
-                                            |> CropForm.updateRight (String.fromInt newCropParams.right)
-                                            |> CropForm.updateBottom (String.fromInt newCropParams.bottom)
+                                        snapBBox (BBox left top right bottom) oldParamsForm.crop
+
+                                    newCrop =
+                                        CropForm.decoded newCropForm
                                 in
                                 ( { model
                                     | pointerMode = WaitingDraw
-                                    , bboxDrawn =
-                                        Just
-                                            { left = leftCrop
-                                            , top = topCrop
-                                            , right = rightCrop
-                                            , bottom = bottomCrop
-                                            }
-                                    , params = { oldParams | crop = Just newCropParams }
+                                    , bboxDrawn = Maybe.map toBBox newCrop
+                                    , params = { oldParams | crop = newCrop }
                                     , paramsForm = { oldParamsForm | crop = newCropForm }
                                   }
                                 , Cmd.none
@@ -614,41 +592,15 @@ update msg model =
                     && (top < toFloat img.height)
             then
                 let
-                    leftCrop =
-                        max 0 left
-
-                    topCrop =
-                        max 0 top
-
-                    rightCrop =
-                        min (toFloat img.width) right
-
-                    bottomCrop =
-                        min (toFloat img.height) bottom
-
-                    newCropParams =
-                        { left = round leftCrop
-                        , top = round topCrop
-                        , right = round rightCrop
-                        , bottom = round bottomCrop
-                        }
-
                     newCropForm =
-                        CropForm.toggle True oldParamsForm.crop
-                            |> CropForm.updateLeft (String.fromInt newCropParams.left)
-                            |> CropForm.updateTop (String.fromInt newCropParams.top)
-                            |> CropForm.updateRight (String.fromInt newCropParams.right)
-                            |> CropForm.updateBottom (String.fromInt newCropParams.bottom)
+                        snapBBox (BBox left top right bottom) oldParamsForm.crop
+
+                    newCrop =
+                        CropForm.decoded newCropForm
                 in
                 ( { model
-                    | bboxDrawn =
-                        Just
-                            { left = leftCrop
-                            , top = topCrop
-                            , right = rightCrop
-                            , bottom = bottomCrop
-                            }
-                    , params = { oldParams | crop = Just newCropParams }
+                    | bboxDrawn = Maybe.map toBBox newCrop
+                    , params = { oldParams | crop = newCrop }
                     , paramsForm = { oldParamsForm | crop = newCropForm }
                   }
                 , Cmd.none
@@ -665,6 +617,47 @@ update msg model =
 
         _ ->
             ( model, Cmd.none )
+
+
+toBBox : Crop -> BBox
+toBBox { left, top, right, bottom } =
+    { left = toFloat left
+    , top = toFloat top
+    , right = toFloat right
+    , bottom = toFloat bottom
+    }
+
+
+{-| Restrict coordinates of a drawn bounding box to the image dimension.
+-}
+snapBBox : BBox -> CropForm.State -> CropForm.State
+snapBBox { left, top, right, bottom } state =
+    let
+        maxRight =
+            -- Should never be Nothing
+            Maybe.withDefault 0 state.right.max
+
+        maxBottom =
+            -- Should never be Nothing
+            Maybe.withDefault 0 state.bottom.max
+
+        leftCrop =
+            round (max 0 left)
+
+        topCrop =
+            round (max 0 top)
+
+        rightCrop =
+            min (round right) maxRight
+
+        bottomCrop =
+            min (round bottom) maxBottom
+    in
+    CropForm.toggle True state
+        |> CropForm.updateLeft (String.fromInt leftCrop)
+        |> CropForm.updateTop (String.fromInt topCrop)
+        |> CropForm.updateRight (String.fromInt rightCrop)
+        |> CropForm.updateBottom (String.fromInt bottomCrop)
 
 
 zoomViewer : ZoomMsg -> Viewer -> Viewer
