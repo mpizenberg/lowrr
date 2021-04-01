@@ -869,12 +869,20 @@ updateParams msg ({ params, paramsForm } as model) =
                     { model
                         | params = { params | crop = Just (Crop left top right bottom) }
                         , paramsForm = { paramsForm | crop = newCropForm }
+                        , bboxDrawn =
+                            Just
+                                { left = toFloat left
+                                , top = toFloat top
+                                , right = toFloat right
+                                , bottom = toFloat bottom
+                                }
                     }
 
                 _ ->
                     { model
                         | params = { params | crop = Nothing }
                         , paramsForm = { paramsForm | crop = newCropForm }
+                        , bboxDrawn = Nothing
                     }
 
         ChangeCropLeft str ->
