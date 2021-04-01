@@ -815,17 +815,11 @@ updateParams msg ({ params, paramsForm } as model) =
                     CropForm.toggle activeCrop paramsForm.crop
             in
             case ( activeCrop, CropForm.decoded newCropForm ) of
-                ( True, Just ({ left, top, right, bottom } as crop) ) ->
+                ( True, Just crop ) ->
                     { model
                         | params = { params | crop = Just crop }
                         , paramsForm = { paramsForm | crop = newCropForm }
-                        , bboxDrawn =
-                            Just
-                                { left = toFloat left
-                                , top = toFloat top
-                                , right = toFloat right
-                                , bottom = toFloat bottom
-                                }
+                        , bboxDrawn = Just (toBBox crop)
                     }
 
                 _ ->
@@ -836,44 +830,38 @@ updateParams msg ({ params, paramsForm } as model) =
                     }
 
         ChangeCropLeft str ->
-            let
-                newCropForm =
-                    CropForm.updateLeft str paramsForm.crop
-            in
-            { model
-                | params = { params | crop = CropForm.decoded newCropForm }
-                , paramsForm = { paramsForm | crop = newCropForm }
-            }
+            changeCropSide (CropForm.updateLeft str) model
 
         ChangeCropTop str ->
-            let
-                newCropForm =
-                    CropForm.updateTop str paramsForm.crop
-            in
-            { model
-                | params = { params | crop = CropForm.decoded newCropForm }
-                , paramsForm = { paramsForm | crop = newCropForm }
-            }
+            changeCropSide (CropForm.updateTop str) model
 
         ChangeCropRight str ->
-            let
-                newCropForm =
-                    CropForm.updateRight str paramsForm.crop
-            in
-            { model
-                | params = { params | crop = CropForm.decoded newCropForm }
-                , paramsForm = { paramsForm | crop = newCropForm }
-            }
+            changeCropSide (CropForm.updateRight str) model
 
         ChangeCropBottom str ->
-            let
-                newCropForm =
-                    CropForm.updateBottom str paramsForm.crop
-            in
-            { model
-                | params = { params | crop = CropForm.decoded newCropForm }
-                , paramsForm = { paramsForm | crop = newCropForm }
-            }
+            changeCropSide (CropForm.updateBottom str) model
+
+
+changeCropSide : (CropForm.State -> CropForm.State) -> Model -> Model
+changeCropSide updateSide model =
+    let
+        params =
+            model.params
+
+        paramsForm =
+            model.paramsForm
+
+        newCropForm =
+            updateSide paramsForm.crop
+
+        newCrop =
+            CropForm.decoded newCropForm
+    in
+    { model
+        | params = { params | crop = newCrop }
+        , paramsForm = { paramsForm | crop = newCropForm }
+        , bboxDrawn = Maybe.map toBBox newCrop
+    }
 
 
 updateParamsInfo : ParamsInfoMsg -> ParametersToggleInfo -> ParametersToggleInfo
