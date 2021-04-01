@@ -1,6 +1,7 @@
 port module Main exposing (main)
 
 import Browser
+import CropForm
 import Device exposing (Device)
 import Dict exposing (Dict)
 import Element exposing (Element, alignRight, centerX, centerY, fill, height, padding, paddingXY, spacing, width)
@@ -114,22 +115,13 @@ type alias Crop =
 
 
 type alias ParametersForm =
-    { crop : CropForm
+    { crop : CropForm.State
     , maxIterations : NumberInput.Field Int NumberInput.IntError
     , convergenceThreshold : NumberInput.Field Float NumberInput.FloatError
     , levels : NumberInput.Field Int NumberInput.IntError
     , sparse : NumberInput.Field Float NumberInput.FloatError
     , lambda : NumberInput.Field Float NumberInput.FloatError
     , rho : NumberInput.Field Float NumberInput.FloatError
-    }
-
-
-type alias CropForm =
-    { active : Bool
-    , left : NumberInput.Field Int NumberInput.IntError
-    , top : NumberInput.Field Int NumberInput.IntError
-    , right : NumberInput.Field Int NumberInput.IntError
-    , bottom : NumberInput.Field Int NumberInput.IntError
     }
 
 
@@ -198,7 +190,7 @@ defaultParamsForm =
         anyFloat =
             NumberInput.floatDefault
     in
-    { crop = defaultCropForm 1920 1080
+    { crop = CropForm.withSize 1920 1080
     , maxIterations =
         { anyInt | min = Just 1, max = Just 1000 }
             |> NumberInput.setDefaultIntValue defaultParams.maxIterations
@@ -229,28 +221,6 @@ defaultParamsForm =
         , input = String.fromFloat defaultParams.rho
         , decodedInput = Ok defaultParams.rho
         }
-    }
-
-
-defaultCropForm : Int -> Int -> CropForm
-defaultCropForm width height =
-    let
-        anyInt =
-            NumberInput.intDefault
-    in
-    { active = defaultParams.crop /= Nothing
-    , left =
-        { anyInt | min = Just 0, max = Just width }
-            |> NumberInput.setDefaultIntValue 0
-    , top =
-        { anyInt | min = Just 0, max = Just height }
-            |> NumberInput.setDefaultIntValue 0
-    , right =
-        { anyInt | min = Just 0, max = Just width }
-            |> NumberInput.setDefaultIntValue width
-    , bottom =
-        { anyInt | min = Just 0, max = Just height }
-            |> NumberInput.setDefaultIntValue height
     }
 
 
@@ -858,16 +828,13 @@ updateParams msg ({ params, paramsForm } as model) =
 
         ToggleCrop activeCrop ->
             let
-                oldCropForm =
-                    paramsForm.crop
-
                 newCropForm =
-                    { oldCropForm | active = activeCrop }
+                    CropForm.toggle activeCrop paramsForm.crop
             in
-            case ( activeCrop, ( newCropForm.left.decodedInput, newCropForm.right.decodedInput ), ( newCropForm.top.decodedInput, newCropForm.bottom.decodedInput ) ) of
-                ( True, ( Ok left, Ok right ), ( Ok top, Ok bottom ) ) ->
+            case ( activeCrop, CropForm.decoded newCropForm ) of
+                ( True, Just ({ left, top, right, bottom } as crop) ) ->
                     { model
-                        | params = { params | crop = Just (Crop left top right bottom) }
+                        | params = { params | crop = Just crop }
                         , paramsForm = { paramsForm | crop = newCropForm }
                         , bboxDrawn =
                             Just
@@ -887,155 +854,43 @@ updateParams msg ({ params, paramsForm } as model) =
 
         ChangeCropLeft str ->
             let
-                oldCropForm =
-                    paramsForm.crop
-
-                newLeft =
-                    NumberInput.updateInt str oldCropForm.left
+                newCropForm =
+                    CropForm.updateLeft str paramsForm.crop
             in
-            case ( oldCropForm.active, newLeft.decodedInput ) of
-                ( True, Ok left ) ->
-                    let
-                        newRight =
-                            NumberInput.setMinBound (Just left) oldCropForm.right
-                                |> NumberInput.updateInt oldCropForm.right.input
-
-                        newCropForm =
-                            { oldCropForm | left = newLeft, right = newRight }
-
-                        newCrop =
-                            case ( newRight.decodedInput, oldCropForm.top.decodedInput, oldCropForm.bottom.decodedInput ) of
-                                ( Ok right, Ok top, Ok bottom ) ->
-                                    Just (Crop left top right bottom)
-
-                                _ ->
-                                    Nothing
-                    in
-                    { model
-                        | params = { params | crop = newCrop }
-                        , paramsForm = { paramsForm | crop = newCropForm }
-                    }
-
-                ( True, Err _ ) ->
-                    { model
-                        | params = { params | crop = Nothing }
-                        , paramsForm = { paramsForm | crop = { oldCropForm | left = newLeft } }
-                    }
-
-                ( False, _ ) ->
-                    model
+            { model
+                | params = { params | crop = CropForm.decoded newCropForm }
+                , paramsForm = { paramsForm | crop = newCropForm }
+            }
 
         ChangeCropTop str ->
             let
-                oldCropForm =
-                    paramsForm.crop
-
-                newTop =
-                    NumberInput.updateInt str oldCropForm.top
+                newCropForm =
+                    CropForm.updateTop str paramsForm.crop
             in
-            case ( oldCropForm.active, newTop.decodedInput ) of
-                ( True, Ok top ) ->
-                    let
-                        newBottom =
-                            NumberInput.setMinBound (Just top) oldCropForm.bottom
-                                |> NumberInput.updateInt oldCropForm.bottom.input
-
-                        newCropForm =
-                            { oldCropForm | top = newTop, bottom = newBottom }
-
-                        newCrop =
-                            case ( newBottom.decodedInput, oldCropForm.left.decodedInput, oldCropForm.right.decodedInput ) of
-                                ( Ok bottom, Ok left, Ok right ) ->
-                                    Just (Crop left top right bottom)
-
-                                _ ->
-                                    Nothing
-                    in
-                    { model
-                        | params = { params | crop = newCrop }
-                        , paramsForm = { paramsForm | crop = newCropForm }
-                    }
-
-                ( True, Err _ ) ->
-                    { model
-                        | params = { params | crop = Nothing }
-                        , paramsForm = { paramsForm | crop = { oldCropForm | top = newTop } }
-                    }
-
-                ( False, _ ) ->
-                    model
+            { model
+                | params = { params | crop = CropForm.decoded newCropForm }
+                , paramsForm = { paramsForm | crop = newCropForm }
+            }
 
         ChangeCropRight str ->
             let
-                oldCropForm =
-                    paramsForm.crop
-
-                newRight =
-                    NumberInput.updateInt str oldCropForm.right
+                newCropForm =
+                    CropForm.updateRight str paramsForm.crop
             in
-            case ( oldCropForm.active, newRight.decodedInput ) of
-                ( True, Ok right ) ->
-                    let
-                        newCropForm =
-                            { oldCropForm | right = newRight }
-
-                        newCrop =
-                            case ( oldCropForm.left.decodedInput, oldCropForm.top.decodedInput, oldCropForm.bottom.decodedInput ) of
-                                ( Ok left, Ok top, Ok bottom ) ->
-                                    Just (Crop left top right bottom)
-
-                                _ ->
-                                    Nothing
-                    in
-                    { model
-                        | params = { params | crop = newCrop }
-                        , paramsForm = { paramsForm | crop = newCropForm }
-                    }
-
-                ( True, Err _ ) ->
-                    { model
-                        | params = { params | crop = Nothing }
-                        , paramsForm = { paramsForm | crop = { oldCropForm | right = newRight } }
-                    }
-
-                ( False, _ ) ->
-                    model
+            { model
+                | params = { params | crop = CropForm.decoded newCropForm }
+                , paramsForm = { paramsForm | crop = newCropForm }
+            }
 
         ChangeCropBottom str ->
             let
-                oldCropForm =
-                    paramsForm.crop
-
-                newBottom =
-                    NumberInput.updateInt str oldCropForm.bottom
+                newCropForm =
+                    CropForm.updateBottom str paramsForm.crop
             in
-            case ( oldCropForm.active, newBottom.decodedInput ) of
-                ( True, Ok bottom ) ->
-                    let
-                        newCropForm =
-                            { oldCropForm | bottom = newBottom }
-
-                        newCrop =
-                            case ( oldCropForm.left.decodedInput, oldCropForm.top.decodedInput, oldCropForm.right.decodedInput ) of
-                                ( Ok left, Ok top, Ok right ) ->
-                                    Just (Crop left top right bottom)
-
-                                _ ->
-                                    Nothing
-                    in
-                    { model
-                        | params = { params | crop = newCrop }
-                        , paramsForm = { paramsForm | crop = newCropForm }
-                    }
-
-                ( True, Err _ ) ->
-                    { model
-                        | params = { params | crop = Nothing }
-                        , paramsForm = { paramsForm | crop = { oldCropForm | bottom = newBottom } }
-                    }
-
-                ( False, _ ) ->
-                    model
+            { model
+                | params = { params | crop = CropForm.decoded newCropForm }
+                , paramsForm = { paramsForm | crop = newCropForm }
+            }
 
 
 updateParamsInfo : ParamsInfoMsg -> ParametersToggleInfo -> ParametersToggleInfo
@@ -1253,8 +1108,14 @@ viewConfig params paramsForm paramsInfo =
                     , toggle (ParamsMsg << ToggleCrop) paramsForm.crop.active 30 "Toggle cropped working frame"
                     , Element.text "on"
                     ]
-                , cropBox paramsForm.crop
-                , cropBoxErrors paramsForm.crop
+                , CropForm.boxEditor
+                    { changeLeft = ParamsMsg << ChangeCropLeft
+                    , changeTop = ParamsMsg << ChangeCropTop
+                    , changeRight = ParamsMsg << ChangeCropRight
+                    , changeBottom = ParamsMsg << ChangeCropBottom
+                    }
+                    paramsForm.crop
+                , displayErrors (CropForm.errors paramsForm.crop)
                 ]
 
             -- Equalize mean intensities
@@ -1423,7 +1284,7 @@ runButton : ParametersForm -> Element Msg
 runButton paramsForm =
     let
         hasNoError =
-            List.isEmpty (allCropErrors paramsForm.crop)
+            List.isEmpty (CropForm.errors paramsForm.crop)
                 && isOk paramsForm.maxIterations.decodedInput
                 && isOk paramsForm.convergenceThreshold.decodedInput
                 && isOk paramsForm.levels.decodedInput
@@ -1467,37 +1328,6 @@ isOk result =
 -- Crop input
 
 
-cropBoxErrors : CropForm -> Element Msg
-cropBoxErrors cropForm =
-    displayErrors (allCropErrors cropForm)
-
-
-allCropErrors : CropForm -> List String
-allCropErrors cropForm =
-    if not cropForm.active then
-        []
-
-    else
-        let
-            errorLeft =
-                errorsList cropForm.left.decodedInput
-                    |> List.map (NumberInput.intErrorToString { valueName = "Left" })
-
-            errorTop =
-                errorsList cropForm.top.decodedInput
-                    |> List.map (NumberInput.intErrorToString { valueName = "Top" })
-
-            errorRight =
-                errorsList cropForm.right.decodedInput
-                    |> List.map (NumberInput.intErrorToString { valueName = "Right" })
-
-            errorBottom =
-                errorsList cropForm.bottom.decodedInput
-                    |> List.map (NumberInput.intErrorToString { valueName = "Bottom" })
-        in
-        errorLeft ++ errorTop ++ errorRight ++ errorBottom
-
-
 displayErrors : List String -> Element msg
 displayErrors errors =
     if List.isEmpty errors then
@@ -1506,112 +1336,6 @@ displayErrors errors =
     else
         Element.column [ spacing 10, Element.Font.size 14, Element.Font.color Style.errorColor ]
             (List.map (\err -> Element.paragraph [] [ Element.text err ]) errors)
-
-
-errorsList : Result (List err) ok -> List err
-errorsList result =
-    case result of
-        Err list ->
-            list
-
-        Ok _ ->
-            []
-
-
-cropBox : CropForm -> Element Msg
-cropBox cropForm =
-    if not cropForm.active then
-        Element.none
-
-    else
-        Element.el [ width fill, padding 4 ] <|
-            Element.el
-                [ centerX
-                , centerY
-                , paddingXY 48 20
-                , Element.Border.dashed
-                , Element.Border.width 2
-                , Element.onLeft
-                    (Element.el (Element.moveRight 30 :: onBorderAttributes)
-                        (cropField "left" (ParamsMsg << ChangeCropLeft) cropForm.left)
-                    )
-                , Element.above
-                    (Element.el (Element.moveDown 12 :: onBorderAttributes)
-                        (cropField "top" (ParamsMsg << ChangeCropTop) cropForm.top)
-                    )
-                , Element.onRight
-                    (Element.el (Element.moveLeft 30 :: onBorderAttributes)
-                        (cropField "right" (ParamsMsg << ChangeCropRight) cropForm.right)
-                    )
-                , Element.below
-                    (Element.el (Element.moveUp 14 :: onBorderAttributes)
-                        (cropField "bottom" (ParamsMsg << ChangeCropBottom) cropForm.bottom)
-                    )
-                ]
-                (Element.el [ Element.Font.size 12 ] <|
-                    case ( decodedCropWidth cropForm, decodedCropHeight cropForm ) of
-                        ( Just cropWidth, Just cropHeight ) ->
-                            Element.text (String.fromInt cropWidth ++ " x " ++ String.fromInt cropHeight)
-
-                        ( Nothing, Just cropHeight ) ->
-                            Element.text ("? x " ++ String.fromInt cropHeight)
-
-                        ( Just cropWidth, Nothing ) ->
-                            Element.text (String.fromInt cropWidth ++ " x ?")
-
-                        ( Nothing, Nothing ) ->
-                            Element.text "? x ?"
-                )
-
-
-decodedCropWidth : CropForm -> Maybe Int
-decodedCropWidth cropForm =
-    case ( cropForm.left.decodedInput, cropForm.right.decodedInput ) of
-        ( Ok left, Ok right ) ->
-            Just (right - left)
-
-        _ ->
-            Nothing
-
-
-decodedCropHeight : CropForm -> Maybe Int
-decodedCropHeight cropForm =
-    case ( cropForm.top.decodedInput, cropForm.bottom.decodedInput ) of
-        ( Ok top, Ok bottom ) ->
-            Just (bottom - top)
-
-        _ ->
-            Nothing
-
-
-onBorderAttributes : List (Element.Attribute msg)
-onBorderAttributes =
-    [ centerX, centerY, Element.Background.color Style.white ]
-
-
-cropField : String -> (String -> msg) -> NumberInput.Field Int NumberInput.IntError -> Element msg
-cropField label msgTag field =
-    let
-        fontColor =
-            case field.decodedInput of
-                Ok _ ->
-                    Style.black
-
-                Err _ ->
-                    Style.errorColor
-    in
-    Element.Input.text
-        [ paddingXY 0 4
-        , width (Element.px 60)
-        , Element.Border.width 0
-        , Element.Font.center
-        , Element.Font.color fontColor
-        ]
-        { onChange = msgTag
-        , text = field.input
-        , placeholder = Nothing
-        , label = Element.Input.labelHidden label
-        }
 
 
 
