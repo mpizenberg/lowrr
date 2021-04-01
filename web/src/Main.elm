@@ -540,12 +540,11 @@ update msg model =
                                         }
 
                                     newCropForm =
-                                        { active = True
-                                        , left = NumberInput.updateInt (String.fromInt newCropParams.left) model.paramsForm.crop.left
-                                        , top = NumberInput.updateInt (String.fromInt newCropParams.top) model.paramsForm.crop.top
-                                        , right = NumberInput.updateInt (String.fromInt newCropParams.right) model.paramsForm.crop.right
-                                        , bottom = NumberInput.updateInt (String.fromInt newCropParams.bottom) model.paramsForm.crop.bottom
-                                        }
+                                        CropForm.toggle True oldParamsForm.crop
+                                            |> CropForm.updateLeft (String.fromInt newCropParams.left)
+                                            |> CropForm.updateTop (String.fromInt newCropParams.top)
+                                            |> CropForm.updateRight (String.fromInt newCropParams.right)
+                                            |> CropForm.updateBottom (String.fromInt newCropParams.bottom)
                                 in
                                 ( { model
                                     | pointerMode = WaitingDraw
@@ -563,15 +562,11 @@ update msg model =
                                 )
 
                             else
-                                let
-                                    cropForm =
-                                        oldParamsForm.crop
-                                in
                                 ( { model
                                     | pointerMode = WaitingDraw
                                     , bboxDrawn = Nothing
                                     , params = { oldParams | crop = Nothing }
-                                    , paramsForm = { oldParamsForm | crop = { cropForm | active = False } }
+                                    , paramsForm = { oldParamsForm | crop = CropForm.toggle False oldParamsForm.crop }
                                   }
                                 , Cmd.none
                                 )
@@ -639,12 +634,11 @@ update msg model =
                         }
 
                     newCropForm =
-                        { active = True
-                        , left = NumberInput.updateInt (String.fromInt newCropParams.left) model.paramsForm.crop.left
-                        , top = NumberInput.updateInt (String.fromInt newCropParams.top) model.paramsForm.crop.top
-                        , right = NumberInput.updateInt (String.fromInt newCropParams.right) model.paramsForm.crop.right
-                        , bottom = NumberInput.updateInt (String.fromInt newCropParams.bottom) model.paramsForm.crop.bottom
-                        }
+                        CropForm.toggle True oldParamsForm.crop
+                            |> CropForm.updateLeft (String.fromInt newCropParams.left)
+                            |> CropForm.updateTop (String.fromInt newCropParams.top)
+                            |> CropForm.updateRight (String.fromInt newCropParams.right)
+                            |> CropForm.updateBottom (String.fromInt newCropParams.bottom)
                 in
                 ( { model
                     | bboxDrawn =
@@ -661,14 +655,10 @@ update msg model =
                 )
 
             else
-                let
-                    cropForm =
-                        oldParamsForm.crop
-                in
                 ( { model
                     | bboxDrawn = Nothing
                     , params = { oldParams | crop = Nothing }
-                    , paramsForm = { oldParamsForm | crop = { cropForm | active = False } }
+                    , paramsForm = { oldParamsForm | crop = CropForm.toggle False oldParamsForm.crop }
                   }
                 , Cmd.none
                 )
