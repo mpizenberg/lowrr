@@ -4,7 +4,7 @@ import Browser
 import CropForm
 import Device exposing (Device)
 import Dict exposing (Dict)
-import Element exposing (Element, alignRight, centerX, centerY, fill, height, padding, paddingXY, spacing, width)
+import Element exposing (Element, alignBottom, alignLeft, alignRight, centerX, centerY, fill, height, padding, paddingXY, spacing, width)
 import Element.Background
 import Element.Border
 import Element.Font
@@ -147,9 +147,7 @@ type PointerMode
 -}
 init : Device.Size -> ( Model, Cmd Msg )
 init size =
-    -- ( initialModel size
-    -- , Cmd.none
-    -- )
+    -- ( initialModel size, Cmd.none)
     initialModel size
         |> (\m -> { m | state = Loading { names = Set.singleton "img", loaded = Dict.empty } })
         |> update (ImageDecoded { id = "img", url = "/img/pano_bayeux.jpg", width = 2000, height = 225 })
@@ -279,6 +277,8 @@ type ViewImgMsg
     = SelectMovingMode
     | SelectDrawingMode
     | CropCurrentFrame
+    | ClickPreviousImage
+    | ClickNextImage
 
 
 type ParamsMsg
@@ -555,12 +555,6 @@ update msg model =
                 _ ->
                     ( model, Cmd.none )
 
-        ( ViewImgMsg SelectMovingMode, ViewImgs _ ) ->
-            ( { model | pointerMode = WaitingMove }, Cmd.none )
-
-        ( ViewImgMsg SelectDrawingMode, ViewImgs _ ) ->
-            ( { model | pointerMode = WaitingDraw }, Cmd.none )
-
         ( ViewImgMsg CropCurrentFrame, ViewImgs { images } ) ->
             let
                 img =
@@ -614,6 +608,26 @@ update msg model =
                   }
                 , Cmd.none
                 )
+
+        ( ViewImgMsg SelectMovingMode, ViewImgs _ ) ->
+            ( { model | pointerMode = WaitingMove }, Cmd.none )
+
+        ( ViewImgMsg SelectDrawingMode, ViewImgs _ ) ->
+            ( { model | pointerMode = WaitingDraw }, Cmd.none )
+
+        ( ViewImgMsg ClickPreviousImage, ViewImgs { images } ) ->
+            let
+                previousImage =
+                    Maybe.withDefault (Pivot.goToEnd images) (Pivot.goL images)
+            in
+            ( { model | state = ViewImgs { images = previousImage } }, Cmd.none )
+
+        ( ViewImgMsg ClickNextImage, ViewImgs { images } ) ->
+            let
+                nextImage =
+                    Maybe.withDefault (Pivot.goToStart images) (Pivot.goR images)
+            in
+            ( { model | state = ViewImgs { images = nextImage } }, Cmd.none )
 
         _ ->
             ( model, Cmd.none )
@@ -1560,7 +1574,7 @@ viewImgs pointerMode bboxDrawn viewer images =
         img =
             Pivot.getC images
 
-        clickButton abled msg title icon =
+        clickButton alignment abled msg title icon =
             let
                 strokeColor =
                     if abled then
@@ -1571,7 +1585,7 @@ viewImgs pointerMode bboxDrawn viewer images =
             in
             Element.Input.button
                 [ padding 6
-                , centerX
+                , alignment
                 , Element.Background.color (Element.rgba255 255 255 255 0.8)
                 , Element.Font.color strokeColor
                 , Element.htmlAttribute <| Html.Attributes.style "box-shadow" "none"
@@ -1617,13 +1631,13 @@ viewImgs pointerMode bboxDrawn viewer images =
 
         buttonsRow =
             Element.row [ width fill ]
-                [ clickButton True (ZoomMsg (ZoomFit img)) "Fit zoom to image" Icon.zoomFit
-                , clickButton True (ZoomMsg ZoomOut) "Zoom out" Icon.zoomOut
-                , clickButton True (ZoomMsg ZoomIn) "Zoom in" Icon.zoomIn
+                [ clickButton centerX True (ZoomMsg (ZoomFit img)) "Fit zoom to image" Icon.zoomFit
+                , clickButton centerX True (ZoomMsg ZoomOut) "Zoom out" Icon.zoomOut
+                , clickButton centerX True (ZoomMsg ZoomIn) "Zoom in" Icon.zoomIn
                 , modeButton isMovingMode (ViewImgMsg SelectMovingMode) "Move mode" Icon.move
                 , Element.el [ width (Element.maximum 100 fill) ] Element.none
                 , modeButton (not isMovingMode) (ViewImgMsg SelectDrawingMode) "Draw the cropped working area as a bounding box" Icon.boundingBox
-                , clickButton True (ViewImgMsg CropCurrentFrame) "Set the cropped working area to the current frame" Icon.maximize
+                , clickButton centerX True (ViewImgMsg CropCurrentFrame) "Set the cropped working area to the current frame" Icon.maximize
                 ]
 
         imgSvgAttributes =
@@ -1702,6 +1716,12 @@ viewImgs pointerMode bboxDrawn viewer images =
                 [ Html.text ".pixelated { image-rendering: pixelated; image-rendering: crisp-edges; }" ]
         , Element.el
             [ Element.inFront buttonsRow
+            , Element.inFront
+                (Element.row [ alignBottom, width fill ]
+                    [ clickButton alignLeft True (ViewImgMsg ClickPreviousImage) "Previous image" Icon.arrowLeftCircle
+                    , clickButton alignRight True (ViewImgMsg ClickNextImage) "Next image" Icon.arrowRightCircle
+                    ]
+                )
             , Element.clip
             , height fill
             ]
