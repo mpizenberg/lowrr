@@ -504,7 +504,7 @@ update msg model =
                         Just { left, right, top, bottom } ->
                             let
                                 img =
-                                    Pivot.getC images
+                                    Pivot.getC (Pivot.goToStart images)
 
                                 oldParams =
                                     model.params
@@ -564,7 +564,7 @@ update msg model =
         ( ViewImgMsg CropCurrentFrame, ViewImgs { images } ) ->
             let
                 img =
-                    Pivot.getC images
+                    Pivot.getC (Pivot.goToStart images)
 
                 ( left, top ) =
                     model.viewer.origin
