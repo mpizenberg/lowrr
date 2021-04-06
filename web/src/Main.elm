@@ -61,6 +61,7 @@ type alias Model =
     , viewer : Viewer
     , pointerMode : PointerMode
     , bboxDrawn : Maybe BBox
+    , registeredImages : Maybe (Pivot Image)
     }
 
 
@@ -163,6 +164,7 @@ initialModel size =
     , viewer = Viewer.withSize ( size.width, size.height - toFloat headerHeight )
     , pointerMode = WaitingMove
     , bboxDrawn = Nothing
+    , registeredImages = Nothing
     }
 
 
@@ -929,7 +931,7 @@ viewElmUI model =
             viewConfig model.params model.paramsForm model.paramsInfo
 
         Registration { images } ->
-            viewRegistration
+            viewRegistration model.registeredImages
 
         Logs { images } ->
             viewLogs
@@ -1045,15 +1047,22 @@ viewLogs =
 -- Registration
 
 
-viewRegistration : Element Msg
-viewRegistration =
-    Element.column [ width fill ]
+viewRegistration : Maybe (Pivot Image) -> Element Msg
+viewRegistration maybeImages =
+    Element.column [ width fill, height fill ]
         [ headerBar
             [ ( PageImages, False )
             , ( PageConfig, False )
             , ( PageRegistration, True )
             , ( PageLogs, False )
             ]
+        , case maybeImages of
+            Nothing ->
+                Element.el [ centerX, centerY ]
+                    (Element.text "Registration not done yet")
+
+            Just images ->
+                Debug.todo "viewregistration"
         ]
 
 
