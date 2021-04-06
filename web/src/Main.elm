@@ -1072,7 +1072,7 @@ pageHeaderElement current page =
 
 viewLogs : List { lvl : Int, content : String } -> Element Msg
 viewLogs logs =
-    Element.column [ width fill ]
+    Element.column [ width fill, height fill ]
         [ headerBar
             [ ( PageImages, False )
             , ( PageConfig, False )
@@ -1081,9 +1081,13 @@ viewLogs logs =
             ]
         , Element.column
             [ padding 18
-            , width (Element.px 400)
+            , height fill
+            , width fill
+
+            -- , width (Element.px 400)
+            , centerX
             , Element.Font.size 18
-            , Element.centerX
+            , Element.scrollbars
             ]
             (List.map viewLog (List.reverse logs))
         ]

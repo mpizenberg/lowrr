@@ -42,11 +42,23 @@ export function activatePorts(app, containerSize) {
   app.ports.run.subscribe(async (params) => {
     // run the algorithm with the provided parameters.
     sendLog(0, "The registration algorithm just started.");
+    sendLog(
+      0,
+      "Long long long long long long long long long long long long long long long long long long message."
+    );
+    sendLog(
+      1,
+      "Long long long long long long long long long long long long long long long long long long message."
+    );
+    sendLog(
+      0,
+      "Long long long long long long long long long long long long long long long long long long message."
+    );
 
     // Simulate processing.
     for (let progress = 0; progress < 100; progress++) {
       sendLog(1, `progress: ${progress} / 100`);
-      await sleep(100);
+      await sleep(50);
     }
   });
 
