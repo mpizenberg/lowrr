@@ -52,7 +52,7 @@ export function activatePorts(app, containerSize) {
     );
     sendLog(
       0,
-      "Long long long long long long long long long long long long long long long long long long message."
+      "Long long long long long long long long long long\n\n\nmultiline\n   long long long long long long long long message."
     );
 
     // Simulate processing.

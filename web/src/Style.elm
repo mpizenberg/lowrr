@@ -1,12 +1,12 @@
 module Style exposing
-    ( font
+    ( font, fontMonospace
     , dropColor, errorColor
     , black, white, almostWhite, lightGrey, green
     )
 
 {-| Style of our application
 
-@docs font
+@docs font, fontMonospace
 
 @docs dropColor, errorColor
 
@@ -23,6 +23,14 @@ font =
     Font.family
         [ Font.typeface "Open Sans"
         , Font.sansSerif
+        ]
+
+
+fontMonospace : Element.Attribute msg
+fontMonospace =
+    Font.family
+        [ Font.typeface "Inconsolata"
+        , Font.monospace
         ]
 
 

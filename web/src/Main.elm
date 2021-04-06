@@ -1083,9 +1083,8 @@ viewLogs logs =
             [ padding 18
             , height fill
             , width fill
-
-            -- , width (Element.px 400)
             , centerX
+            , Style.fontMonospace
             , Element.Font.size 18
             , Element.scrollbars
             ]
