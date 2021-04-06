@@ -34,13 +34,20 @@ export function activatePorts(app, containerSize) {
     event.target.setPointerCapture(event.pointerId);
   });
 
+  function sendLog(lvl, content) {
+    app.ports.log.send({ lvl, content });
+  }
+
   // Run the registration algorithm.
-  app.ports.run.subscribe((params) => {
+  app.ports.run.subscribe(async (params) => {
     // run the algorithm with the provided parameters.
-    app.ports.log.send({
-      lvl: 0,
-      content: "The registration algorithm just started.",
-    });
+    sendLog(0, "The registration algorithm just started.");
+
+    // Simulate processing.
+    for (let progress = 0; progress < 100; progress++) {
+      sendLog(1, `progress: ${progress} / 100`);
+      await sleep(100);
+    }
   });
 
   // Replace elm Browser.onAnimationFrameDelta that seems to have timing issues.

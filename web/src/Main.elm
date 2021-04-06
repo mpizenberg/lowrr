@@ -1085,7 +1085,7 @@ viewLogs logs =
             , Element.Font.size 18
             , Element.centerX
             ]
-            (List.map viewLog logs)
+            (List.map viewLog (List.reverse logs))
         ]
 
 
