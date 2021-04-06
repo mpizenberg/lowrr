@@ -70,6 +70,7 @@ type alias Model =
     , bboxDrawn : Maybe BBox
     , registeredImages : Maybe (Pivot Image)
     , logs : List { lvl : Int, content : String }
+    , verbosity : Int
     }
 
 
@@ -196,6 +197,7 @@ initialModel size =
     , bboxDrawn = Nothing
     , registeredImages = Nothing
     , logs = []
+    , verbosity = 4
     }
 
 
@@ -285,6 +287,7 @@ type Msg
     | PointerMsg PointerMsg
     | RunAlgorithm Parameters
     | Log { lvl : Int, content : String }
+    | VerbosityChange Float
 
 
 type DragDropMsg
@@ -670,6 +673,9 @@ update msg model =
         ( Log logData, _ ) ->
             ( { model | logs = logData :: model.logs }, Cmd.none )
 
+        ( VerbosityChange floatVerbosity, _ ) ->
+            ( { model | verbosity = round floatVerbosity }, Cmd.none )
+
         _ ->
             ( model, Cmd.none )
 
@@ -973,7 +979,7 @@ viewElmUI model =
             viewRegistration model.registeredImages
 
         Logs { images } ->
-            viewLogs model.logs
+            viewLogs model.verbosity model.logs
 
 
 
@@ -1070,8 +1076,8 @@ pageHeaderElement current page =
 -- Logs
 
 
-viewLogs : List { lvl : Int, content : String } -> Element Msg
-viewLogs logs =
+viewLogs : Int -> List { lvl : Int, content : String } -> Element Msg
+viewLogs verbosity logs =
     Element.column [ width fill, height fill ]
         [ headerBar
             [ ( PageImages, False )
@@ -1079,6 +1085,7 @@ viewLogs logs =
             , ( PageRegistration, False )
             , ( PageLogs, True )
             ]
+        , Element.el [ centerX, paddingXY 0 18 ] (verbositySlider verbosity)
         , Element.column
             [ padding 18
             , height fill
@@ -1088,13 +1095,43 @@ viewLogs logs =
             , Element.Font.size 18
             , Element.scrollbars
             ]
-            (List.map viewLog (List.reverse logs))
+            (List.filter (\l -> l.lvl <= verbosity) logs
+                |> List.reverse
+                |> List.map viewLog
+            )
         ]
 
 
 viewLog : { lvl : Int, content : String } -> Element msg
 viewLog { lvl, content } =
     Element.text content
+
+
+verbositySlider : Int -> Element Msg
+verbositySlider verbosity =
+    Element.Input.slider
+        [ width (Element.px 200)
+        , spacing 18
+
+        -- Here is where we're creating/styling the "track"
+        , Element.behindContent <|
+            Element.el
+                [ width fill
+                , height (Element.px 2)
+                , centerY
+                , Element.Background.color Style.lightGrey
+                , Element.Border.rounded 2
+                ]
+                Element.none
+        ]
+        { onChange = VerbosityChange
+        , label = Element.Input.labelLeft [ centerY, Element.Font.size 18 ] (Element.text "Verbosity")
+        , min = 0
+        , max = 4
+        , step = Just 1
+        , value = toFloat verbosity
+        , thumb = Element.Input.defaultThumb
+        }
 
 
 
