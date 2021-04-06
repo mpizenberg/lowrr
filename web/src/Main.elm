@@ -17,6 +17,7 @@ import Html.Events.Extra.Pointer as Pointer
 import Html.Events.Extra.Wheel as Wheel
 import Icon
 import Json.Decode exposing (Decoder, Value)
+import Json.Encode
 import Keyboard exposing (RawKey)
 import NumberInput
 import Pivot exposing (Pivot)
@@ -39,6 +40,9 @@ port imageDecoded : (Image -> msg) -> Sub msg
 
 
 port capture : Value -> Cmd msg
+
+
+port run : Value -> Cmd msg
 
 
 main : Program Device.Size Model Msg
@@ -107,12 +111,34 @@ type alias Parameters =
     }
 
 
+encodeParams : Parameters -> Value
+encodeParams params =
+    Json.Encode.object
+        [ ( "crop", encodeMaybe encodeCrop params.crop )
+        ]
+
+
+encodeMaybe : (a -> Value) -> Maybe a -> Value
+encodeMaybe encoder data =
+    Maybe.withDefault Json.Encode.null (Maybe.map encoder data)
+
+
 type alias Crop =
     { left : Int
     , top : Int
     , right : Int
     , bottom : Int
     }
+
+
+encodeCrop : Crop -> Value
+encodeCrop { left, top, right, bottom } =
+    Json.Encode.object
+        [ ( "left", Json.Encode.int left )
+        , ( "top", Json.Encode.int top )
+        , ( "right", Json.Encode.int right )
+        , ( "bottom", Json.Encode.int bottom )
+        ]
 
 
 type alias ParametersForm =
@@ -252,6 +278,7 @@ type Msg
     | ParamsInfoMsg ParamsInfoMsg
     | NavigationMsg NavigationMsg
     | PointerMsg PointerMsg
+    | RunAlgorithm Parameters
 
 
 type DragDropMsg
@@ -630,6 +657,9 @@ update msg model =
                     Maybe.withDefault (Pivot.goToStart images) (Pivot.goR images)
             in
             ( { model | state = ViewImgs { images = nextImage } }, Cmd.none )
+
+        ( RunAlgorithm params, Config imgs ) ->
+            ( { model | state = Logs imgs }, run (encodeParams params) )
 
         _ ->
             ( model, Cmd.none )
@@ -1080,7 +1110,7 @@ viewConfig params paramsForm paramsInfo =
             , ( PageLogs, False )
             ]
         , Element.column [ paddingXY 20 32, spacing 32, centerX ]
-            [ runButton paramsForm
+            [ runButton params paramsForm
 
             -- Title
             , Element.el [ Element.Font.center, Element.Font.size 32 ] (Element.text "Algorithm parameters")
@@ -1274,8 +1304,8 @@ infoIcon detailsVisible =
 -- Run button
 
 
-runButton : ParametersForm -> Element Msg
-runButton paramsForm =
+runButton : Parameters -> ParametersForm -> Element Msg
+runButton params paramsForm =
     let
         hasNoError =
             List.isEmpty (CropForm.errors paramsForm.crop)
@@ -1294,7 +1324,7 @@ runButton paramsForm =
             , Element.Border.width 1
             , Element.Border.rounded 4
             ]
-            { onPress = Nothing, label = Element.text "Run ▶" }
+            { onPress = Just (RunAlgorithm params), label = Element.text "Run ▶" }
 
     else
         Element.Input.button
