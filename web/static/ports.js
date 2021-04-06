@@ -34,6 +34,15 @@ export function activatePorts(app, containerSize) {
     event.target.setPointerCapture(event.pointerId);
   });
 
+  // Run the registration algorithm.
+  app.ports.run.subscribe((params) => {
+    // run the algorithm with the provided parameters.
+    app.ports.log.send({
+      lvl: 0,
+      content: "The registration algorithm just started.",
+    });
+  });
+
   // Replace elm Browser.onAnimationFrameDelta that seems to have timing issues.
   // startAnimationFrameLoop(app.ports.animationFrame);
 

@@ -45,6 +45,9 @@ port capture : Value -> Cmd msg
 port run : Value -> Cmd msg
 
 
+port log : ({ lvl : Int, content : String } -> msg) -> Sub msg
+
+
 main : Program Device.Size Model Msg
 main =
     Browser.element
@@ -66,6 +69,7 @@ type alias Model =
     , pointerMode : PointerMode
     , bboxDrawn : Maybe BBox
     , registeredImages : Maybe (Pivot Image)
+    , logs : List { lvl : Int, content : String }
     }
 
 
@@ -191,6 +195,7 @@ initialModel size =
     , pointerMode = WaitingMove
     , bboxDrawn = Nothing
     , registeredImages = Nothing
+    , logs = []
     }
 
 
@@ -279,6 +284,7 @@ type Msg
     | NavigationMsg NavigationMsg
     | PointerMsg PointerMsg
     | RunAlgorithm Parameters
+    | Log { lvl : Int, content : String }
 
 
 type DragDropMsg
@@ -346,22 +352,22 @@ subscriptions : Model -> Sub Msg
 subscriptions model =
     case model.state of
         Home _ ->
-            Sub.batch [ resizes WindowResizes, imageDecoded ImageDecoded ]
+            Sub.batch [ resizes WindowResizes, log Log, imageDecoded ImageDecoded ]
 
         Loading _ ->
-            Sub.batch [ resizes WindowResizes, imageDecoded ImageDecoded ]
+            Sub.batch [ resizes WindowResizes, log Log, imageDecoded ImageDecoded ]
 
         ViewImgs _ ->
-            Sub.batch [ resizes WindowResizes, Keyboard.downs KeyDown ]
+            Sub.batch [ resizes WindowResizes, log Log, Keyboard.downs KeyDown ]
 
         Config _ ->
-            Sub.batch [ resizes WindowResizes ]
+            Sub.batch [ resizes WindowResizes, log Log ]
 
         Registration _ ->
-            Sub.batch [ resizes WindowResizes ]
+            Sub.batch [ resizes WindowResizes, log Log ]
 
         Logs _ ->
-            Sub.batch [ resizes WindowResizes ]
+            Sub.batch [ resizes WindowResizes, log Log ]
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -660,6 +666,9 @@ update msg model =
 
         ( RunAlgorithm params, Config imgs ) ->
             ( { model | state = Logs imgs }, run (encodeParams params) )
+
+        ( Log logData, _ ) ->
+            ( { model | logs = logData :: model.logs }, Cmd.none )
 
         _ ->
             ( model, Cmd.none )
@@ -964,7 +973,7 @@ viewElmUI model =
             viewRegistration model.registeredImages
 
         Logs { images } ->
-            viewLogs
+            viewLogs model.logs
 
 
 
@@ -1061,8 +1070,8 @@ pageHeaderElement current page =
 -- Logs
 
 
-viewLogs : Element Msg
-viewLogs =
+viewLogs : List { lvl : Int, content : String } -> Element Msg
+viewLogs logs =
     Element.column [ width fill ]
         [ headerBar
             [ ( PageImages, False )
@@ -1070,7 +1079,19 @@ viewLogs =
             , ( PageRegistration, False )
             , ( PageLogs, True )
             ]
+        , Element.column
+            [ padding 18
+            , width (Element.px 400)
+            , Element.Font.size 18
+            , Element.centerX
+            ]
+            (List.map viewLog logs)
         ]
+
+
+viewLog : { lvl : Int, content : String } -> Element msg
+viewLog { lvl, content } =
+    Element.text content
 
 
 
