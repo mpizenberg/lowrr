@@ -46,6 +46,7 @@ async function run(params) {
   let height = canvas.height;
   for (let img of images) {
     let croppedImg = await crop(img, x, y, width, height);
+    await sleep((width * height) / 50000);
     croppedImages.push(croppedImg);
   }
 }
@@ -60,5 +61,16 @@ async function crop(img, x, y, width, height) {
   imgBitmap.close();
   const croppedBlob = await canvas.convertToBlob();
   const croppedUrl = URL.createObjectURL(croppedBlob);
+  log(2, `Cropping ${img.id}`);
   return { id: img.id, url: croppedUrl, width, height };
+}
+
+// Log something in the interface with the provided verbosity level.
+function log(lvl, content) {
+  postMessage({ type: "log", data: { lvl, content } });
+}
+
+// Small utility function.
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }

@@ -10,6 +10,15 @@ export function activatePorts(app, containerSize) {
 
   let worker = new Worker("worker.js");
 
+  // Listen to worker messages.
+  worker.onmessage = async function (event) {
+    if (event.data.type == "log") {
+      app.ports.log.send(event.data.data);
+    } else {
+      console.warn("Unknown message type:", event.data.type);
+    }
+  };
+
   // Listen for images to decode.
   app.ports.decodeImages.subscribe(async (imgs) => {
     console.log("Received images to decode");
@@ -34,29 +43,9 @@ export function activatePorts(app, containerSize) {
     app.ports.log.send({ lvl, content });
   }
 
-  // Run the registration algorithm.
+  // Run the registration algorithm with the provided parameters.
   app.ports.run.subscribe(async (params) => {
     worker.postMessage({ type: "run", data: params });
-    // run the algorithm with the provided parameters.
-    sendLog(0, "The registration algorithm just started.");
-    sendLog(
-      0,
-      "Long long long long long long long long long long long long long long long long long long message."
-    );
-    sendLog(
-      1,
-      "Long long long long long long long long long long long long long long long long long long message."
-    );
-    sendLog(
-      0,
-      "Long long long long long long long long long long\n\n\nmultiline\n   long long long long long long long long message."
-    );
-
-    // Simulate processing.
-    for (let progress = 0; progress < 100; progress++) {
-      sendLog(1, `progress: ${progress} / 100`);
-      await sleep(50);
-    }
   });
 
   // Replace elm Browser.onAnimationFrameDelta that seems to have timing issues.
