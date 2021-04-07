@@ -13,5 +13,12 @@ onmessage = function (event) {
   console.log(`worker message: ${event.data.type}`);
   if (event.data.type == "image-loaded") {
     images.push(event.data.data);
+  } else if (event.data.type == "run") {
+    run(event.data.data);
   }
 };
+
+// Main algorithm with the parameters passed as arguments.
+function run(params) {
+  console.log("worker running with parameters:", params);
+}

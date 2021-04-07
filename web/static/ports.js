@@ -36,6 +36,7 @@ export function activatePorts(app, containerSize) {
 
   // Run the registration algorithm.
   app.ports.run.subscribe(async (params) => {
+    worker.postMessage({ type: "run", data: params });
     // run the algorithm with the provided parameters.
     sendLog(0, "The registration algorithm just started.");
     sendLog(
