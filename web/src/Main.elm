@@ -179,10 +179,10 @@ type PointerMode
 -}
 init : Device.Size -> ( Model, Cmd Msg )
 init size =
-    -- ( initialModel size, Cmd.none)
-    initialModel size
-        |> (\m -> { m | state = Loading { names = Set.singleton "img", loaded = Dict.empty } })
-        |> update (ImageDecoded { id = "img", url = "/img/pano_bayeux.jpg", width = 2000, height = 225 })
+    -- initialModel size
+    --     |> (\m -> { m | state = Loading { names = Set.singleton "img", loaded = Dict.empty } })
+    --     |> update (ImageDecoded { id = "img", url = "/img/pano_bayeux.jpg", width = 2000, height = 225 })
+    ( initialModel size, Cmd.none )
 
 
 initialModel : Device.Size -> Model
@@ -1881,7 +1881,7 @@ loadBar : Int -> Int -> Element msg
 loadBar loaded total =
     let
         barLength =
-            (400 - 2 * 4) * loaded // total
+            (325 - 2 * 4) * loaded // total
     in
     Element.el
         [ width (Element.px barLength)
