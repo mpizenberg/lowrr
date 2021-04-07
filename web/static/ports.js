@@ -8,13 +8,7 @@ export function activatePorts(app, containerSize) {
     app.ports.resizes.send(containerSize())
   );
 
-  // // Create an image object and send it back to the Elm app.
-  // app.ports.loadImageFile.subscribe(value => {
-  //   utils
-  //     .createImageObject(value.id, value.file)
-  //     .then(image => app.ports.imageLoaded.send(image))
-  //     .catch(error => console.log(error));
-  // });
+  let worker = new Worker("worker.js");
 
   // Listen for images to decode.
   app.ports.decodeImages.subscribe(async (imgs) => {
@@ -22,6 +16,8 @@ export function activatePorts(app, containerSize) {
     try {
       for (let img of imgs) {
         let image = await utils.createImageObject(img.name, img);
+        worker.postMessage({ type: "image-loaded", data: image });
+        await sleep((image.width * image.height) / 50000);
         app.ports.imageDecoded.send(image);
       }
     } catch (error) {
