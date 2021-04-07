@@ -120,6 +120,13 @@ encodeParams : Parameters -> Value
 encodeParams params =
     Json.Encode.object
         [ ( "crop", encodeMaybe encodeCrop params.crop )
+        , ( "equalize", Json.Encode.bool params.equalize )
+        , ( "levels", Json.Encode.int params.levels )
+        , ( "sparse", Json.Encode.float params.sparse )
+        , ( "lambda", Json.Encode.float params.lambda )
+        , ( "rho", Json.Encode.float params.rho )
+        , ( "maxIterations", Json.Encode.int params.maxIterations )
+        , ( "convergenceThreshold", Json.Encode.float params.convergenceThreshold )
         ]
 
 
