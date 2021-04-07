@@ -14,6 +14,8 @@ export function activatePorts(app, containerSize) {
   worker.onmessage = async function (event) {
     if (event.data.type == "log") {
       app.ports.log.send(event.data.data);
+    } else if (event.data.type == "cropped-images") {
+      app.ports.receiveCroppedImages.send(event.data.data);
     } else {
       console.warn("Unknown message type:", event.data.type);
     }

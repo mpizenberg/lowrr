@@ -24,11 +24,12 @@ onmessage = async function (event) {
 
 // Main algorithm with the parameters passed as arguments.
 async function run(params) {
+  croppedImages.length = 0;
   console.log("worker running with parameters:", params);
   // Reshape the canvas to the appropriate cropped size.
   if (params.crop != null) {
     canvas.width = params.crop.right - params.crop.left;
-    canvas.height = params.crop.right - params.crop.left;
+    canvas.height = params.crop.bottom - params.crop.top;
   } else {
     canvas.width = images[0].width;
     canvas.height = images[0].height;
@@ -49,6 +50,9 @@ async function run(params) {
     await sleep((width * height) / 50000);
     croppedImages.push(croppedImg);
   }
+
+  // Send back to main thread all cropped images.
+  postMessage({ type: "cropped-images", data: croppedImages });
 }
 
 // Temporary function just to crop a given image.

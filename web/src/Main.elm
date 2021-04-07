@@ -48,6 +48,9 @@ port run : Value -> Cmd msg
 port log : ({ lvl : Int, content : String } -> msg) -> Sub msg
 
 
+port receiveCroppedImages : (List Image -> msg) -> Sub msg
+
+
 main : Program Device.Size Model Msg
 main =
     Browser.element
@@ -66,6 +69,7 @@ type alias Model =
     , paramsForm : ParametersForm
     , paramsInfo : ParametersToggleInfo
     , viewer : Viewer
+    , registeredViewer : Viewer
     , pointerMode : PointerMode
     , bboxDrawn : Maybe BBox
     , registeredImages : Maybe (Pivot Image)
@@ -200,6 +204,7 @@ initialModel size =
     , paramsForm = defaultParamsForm
     , paramsInfo = defaultParamsInfo
     , viewer = Viewer.withSize ( size.width, size.height - toFloat headerHeight )
+    , registeredViewer = Viewer.withSize ( size.width, size.height - toFloat headerHeight )
     , pointerMode = WaitingMove
     , bboxDrawn = Nothing
     , registeredImages = Nothing
@@ -286,6 +291,8 @@ type Msg
     | DragDropMsg DragDropMsg
     | ImageDecoded Image
     | KeyDown RawKey
+    | ClickPreviousImage
+    | ClickNextImage
     | ZoomMsg ZoomMsg
     | ViewImgMsg ViewImgMsg
     | ParamsMsg ParamsMsg
@@ -295,6 +302,7 @@ type Msg
     | RunAlgorithm Parameters
     | Log { lvl : Int, content : String }
     | VerbosityChange Float
+    | ReceiveCroppedImages (List Image)
 
 
 type DragDropMsg
@@ -322,8 +330,6 @@ type ViewImgMsg
     = SelectMovingMode
     | SelectDrawingMode
     | CropCurrentFrame
-    | ClickPreviousImage
-    | ClickNextImage
 
 
 type ParamsMsg
@@ -368,16 +374,16 @@ subscriptions model =
             Sub.batch [ resizes WindowResizes, log Log, imageDecoded ImageDecoded ]
 
         ViewImgs _ ->
-            Sub.batch [ resizes WindowResizes, log Log, Keyboard.downs KeyDown ]
+            Sub.batch [ resizes WindowResizes, log Log, receiveCroppedImages ReceiveCroppedImages, Keyboard.downs KeyDown ]
 
         Config _ ->
-            Sub.batch [ resizes WindowResizes, log Log ]
+            Sub.batch [ resizes WindowResizes, log Log, receiveCroppedImages ReceiveCroppedImages ]
 
         Registration _ ->
-            Sub.batch [ resizes WindowResizes, log Log ]
+            Sub.batch [ resizes WindowResizes, log Log, receiveCroppedImages ReceiveCroppedImages, Keyboard.downs KeyDown ]
 
         Logs _ ->
-            Sub.batch [ resizes WindowResizes, log Log ]
+            Sub.batch [ resizes WindowResizes, log Log, receiveCroppedImages ReceiveCroppedImages ]
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -390,10 +396,14 @@ update msg model =
             let
                 viewer =
                     model.viewer
+
+                registeredViewer =
+                    model.registeredViewer
             in
             ( { model
                 | device = Device.classify size
                 , viewer = { viewer | size = ( size.width, size.height - toFloat headerHeight ) }
+                , registeredViewer = { registeredViewer | size = ( size.width, size.height - toFloat headerHeight ) }
               }
             , Cmd.none
             )
@@ -447,14 +457,21 @@ update msg model =
         ( KeyDown rawKey, ViewImgs { images } ) ->
             case Keyboard.navigationKey rawKey of
                 Just Keyboard.ArrowRight ->
-                    ( { model | state = ViewImgs { images = Pivot.goR images |> Maybe.withDefault (Pivot.goToStart images) } }
-                    , Cmd.none
-                    )
+                    ( { model | state = ViewImgs { images = goToNextImage images } }, Cmd.none )
 
                 Just Keyboard.ArrowLeft ->
-                    ( { model | state = ViewImgs { images = Pivot.goL images |> Maybe.withDefault (Pivot.goToEnd images) } }
-                    , Cmd.none
-                    )
+                    ( { model | state = ViewImgs { images = goToPreviousImage images } }, Cmd.none )
+
+                _ ->
+                    ( model, Cmd.none )
+
+        ( KeyDown rawKey, Registration _ ) ->
+            case Keyboard.navigationKey rawKey of
+                Just Keyboard.ArrowRight ->
+                    ( { model | registeredImages = Maybe.map goToNextImage model.registeredImages }, Cmd.none )
+
+                Just Keyboard.ArrowLeft ->
+                    ( { model | registeredImages = Maybe.map goToPreviousImage model.registeredImages }, Cmd.none )
 
                 _ ->
                     ( model, Cmd.none )
@@ -479,6 +496,9 @@ update msg model =
 
         ( ZoomMsg zoomMsg, ViewImgs _ ) ->
             ( { model | viewer = zoomViewer zoomMsg model.viewer }, Cmd.none )
+
+        ( ZoomMsg zoomMsg, Registration _ ) ->
+            ( { model | registeredViewer = zoomViewer zoomMsg model.registeredViewer }, Cmd.none )
 
         ( PointerMsg pointerMsg, ViewImgs { images } ) ->
             case ( pointerMsg, model.pointerMode ) of
@@ -660,19 +680,17 @@ update msg model =
         ( ViewImgMsg SelectDrawingMode, ViewImgs _ ) ->
             ( { model | pointerMode = WaitingDraw }, Cmd.none )
 
-        ( ViewImgMsg ClickPreviousImage, ViewImgs { images } ) ->
-            let
-                previousImage =
-                    Maybe.withDefault (Pivot.goToEnd images) (Pivot.goL images)
-            in
-            ( { model | state = ViewImgs { images = previousImage } }, Cmd.none )
+        ( ClickPreviousImage, ViewImgs { images } ) ->
+            ( { model | state = ViewImgs { images = goToPreviousImage images } }, Cmd.none )
 
-        ( ViewImgMsg ClickNextImage, ViewImgs { images } ) ->
-            let
-                nextImage =
-                    Maybe.withDefault (Pivot.goToStart images) (Pivot.goR images)
-            in
-            ( { model | state = ViewImgs { images = nextImage } }, Cmd.none )
+        ( ClickPreviousImage, Registration _ ) ->
+            ( { model | registeredImages = Maybe.map goToPreviousImage model.registeredImages }, Cmd.none )
+
+        ( ClickNextImage, ViewImgs { images } ) ->
+            ( { model | state = ViewImgs { images = goToNextImage images } }, Cmd.none )
+
+        ( ClickNextImage, Registration _ ) ->
+            ( { model | registeredImages = Maybe.map goToNextImage model.registeredImages }, Cmd.none )
 
         ( RunAlgorithm params, Config imgs ) ->
             ( { model | state = Logs imgs }, run (encodeParams params) )
@@ -683,8 +701,56 @@ update msg model =
         ( VerbosityChange floatVerbosity, _ ) ->
             ( { model | verbosity = round floatVerbosity }, Cmd.none )
 
+        ( ReceiveCroppedImages croppedImages, _ ) ->
+            case croppedImages of
+                [] ->
+                    ( model, Cmd.none )
+
+                firstImage :: otherImages ->
+                    ( { model
+                        | registeredImages = Just (Pivot.fromCons firstImage otherImages)
+                        , registeredViewer = Viewer.fitImage 1.0 ( toFloat firstImage.width, toFloat firstImage.height ) model.registeredViewer
+                      }
+                    , Cmd.none
+                    )
+
+        ( PointerMsg pointerMsg, Registration _ ) ->
+            case ( pointerMsg, model.pointerMode ) of
+                -- Moving the viewer
+                ( PointerDownRaw event, WaitingMove ) ->
+                    case Json.Decode.decodeValue Pointer.eventDecoder event of
+                        Err _ ->
+                            ( model, Cmd.none )
+
+                        Ok { pointer } ->
+                            ( { model | pointerMode = PointerMovingFromClientCoords pointer.clientPos }, capture event )
+
+                ( PointerMove ( newX, newY ), PointerMovingFromClientCoords ( x, y ) ) ->
+                    ( { model
+                        | registeredViewer = Viewer.pan ( newX - x, newY - y ) model.registeredViewer
+                        , pointerMode = PointerMovingFromClientCoords ( newX, newY )
+                      }
+                    , Cmd.none
+                    )
+
+                ( PointerUp _, PointerMovingFromClientCoords _ ) ->
+                    ( { model | pointerMode = WaitingMove }, Cmd.none )
+
+                _ ->
+                    ( model, Cmd.none )
+
         _ ->
             ( model, Cmd.none )
+
+
+goToPreviousImage : Pivot Image -> Pivot Image
+goToPreviousImage images =
+    Maybe.withDefault (Pivot.goToEnd images) (Pivot.goL images)
+
+
+goToNextImage : Pivot Image -> Pivot Image
+goToNextImage images =
+    Maybe.withDefault (Pivot.goToStart images) (Pivot.goR images)
 
 
 toBBox : Crop -> BBox
@@ -751,13 +817,13 @@ goTo : NavigationMsg -> Model -> { images : Pivot Image } -> Model
 goTo msg model data =
     case msg of
         GoToPageImages ->
-            { model | state = ViewImgs data }
+            { model | state = ViewImgs data, pointerMode = WaitingMove }
 
         GoToPageConfig ->
             { model | state = Config data }
 
         GoToPageRegistration ->
-            { model | state = Registration data }
+            { model | state = Registration data, pointerMode = WaitingMove }
 
         GoToPageLogs ->
             { model | state = Logs data }
@@ -983,7 +1049,7 @@ viewElmUI model =
             viewConfig model.params model.paramsForm model.paramsInfo
 
         Registration { images } ->
-            viewRegistration model.registeredImages
+            viewRegistration model.registeredImages model.registeredViewer
 
         Logs { images } ->
             viewLogs model.verbosity model.logs
@@ -1145,8 +1211,8 @@ verbositySlider verbosity =
 -- Registration
 
 
-viewRegistration : Maybe (Pivot Image) -> Element Msg
-viewRegistration maybeImages =
+viewRegistration : Maybe (Pivot Image) -> Viewer -> Element Msg
+viewRegistration maybeImages viewer =
     Element.column [ width fill, height fill ]
         [ headerBar
             [ ( PageImages, False )
@@ -1154,13 +1220,87 @@ viewRegistration maybeImages =
             , ( PageRegistration, True )
             , ( PageLogs, False )
             ]
+        , Element.html <|
+            Html.node "style"
+                []
+                [ Html.text ".pixelated { image-rendering: pixelated; image-rendering: crisp-edges; }" ]
         , case maybeImages of
             Nothing ->
                 Element.el [ centerX, centerY ]
                     (Element.text "Registration not done yet")
 
             Just images ->
-                Debug.todo "viewregistration"
+                let
+                    img =
+                        Pivot.getC images
+
+                    clickButton alignment msg title icon =
+                        Element.Input.button
+                            [ padding 6
+                            , alignment
+                            , Element.Background.color (Element.rgba255 255 255 255 0.8)
+                            , Element.Font.color Style.black
+                            , Element.htmlAttribute <| Html.Attributes.style "box-shadow" "none"
+                            , Element.htmlAttribute <| Html.Attributes.title title
+                            ]
+                            { onPress = Just msg
+                            , label = icon 32
+                            }
+
+                    buttonsRow =
+                        Element.row [ centerX ]
+                            [ clickButton centerX (ZoomMsg (ZoomFit img)) "Fit zoom to image" Icon.zoomFit
+                            , clickButton centerX (ZoomMsg ZoomOut) "Zoom out" Icon.zoomOut
+                            , clickButton centerX (ZoomMsg ZoomIn) "Zoom in" Icon.zoomIn
+                            ]
+
+                    imgSvgAttributes =
+                        [ Svg.Attributes.xlinkHref img.url
+                        , Svg.Attributes.width (String.fromInt img.width)
+                        , Svg.Attributes.height (String.fromInt img.height)
+                        , Svg.Attributes.class "pixelated"
+                        ]
+
+                    ( viewerWidth, viewerHeight ) =
+                        viewer.size
+
+                    viewerAttributes =
+                        [ Html.Attributes.style "pointer-events" "none"
+                        , Viewer.Svg.transform viewer
+                        ]
+
+                    svgContent =
+                        Svg.g viewerAttributes [ Svg.image imgSvgAttributes [] ]
+
+                    svgViewer =
+                        Element.html <|
+                            Svg.svg
+                                [ Html.Attributes.width (floor viewerWidth)
+                                , Html.Attributes.height (floor viewerHeight)
+                                , Wheel.onWheel (zoomWheelMsg viewer)
+                                , msgOn "pointerdown" (Json.Decode.map (PointerMsg << PointerDownRaw) Json.Decode.value)
+                                , Pointer.onUp (\e -> PointerMsg (PointerUp e.pointer.offsetPos))
+                                , Html.Attributes.style "touch-action" "none"
+                                , Html.Events.preventDefaultOn "pointermove" <|
+                                    Json.Decode.map (\coords -> ( PointerMsg (PointerMove coords), True )) <|
+                                        Json.Decode.map2 Tuple.pair
+                                            (Json.Decode.field "clientX" Json.Decode.float)
+                                            (Json.Decode.field "clientY" Json.Decode.float)
+                                ]
+                                [ svgContent ]
+                in
+                Element.el
+                    [ Element.inFront buttonsRow
+                    , Element.inFront
+                        (Element.row [ alignBottom, width fill ]
+                            [ clickButton alignLeft ClickPreviousImage "Previous image" Icon.arrowLeftCircle
+                            , clickButton alignRight ClickNextImage "Next image" Icon.arrowRightCircle
+                            ]
+                        )
+                    , Element.clip
+                    , height fill
+                    ]
+                    svgViewer
         ]
 
 
@@ -1825,8 +1965,8 @@ viewImgs pointerMode bboxDrawn viewer images =
             [ Element.inFront buttonsRow
             , Element.inFront
                 (Element.row [ alignBottom, width fill ]
-                    [ clickButton alignLeft True (ViewImgMsg ClickPreviousImage) "Previous image" Icon.arrowLeftCircle
-                    , clickButton alignRight True (ViewImgMsg ClickNextImage) "Next image" Icon.arrowRightCircle
+                    [ clickButton alignLeft True ClickPreviousImage "Previous image" Icon.arrowLeftCircle
+                    , clickButton alignRight True ClickNextImage "Next image" Icon.arrowRightCircle
                     ]
                 )
             , Element.clip
