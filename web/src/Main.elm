@@ -393,17 +393,10 @@ update msg model =
             ( model, Cmd.none )
 
         ( WindowResizes size, _ ) ->
-            let
-                viewer =
-                    model.viewer
-
-                registeredViewer =
-                    model.registeredViewer
-            in
             ( { model
                 | device = Device.classify size
-                , viewer = { viewer | size = ( size.width, size.height - toFloat headerHeight ) }
-                , registeredViewer = { registeredViewer | size = ( size.width, size.height - toFloat headerHeight ) }
+                , viewer = Viewer.resize ( size.width, size.height - toFloat headerHeight ) model.viewer
+                , registeredViewer = Viewer.resize ( size.width, size.height - toFloat headerHeight ) model.registeredViewer
               }
             , Cmd.none
             )
