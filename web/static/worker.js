@@ -13,6 +13,7 @@ const ctx = canvas.getContext("2d");
 // Listener for messages containing data of the shape: { type, data }
 // where type can be one of:
 //   - "image-loaded": received when an image was loaded in the main thread
+//   - "run": run the algorithm on all images
 onmessage = async function (event) {
   console.log(`worker message: ${event.data.type}`);
   if (event.data.type == "image-loaded") {

@@ -15,7 +15,14 @@ export function activatePorts(app, containerSize) {
     if (event.data.type == "log") {
       app.ports.log.send(event.data.data);
     } else if (event.data.type == "cropped-images") {
-      app.ports.receiveCroppedImages.send(event.data.data);
+      // Build and HTMLImageElement for each cropped image.
+      const decodedImages = await Promise.all(
+        event.data.data.map(async ({ id, url }) => {
+          const decodedImg = await utils.decodeImage(url);
+          return { id, img: decodedImg };
+        })
+      );
+      app.ports.receiveCroppedImages.send(decodedImages);
     } else {
       console.warn("Unknown message type:", event.data.type);
     }
@@ -26,8 +33,14 @@ export function activatePorts(app, containerSize) {
     console.log("Received images to decode");
     try {
       for (let img of imgs) {
-        let image = await utils.createImageObject(img.name, img);
-        worker.postMessage({ type: "image-loaded", data: image });
+        const image = await utils.createImageObject(img.name, img);
+        const workerImage = {
+          id: img.name,
+          url: image.img.src,
+          width: image.img.width,
+          height: image.img.height,
+        };
+        worker.postMessage({ type: "image-loaded", data: workerImage });
         await sleep((image.width * image.height) / 50000);
         app.ports.imageDecoded.send(image);
       }

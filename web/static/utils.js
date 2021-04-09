@@ -41,13 +41,7 @@ const utils = (function () {
     const promise = new Promise((resolve, reject) => {
       if (imageFile.type.startsWith("image")) {
         const img = document.createElement("img");
-        img.onload = () =>
-          resolve({
-            id: id,
-            url: img.src,
-            width: img.width,
-            height: img.height,
-          });
+        img.onload = () => resolve({ id, img });
         img.src = window.URL.createObjectURL(imageFile);
       } else {
         reject("Not an image file: " + imageFile.type);
@@ -56,9 +50,18 @@ const utils = (function () {
     return promise;
   }
 
+  // Create an HTMLImageElement and return it when it is loaded.
+  async function decodeImage(src) {
+    let img = new Image();
+    img.src = src;
+    await img.decode();
+    return img;
+  }
+
   return {
     download: download,
     readJsonFile: readJsonFile,
     createImageObject: createImageObject,
+    decodeImage: decodeImage,
   };
 })();

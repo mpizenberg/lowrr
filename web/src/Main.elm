@@ -1,6 +1,12 @@
 port module Main exposing (main)
 
 import Browser
+import Canvas
+import Canvas.Settings
+import Canvas.Settings.Advanced
+import Canvas.Settings.Line
+import Canvas.Texture exposing (Texture)
+import Color
 import CropForm
 import Device exposing (Device)
 import Dict exposing (Dict)
@@ -17,17 +23,15 @@ import Html.Events.Extra.Pointer as Pointer
 import Html.Events.Extra.Wheel as Wheel
 import Icon
 import Json.Decode exposing (Decoder, Value)
-import Json.Encode
+import Json.Encode exposing (Value)
 import Keyboard exposing (RawKey)
 import NumberInput
 import Pivot exposing (Pivot)
 import Set exposing (Set)
 import Simple.Transition as Transition
 import Style
-import Svg
-import Svg.Attributes
 import Viewer exposing (Viewer)
-import Viewer.Svg
+import Viewer.Canvas
 
 
 port resizes : (Device.Size -> msg) -> Sub msg
@@ -36,7 +40,7 @@ port resizes : (Device.Size -> msg) -> Sub msg
 port decodeImages : List Value -> Cmd msg
 
 
-port imageDecoded : (Image -> msg) -> Sub msg
+port imageDecoded : ({ id : String, img : Value } -> msg) -> Sub msg
 
 
 port capture : Value -> Cmd msg
@@ -48,7 +52,7 @@ port run : Value -> Cmd msg
 port log : ({ lvl : Int, content : String } -> msg) -> Sub msg
 
 
-port receiveCroppedImages : (List Image -> msg) -> Sub msg
+port receiveCroppedImages : (List { id : String, img : Value } -> msg) -> Sub msg
 
 
 main : Program Device.Size Model Msg
@@ -102,7 +106,7 @@ type FileDraggingState
 
 type alias Image =
     { id : String
-    , url : String
+    , texture : Texture
     , width : Int
     , height : Int
     }
@@ -289,7 +293,7 @@ type Msg
     = NoMsg
     | WindowResizes Device.Size
     | DragDropMsg DragDropMsg
-    | ImageDecoded Image
+    | ImageDecoded { id : String, img : Value }
     | KeyDown RawKey
     | ClickPreviousImage
     | ClickNextImage
@@ -302,7 +306,7 @@ type Msg
     | RunAlgorithm Parameters
     | Log { lvl : Int, content : String }
     | VerbosityChange Float
-    | ReceiveCroppedImages (List Image)
+    | ReceiveCroppedImages (List { id : String, img : Value })
 
 
 type DragDropMsg
@@ -419,18 +423,27 @@ update msg model =
         ( DragDropMsg DragLeave, Home _ ) ->
             ( { model | state = Home Idle }, Cmd.none )
 
-        ( ImageDecoded img, Loading { names, loaded } ) ->
+        ( ImageDecoded ({ id } as imgValue), Loading { names, loaded } ) ->
             let
+                newLoaded =
+                    case imageFromValue imgValue of
+                        Nothing ->
+                            -- Should never happen
+                            loaded
+
+                        Just image ->
+                            Dict.insert id image loaded
+
                 updatedLoadingState =
                     { names = names
-                    , loaded = Dict.insert img.id img loaded
+                    , loaded = newLoaded
                     }
 
                 oldParamsForm =
                     model.paramsForm
             in
-            if Set.size names == Dict.size updatedLoadingState.loaded then
-                case Dict.values updatedLoadingState.loaded of
+            if Set.size names == Dict.size newLoaded then
+                case Dict.values newLoaded of
                     [] ->
                         -- This should be impossible, there must be at least 1 image
                         ( { model | state = Home Idle }, Cmd.none )
@@ -695,7 +708,7 @@ update msg model =
             ( { model | verbosity = round floatVerbosity }, Cmd.none )
 
         ( ReceiveCroppedImages croppedImages, _ ) ->
-            case croppedImages of
+            case List.filterMap imageFromValue croppedImages of
                 [] ->
                     ( model, Cmd.none )
 
@@ -734,6 +747,25 @@ update msg model =
 
         _ ->
             ( model, Cmd.none )
+
+
+imageFromValue : { id : String, img : Value } -> Maybe Image
+imageFromValue { id, img } =
+    case Canvas.Texture.fromDomImage img of
+        Nothing ->
+            Nothing
+
+        Just texture ->
+            let
+                imgSize =
+                    Canvas.Texture.dimensions texture
+            in
+            Just
+                { id = id
+                , texture = texture
+                , width = round imgSize.width
+                , height = round imgSize.height
+                }
 
 
 goToPreviousImage : Pivot Image -> Pivot Image
@@ -1247,40 +1279,37 @@ viewRegistration maybeImages viewer =
                             , clickButton centerX (ZoomMsg ZoomIn) "Zoom in" Icon.zoomIn
                             ]
 
-                    imgSvgAttributes =
-                        [ Svg.Attributes.xlinkHref img.url
-                        , Svg.Attributes.width (String.fromInt img.width)
-                        , Svg.Attributes.height (String.fromInt img.height)
-                        , Svg.Attributes.class "pixelated"
-                        ]
-
                     ( viewerWidth, viewerHeight ) =
                         viewer.size
 
-                    viewerAttributes =
-                        [ Html.Attributes.style "pointer-events" "none"
-                        , Viewer.Svg.transform viewer
-                        ]
+                    clearCanvas : Canvas.Renderable
+                    clearCanvas =
+                        Canvas.clear ( 0, 0 ) viewerWidth viewerHeight
 
-                    svgContent =
-                        Svg.g viewerAttributes [ Svg.image imgSvgAttributes [] ]
+                    renderedImage : Canvas.Renderable
+                    renderedImage =
+                        Canvas.texture
+                            [ Viewer.Canvas.transform viewer
+                            , Canvas.Settings.Advanced.imageSmoothing False
+                            ]
+                            ( 0, 0 )
+                            img.texture
 
-                    svgViewer =
-                        Element.html <|
-                            Svg.svg
-                                [ Html.Attributes.width (floor viewerWidth)
-                                , Html.Attributes.height (floor viewerHeight)
-                                , Wheel.onWheel (zoomWheelMsg viewer)
-                                , msgOn "pointerdown" (Json.Decode.map (PointerMsg << PointerDownRaw) Json.Decode.value)
-                                , Pointer.onUp (\e -> PointerMsg (PointerUp e.pointer.offsetPos))
-                                , Html.Attributes.style "touch-action" "none"
-                                , Html.Events.preventDefaultOn "pointermove" <|
-                                    Json.Decode.map (\coords -> ( PointerMsg (PointerMove coords), True )) <|
-                                        Json.Decode.map2 Tuple.pair
-                                            (Json.Decode.field "clientX" Json.Decode.float)
-                                            (Json.Decode.field "clientY" Json.Decode.float)
-                                ]
-                                [ svgContent ]
+                    canvasViewer =
+                        Canvas.toHtml ( round viewerWidth, round viewerHeight )
+                            [ Html.Attributes.id "theCanvas"
+                            , Html.Attributes.style "display" "block"
+                            , Wheel.onWheel (zoomWheelMsg viewer)
+                            , msgOn "pointerdown" (Json.Decode.map (PointerMsg << PointerDownRaw) Json.Decode.value)
+                            , Pointer.onUp (\e -> PointerMsg (PointerUp e.pointer.offsetPos))
+                            , Html.Attributes.style "touch-action" "none"
+                            , Html.Events.preventDefaultOn "pointermove" <|
+                                Json.Decode.map (\coords -> ( PointerMsg (PointerMove coords), True )) <|
+                                    Json.Decode.map2 Tuple.pair
+                                        (Json.Decode.field "clientX" Json.Decode.float)
+                                        (Json.Decode.field "clientY" Json.Decode.float)
+                            ]
+                            [ clearCanvas, renderedImage ]
                 in
                 Element.el
                     [ Element.inFront buttonsRow
@@ -1293,7 +1322,7 @@ viewRegistration maybeImages viewer =
                     , Element.clip
                     , height fill
                     ]
-                    svgViewer
+                    (Element.html canvasViewer)
         ]
 
 
@@ -1880,25 +1909,26 @@ viewImgs pointerMode bboxDrawn viewer images =
                 , clickButton centerX True (ViewImgMsg CropCurrentFrame) "Set the cropped working area to the current frame" Icon.maximize
                 ]
 
-        imgSvgAttributes =
-            [ Svg.Attributes.xlinkHref img.url
-            , Svg.Attributes.width (String.fromInt img.width)
-            , Svg.Attributes.height (String.fromInt img.height)
-            , Svg.Attributes.class "pixelated"
-            ]
-
         ( viewerWidth, viewerHeight ) =
             viewer.size
 
-        viewerAttributes =
-            [ Html.Attributes.style "pointer-events" "none"
-            , Viewer.Svg.transform viewer
-            ]
+        clearCanvas : Canvas.Renderable
+        clearCanvas =
+            Canvas.clear ( 0, 0 ) viewerWidth viewerHeight
 
-        svgContent =
+        renderedImage : Canvas.Renderable
+        renderedImage =
+            Canvas.texture
+                [ Viewer.Canvas.transform viewer
+                , Canvas.Settings.Advanced.imageSmoothing False
+                ]
+                ( 0, 0 )
+                img.texture
+
+        renderedBbox =
             case bboxDrawn of
                 Nothing ->
-                    Svg.g viewerAttributes [ Svg.image imgSvgAttributes [] ]
+                    Canvas.shapes [] []
 
                 Just { left, top, right, bottom } ->
                     let
@@ -1911,37 +1941,29 @@ viewImgs pointerMode bboxDrawn viewer images =
                         strokeWidth =
                             viewer.scale * 2
                     in
-                    Svg.g viewerAttributes
-                        [ Svg.image imgSvgAttributes []
-                        , Svg.rect
-                            [ Svg.Attributes.x (String.fromFloat left)
-                            , Svg.Attributes.y (String.fromFloat top)
-                            , Svg.Attributes.width (String.fromFloat bboxWidth)
-                            , Svg.Attributes.height (String.fromFloat bboxHeight)
-                            , Svg.Attributes.fill "white"
-                            , Svg.Attributes.fillOpacity "0.3"
-                            , Svg.Attributes.stroke "red"
-                            , Svg.Attributes.strokeWidth (String.fromFloat strokeWidth)
-                            ]
-                            []
+                    Canvas.shapes
+                        [ Canvas.Settings.fill (Color.rgba 1 1 1 0.3)
+                        , Canvas.Settings.stroke Color.red
+                        , Canvas.Settings.Line.lineWidth strokeWidth
+                        , Viewer.Canvas.transform viewer
                         ]
+                        [ Canvas.rect ( left, top ) bboxWidth bboxHeight ]
 
-        svgViewer =
-            Element.html <|
-                Svg.svg
-                    [ Html.Attributes.width (floor viewerWidth)
-                    , Html.Attributes.height (floor viewerHeight)
-                    , Wheel.onWheel (zoomWheelMsg viewer)
-                    , msgOn "pointerdown" (Json.Decode.map (PointerMsg << PointerDownRaw) Json.Decode.value)
-                    , Pointer.onUp (\e -> PointerMsg (PointerUp e.pointer.offsetPos))
-                    , Html.Attributes.style "touch-action" "none"
-                    , Html.Events.preventDefaultOn "pointermove" <|
-                        Json.Decode.map (\coords -> ( PointerMsg (PointerMove coords), True )) <|
-                            Json.Decode.map2 Tuple.pair
-                                (Json.Decode.field "clientX" Json.Decode.float)
-                                (Json.Decode.field "clientY" Json.Decode.float)
-                    ]
-                    [ svgContent ]
+        canvasViewer =
+            Canvas.toHtml ( round viewerWidth, round viewerHeight )
+                [ Html.Attributes.id "theCanvas"
+                , Html.Attributes.style "display" "block"
+                , Wheel.onWheel (zoomWheelMsg viewer)
+                , msgOn "pointerdown" (Json.Decode.map (PointerMsg << PointerDownRaw) Json.Decode.value)
+                , Pointer.onUp (\e -> PointerMsg (PointerUp e.pointer.offsetPos))
+                , Html.Attributes.style "touch-action" "none"
+                , Html.Events.preventDefaultOn "pointermove" <|
+                    Json.Decode.map (\coords -> ( PointerMsg (PointerMove coords), True )) <|
+                        Json.Decode.map2 Tuple.pair
+                            (Json.Decode.field "clientX" Json.Decode.float)
+                            (Json.Decode.field "clientY" Json.Decode.float)
+                ]
+                [ clearCanvas, renderedImage, renderedBbox ]
     in
     Element.column [ height fill ]
         [ headerBar
@@ -1965,7 +1987,7 @@ viewImgs pointerMode bboxDrawn viewer images =
             , Element.clip
             , height fill
             ]
-            svgViewer
+            (Element.html canvasViewer)
         ]
 
 
