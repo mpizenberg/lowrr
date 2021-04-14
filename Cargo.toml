@@ -4,4 +4,5 @@ members = [
   "lowrr-lib",
   "lowrr-bin",
   "warp-crop",
+  "lowrr-wasm",
 ]
