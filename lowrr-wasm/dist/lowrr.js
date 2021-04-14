@@ -10,6 +10,7 @@ async function init() {
   if (wasm != undefined) {
     wasm = await wasmInit("./pkg/lowrr_wasm_bg.wasm");
   }
+  console.log("Hello from wasm");
 }
 
 // Crop an image file.

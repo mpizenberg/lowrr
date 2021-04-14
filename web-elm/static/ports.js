@@ -2,11 +2,17 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/
 
+// Import WebAssembly module.
+import * as lowrr from "./lowrr-wasm-dist/lowrr.js";
+
 export function activatePorts(app, containerSize) {
   // Inform the Elm app when its container div gets resized.
   window.addEventListener("resize", () =>
     app.ports.resizes.send(containerSize())
   );
+
+  // Initialize the WebAssembly module.
+  lowrr.init();
 
   let worker = new Worker("worker.js");
 
