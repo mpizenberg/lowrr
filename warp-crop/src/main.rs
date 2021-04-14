@@ -85,7 +85,7 @@ fn get_args(matches: &clap::ArgMatches) -> anyhow::Result<Args> {
             let value = str_value
                 .parse()
                 .context(format!("Failed to parse \"{}\" into a float", str_value))?;
-            if value < 0.0 || value > 1.0 {
+            if !(0.0..=1.0).contains(&value) {
                 anyhow::bail!("Expecting an intensity value in [0,1], got {}", value)
             }
             Some(value)
