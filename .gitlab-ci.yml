@@ -44,10 +44,9 @@ build-musl:
     name: "lowrr-executables"
     paths:
       - 'target/x86_64-unknown-linux-musl/release/lowrr'
-      - 'target/x86_64-unknown-linux-musl/release/examples/warp_crop'
+      - 'target/x86_64-unknown-linux-musl/release/warp-crop'
   script:
     - cargo build --release --target x86_64-unknown-linux-musl
-    - cargo build --release --target x86_64-unknown-linux-musl --example warp_crop
   only:
     - main
     - tags
