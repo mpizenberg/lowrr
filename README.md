@@ -130,7 +130,7 @@ All saved images will be located in the `out/` directory.
 
 ## Lib documentation
 
-In addition to the `lowrr` executable compiled from `src/main.rs`,
+In addition to the `lowrr` executable compiled from `lowrr-bin/src/main.rs`,
 we also provide the code in the form of a library,
 so that it can easily be re-used for other Rust applications.
 The API documentation of the library is available at
@@ -222,20 +222,14 @@ All the figures that do not involve 3D reconstruction though
 are reproducible with the code provided here.
 You will need to be able to run Matlab code, I leave that to you.
 
-First, you need to build the main `lowrr` executable.
+First, you need to build the `lowrr` and `warp-crop` executables.
 
 ```sh
 cargo build --release
 ```
 
-Then, you need to build the `warp_crop` example program.
-
-```sh
-cargo build --release --example warp_crop
-```
-
 These two executables will be located at `target/release/lowrr`
-and `target/release/examples/warp_crop` respectively.
+and `target/release/warp_crop` respectively.
 Copy them somewhere in your path to have them available
 when we run the Matlab scripts.
 

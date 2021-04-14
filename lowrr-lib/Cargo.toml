@@ -1,0 +1,14 @@
+[package]
+name = "lowrr"
+version = "0.2.0"
+authors = ["Matthieu Pizenberg <matthieu.pizenberg@gmail.com>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+nalgebra = "0.25.1"
+image = "0.23.14"
+indicatif = "0.15.0"
+thiserror = "1.0.24" # error handling in the library
+log = { version = "0.4.14", default-features = false } # for debug logs with -vvv

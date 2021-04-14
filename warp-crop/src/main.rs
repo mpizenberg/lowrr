@@ -95,7 +95,7 @@ fn get_args(matches: &clap::ArgMatches) -> anyhow::Result<Args> {
     // Retrieving the crop argument.
     let crop = match matches.values_of("crop") {
         None => None,
-        Some(str_coords) => Some(Crop::try_from(str_coords)?),
+        Some(str_coords) => Some(Crop::try_from(str_coords.collect::<Vec<_>>())?),
     };
 
     Ok(Args {

@@ -24,9 +24,10 @@ pub enum CropError {
     Parse(#[from] std::num::ParseIntError),
 }
 
-impl TryFrom<clap::Values<'_>> for Crop {
+impl TryFrom<Vec<&str>> for Crop {
     type Error = CropError;
-    fn try_from(mut vs: clap::Values) -> Result<Self, Self::Error> {
+    fn try_from(vs: Vec<&str>) -> Result<Self, Self::Error> {
+        let mut vs = vs.iter();
         match (vs.next(), vs.next(), vs.next(), vs.next(), vs.next()) {
             (None, _, _, _, _) => Err(CropError::NotEnoughArgs(0)),
             (_, None, _, _, _) => Err(CropError::NotEnoughArgs(1)),
