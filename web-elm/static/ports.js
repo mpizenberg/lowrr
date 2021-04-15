@@ -18,6 +18,7 @@ export function activatePorts(app, containerSize) {
       // Build and HTMLImageElement for each cropped image.
       const decodedImages = await Promise.all(
         event.data.data.map(async ({ id, url }) => {
+          console.log("map url: " + url);
           const decodedImg = await utils.decodeImage(url);
           return { id, img: decodedImg };
         })

@@ -6,8 +6,8 @@
 // Remark: ES modules are not supported in Web Workers,
 // so you have to process this file with esbuild:
 // esbuild worker.mjs --bundle --outfile=worker.js
-import * as lowrr from "./lowrr.mjs";
-lowrr.init();
+import { crop, default as init } from "./pkg/lowrr_wasm.js";
+init("./pkg/lowrr_wasm_bg.wasm");
 
 console.log("Hello from worker");
 
@@ -32,7 +32,7 @@ async function run(params) {
   croppedImages.length = 0;
   console.log("worker running with parameters:", params);
   for (let img of images) {
-    croppedImages.push(await crop(img));
+    croppedImages.push(await wasmCrop(img));
   }
 
   // Send back to main thread all cropped images.
@@ -40,13 +40,13 @@ async function run(params) {
 }
 
 // Temporary function just to crop a given image.
-async function crop(img) {
+async function wasmCrop(img) {
   console.log("Cropping image ", img);
   const response = await fetch(img.url);
   const arrayBuffer = await response.arrayBuffer();
-  const cropped = lowrr.crop(new Uint8Array(arrayBuffer));
+  const cropped = crop(new Uint8Array(arrayBuffer));
   const croppedUrl = URL.createObjectURL(new Blob([cropped]));
-  log(2, `Cropping ${img.id}`);
+  log(2, `Cropped ${img.id}`);
   return {
     id: img.id,
     url: croppedUrl,

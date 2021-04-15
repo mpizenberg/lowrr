@@ -1,1 +1,0 @@
-../../lowrr-wasm/dist/lowrr.mjs
