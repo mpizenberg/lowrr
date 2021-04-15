@@ -6,13 +6,17 @@
 // Remark: ES modules are not supported in Web Workers,
 // so you have to process this file with esbuild:
 // esbuild worker.mjs --bundle --outfile=worker.js
-import { crop, default as init } from "./pkg/lowrr_wasm.js";
-init("./pkg/lowrr_wasm_bg.wasm");
+import { Lowrr as LowrrWasm, default as init } from "./pkg/lowrr_wasm.js";
+
+// Initialize the wasm module.
+// Let's hope this finishes before someone needs to call a Lowrr method.
+let Lowrr;
+(async function () {
+  await init("./pkg/lowrr_wasm_bg.wasm");
+  Lowrr = LowrrWasm.init();
+})();
 
 console.log("Hello from worker");
-
-const images = [];
-const croppedImages = [];
 
 // Listener for messages containing data of the shape: { type, data }
 // where type can be one of:
@@ -21,11 +25,19 @@ const croppedImages = [];
 onmessage = async function (event) {
   console.log(`worker message: ${event.data.type}`);
   if (event.data.type == "image-loaded") {
-    images.push(event.data.data);
+    await load(event.data.data);
   } else if (event.data.type == "run") {
     await run(event.data.data);
   }
 };
+
+// Load image into wasm memory.
+async function load({ id, url, width, height }) {
+  console.log("Loading into wasm: " + id);
+  const response = await fetch(url);
+  const arrayBuffer = await response.arrayBuffer();
+  Lowrr.load(new Uint8Array(arrayBuffer));
+}
 
 // Main algorithm with the parameters passed as arguments.
 async function run(params) {

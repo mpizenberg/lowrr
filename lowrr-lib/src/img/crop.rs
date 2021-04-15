@@ -4,12 +4,16 @@ use nalgebra::{DMatrix, Scalar, Vector6};
 use std::convert::TryFrom;
 use thiserror::Error;
 
+#[cfg(feature = "wasm-bindgen")]
+use wasm_bindgen::prelude::*;
+
+#[cfg_attr(feature = "wasm-bindgen", wasm_bindgen)]
 #[derive(Debug, Clone, Copy)]
 pub struct Crop {
-    left: usize,
-    top: usize,
-    right: usize,
-    bottom: usize,
+    pub left: usize,
+    pub top: usize,
+    pub right: usize,
+    pub bottom: usize,
 }
 
 #[derive(Error, Debug)]

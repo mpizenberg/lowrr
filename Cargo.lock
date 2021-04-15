@@ -329,6 +329,7 @@ dependencies = [
  "log",
  "nalgebra",
  "thiserror",
+ "wasm-bindgen",
 ]
 
 [[package]]
@@ -350,9 +351,12 @@ dependencies = [
 name = "lowrr-wasm"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "console_error_panic_hook",
  "image",
  "log",
+ "lowrr",
+ "nalgebra",
  "wasm-bindgen",
 ]
 

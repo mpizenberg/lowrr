@@ -12,7 +12,11 @@ use crate::affine2d::{projection_mat, projection_params};
 use crate::img::interpolation::CanLinearInterpolate;
 use crate::interop::ToImage;
 
+#[cfg(feature = "wasm-bindgen")]
+use wasm_bindgen::prelude::*;
+
 /// Configuration (parameters) of the registration algorithm.
+#[cfg_attr(feature = "wasm-bindgen", wasm_bindgen)]
 #[derive(Debug, Clone, Copy)]
 pub struct Config {
     pub lambda: f32,
