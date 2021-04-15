@@ -6,16 +6,13 @@
 // Remark: ES modules are not supported in Web Workers,
 // so you have to process this file with esbuild:
 // esbuild worker.mjs --bundle --outfile=worker.js
-import * as lowrr from "./lowrr-wasm-dist/lowrr.mjs";
+import * as lowrr from "./lowrr.mjs";
 lowrr.init();
 
 console.log("Hello from worker");
 
 const images = [];
 const croppedImages = [];
-// TODO: Temporary, chrome-only
-const canvas = new OffscreenCanvas(100, 100);
-const ctx = canvas.getContext("2d");
 
 // Listener for messages containing data of the shape: { type, data }
 // where type can be one of:
@@ -34,29 +31,8 @@ onmessage = async function (event) {
 async function run(params) {
   croppedImages.length = 0;
   console.log("worker running with parameters:", params);
-  // Reshape the canvas to the appropriate cropped size.
-  if (params.crop != null) {
-    canvas.width = params.crop.right - params.crop.left;
-    canvas.height = params.crop.bottom - params.crop.top;
-  } else {
-    canvas.width = images[0].width;
-    canvas.height = images[0].height;
-  }
-  // Crop all images
-  let x, y;
-  if (params.crop == null) {
-    x = 0;
-    y = 0;
-  } else {
-    x = params.crop.left;
-    y = params.crop.top;
-  }
-  let width = canvas.width;
-  let height = canvas.height;
   for (let img of images) {
-    let croppedImg = await crop(img, x, y, width, height);
-    await sleep((width * height) / 50000);
-    croppedImages.push(croppedImg);
+    croppedImages.push(await crop(img));
   }
 
   // Send back to main thread all cropped images.
@@ -64,17 +40,19 @@ async function run(params) {
 }
 
 // Temporary function just to crop a given image.
-async function crop(img, x, y, width, height) {
+async function crop(img) {
   console.log("Cropping image ", img);
   const response = await fetch(img.url);
-  const data = await response.blob();
-  const imgBitmap = await createImageBitmap(data, x, y, width, height);
-  ctx.drawImage(imgBitmap, 0, 0);
-  imgBitmap.close();
-  const croppedBlob = await canvas.convertToBlob();
-  const croppedUrl = URL.createObjectURL(croppedBlob);
+  const arrayBuffer = await response.arrayBuffer();
+  const cropped = lowrr.crop(new Uint8Array(arrayBuffer));
+  const croppedUrl = URL.createObjectURL(new Blob([cropped]));
   log(2, `Cropping ${img.id}`);
-  return { id: img.id, url: croppedUrl, width, height };
+  return {
+    id: img.id,
+    url: croppedUrl,
+    width: Math.floor(img.width / 2),
+    height: Math.floor(img.height / 2),
+  };
 }
 
 // Log something in the interface with the provided verbosity level.

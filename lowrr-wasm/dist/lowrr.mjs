@@ -3,12 +3,12 @@ import { crop as wasmCrop, default as wasmInit } from "./pkg/lowrr_wasm.js";
 export { init, crop };
 
 // Global variable in the module.
-let wasm = undefined;
+let lowrr_wasm = undefined;
 
 // Initialize the wasm module.
 async function init() {
-  if (wasm != undefined) {
-    wasm = await wasmInit("./pkg/lowrr_wasm_bg.wasm");
+  if (lowrr_wasm == undefined) {
+    lowrr_wasm = await wasmInit("./pkg/lowrr_wasm_bg.wasm");
   }
   console.log("Hello from wasm");
 }
