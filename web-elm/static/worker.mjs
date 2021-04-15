@@ -2,6 +2,13 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/
 
+// Import and initialize the WebAssembly module.
+// Remark: ES modules are not supported in Web Workers,
+// so you have to process this file with esbuild:
+// esbuild worker.mjs --bundle --outfile=worker.js
+import * as lowrr from "./lowrr-wasm-dist/lowrr.mjs";
+lowrr.init();
+
 console.log("Hello from worker");
 
 const images = [];
