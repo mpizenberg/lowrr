@@ -58,21 +58,25 @@ async function run(params) {
     crop: params.crop,
   };
 
+  // Run lowrr main registration algorithm.
   let motion = Lowrr.run(args);
-  console.log("Retrieved result in JS:", motion);
-  // let LowrrResult = Lowrr.run(args);
-  // // Send back to main thread all cropped images.
-  // for (let id of Lowrr.imageIds()) {
-  //   let croppedImgArrayBuffer = LowrrResult.croppedImgFile(id);
-  //   // Transfer the array buffer back to main thread.
-  //   postMessage(
-  //     {
-  //       type: "cropped-image",
-  //       data: { id, arrayBuffer: croppedImgArrayBuffer },
-  //     },
-  //     [croppedImgArrayBuffer]
-  //   );
-  // }
+
+  // Send back to main thread all cropped images.
+  const image_ids = Lowrr.image_ids();
+  console.log("Encoding cropped aligned images:");
+  for (let i = 0; i < image_ids.length; i++) {
+    const id = image_ids[i];
+    console.log("   Encoding ", id, " ...");
+    let croppedImgArrayU8 = Lowrr.cropped_img_file(i);
+    // Transfer the array buffer back to main thread.
+    postMessage(
+      {
+        type: "cropped-image",
+        data: { id, arrayBuffer: croppedImgArrayU8.buffer },
+      },
+      [croppedImgArrayU8.buffer]
+    );
+  }
 
   // Signal that we are done.
   postMessage({ type: "registration-done" });

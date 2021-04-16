@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MPL-2.0
 
 use anyhow::Context;
-use image::{DynamicImage, GenericImageView};
-use nalgebra::{DMatrix, Scalar, Vector6};
+use image::DynamicImage;
+use nalgebra::{DMatrix, Vector6};
 use serde::Deserialize;
 use std::io::Cursor;
 use wasm_bindgen::prelude::*;
@@ -19,7 +19,7 @@ mod utils; // define console_log! macro
 pub struct Lowrr {
     image_ids: Vec<String>,
     dataset: Dataset,
-    args: Option<Args>,
+    crop_registered: Vec<DMatrix<u8>>,
 }
 
 enum Dataset {
@@ -46,10 +46,11 @@ impl Lowrr {
         Self {
             image_ids: Vec::new(),
             dataset: Dataset::Empty,
-            args: None,
+            crop_registered: Vec::new(),
         }
     }
 
+    // Load and decode the images to be registered.
     pub fn load(&mut self, id: String, img_file: &[u8]) -> Result<(), JsValue> {
         console_log!("Loading an image");
         let reader = image::io::Reader::new(Cursor::new(img_file))
@@ -115,7 +116,9 @@ impl Lowrr {
         Ok(())
     }
 
+    // Run the main lowrr registration algorithm.
     pub fn run(&mut self, params: JsValue) -> Result<Vec<f32>, JsValue> {
+        self.crop_registered.clear();
         let args: Args = params.into_serde().map_err(|e| e.to_string())?;
         console_log!("Running inside Rust!");
 
@@ -125,32 +128,49 @@ impl Lowrr {
             Dataset::GrayImages(gray_imgs) => {
                 let (motion_vec_crop, cropped_eq_imgs) =
                     crop_and_register(&args, gray_imgs.clone(), 40).map_err(|e| e.to_string())?;
+                self.crop_registered = cropped_eq_imgs;
                 original_motion(args.crop, motion_vec_crop)
             }
             Dataset::GrayImagesU16(gray_imgs) => {
                 let (motion_vec_crop, cropped_eq_imgs) =
                     crop_and_register(&args, gray_imgs.clone(), 10 * 256)
                         .map_err(|e| e.to_string())?;
+                self.crop_registered = cropped_eq_imgs.into_iter().map(into_gray_u8).collect();
                 original_motion(args.crop, motion_vec_crop)
             }
             Dataset::RgbImages(imgs) => {
                 let gray_imgs: Vec<_> = imgs.iter().map(|im| im.map(|(_r, g, _b)| g)).collect();
                 let (motion_vec_crop, cropped_eq_imgs) =
                     crop_and_register(&args, gray_imgs, 40).map_err(|e| e.to_string())?;
+                self.crop_registered = cropped_eq_imgs;
                 original_motion(args.crop, motion_vec_crop)
             }
             Dataset::RgbImagesU16(imgs) => {
                 let gray_imgs: Vec<_> = imgs.iter().map(|im| im.map(|(_r, g, _b)| g)).collect();
                 let (motion_vec_crop, cropped_eq_imgs) =
                     crop_and_register(&args, gray_imgs, 10 * 256).map_err(|e| e.to_string())?;
+                self.crop_registered = cropped_eq_imgs.into_iter().map(into_gray_u8).collect();
                 original_motion(args.crop, motion_vec_crop)
             }
         };
 
-        console_log!("motion_vec: {:?}", motion_vec);
-
         let flat_motion_vec = motion_vec.iter().flatten().cloned().collect();
         Ok(flat_motion_vec)
+    }
+
+    // Return the ids of loaded images: [string]
+    pub fn image_ids(&self) -> Result<JsValue, JsValue> {
+        JsValue::from_serde(&self.image_ids).map_err(|e| e.to_string().into())
+    }
+
+    // Retrieve the cropped registered images.
+    pub fn cropped_img_file(&self, i: usize) -> Result<Box<[u8]>, JsValue> {
+        let mut cropped_buffer: Vec<u8> = Vec::new();
+        self.crop_registered[i]
+            .to_image()
+            .write_to(&mut cropped_buffer, image::ImageOutputFormat::Png)
+            .map_err(|e| e.to_string())?;
+        Ok(cropped_buffer.into_boxed_slice())
     }
 }
 
@@ -158,7 +178,7 @@ impl Lowrr {
 fn crop_and_register<T: CanEqualize + CanRegister>(
     args: &Args,
     gray_imgs: Vec<DMatrix<T>>,
-    sparse_diff_threshold: <T as CanRegister>::Bigger, // 50
+    sparse_diff_threshold: <T as CanRegister>::Bigger,
 ) -> anyhow::Result<(Vec<Vector6<f32>>, Vec<DMatrix<T>>)>
 where
     DMatrix<T>: ToImage,
@@ -191,4 +211,8 @@ fn original_motion(crop: Option<Crop>, motion_vec_crop: Vec<Vector6<f32>>) -> Ve
         None => motion_vec_crop.clone(),
         Some(frame) => recover_original_motion(frame, &motion_vec_crop),
     }
+}
+
+fn into_gray_u8(m: DMatrix<u16>) -> DMatrix<u8> {
+    m.map(|x| (x / 256) as u8)
 }

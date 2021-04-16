@@ -26,7 +26,7 @@ export function activatePorts(app, containerSize) {
       const { id, arrayBuffer } = event.data.data;
       const url = URL.createObjectURL(new Blob([arrayBuffer]));
       const decodedCropped = await utils.decodeImage(url);
-      croppedImages.push({ id, img: decodedImg });
+      croppedImages.push({ id, img: decodedCropped });
     } else if (event.data.type == "registration-done") {
       app.ports.receiveCroppedImages.send(croppedImages);
     } else {

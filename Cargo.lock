@@ -365,6 +365,7 @@ dependencies = [
  "lowrr",
  "nalgebra",
  "serde",
+ "serde_json",
  "wasm-bindgen",
 ]
 
