@@ -23,12 +23,15 @@ export function activatePorts(app, containerSize) {
       app.ports.imageDecoded.send({ id: image.id, img });
     } else if (event.data.type == "cropped-image") {
       // Add the cropped image to the list of cropped images.
-      const { id, arrayBuffer } = event.data.data;
+      const { id, arrayBuffer, imgCount } = event.data.data;
+      console.log("Received cropped image in main:", id);
       const url = URL.createObjectURL(new Blob([arrayBuffer]));
       const decodedCropped = await utils.decodeImage(url);
       croppedImages.push({ id, img: decodedCropped });
-    } else if (event.data.type == "registration-done") {
-      app.ports.receiveCroppedImages.send(croppedImages);
+      if (croppedImages.length == imgCount) {
+        console.log(`Registration done, there are ${imgCount} cropped images.`);
+        app.ports.receiveCroppedImages.send(croppedImages);
+      }
     } else {
       console.warn("Unknown message type:", event.data.type);
     }

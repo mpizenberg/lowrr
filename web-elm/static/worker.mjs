@@ -63,8 +63,9 @@ async function run(params) {
 
   // Send back to main thread all cropped images.
   const image_ids = Lowrr.image_ids();
-  console.log("Encoding cropped aligned images:");
-  for (let i = 0; i < image_ids.length; i++) {
+  const imgCount = image_ids.length;
+  console.log(`Encoding ${imgCount} cropped aligned images:`);
+  for (let i = 0; i < imgCount; i++) {
     const id = image_ids[i];
     console.log("   Encoding ", id, " ...");
     let croppedImgArrayU8 = Lowrr.cropped_img_file(i);
@@ -72,14 +73,11 @@ async function run(params) {
     postMessage(
       {
         type: "cropped-image",
-        data: { id, arrayBuffer: croppedImgArrayU8.buffer },
+        data: { id, arrayBuffer: croppedImgArrayU8.buffer, imgCount },
       },
       [croppedImgArrayU8.buffer]
     );
   }
-
-  // Signal that we are done.
-  postMessage({ type: "registration-done" });
 }
 
 // Log something in the interface with the provided verbosity level.
