@@ -67,6 +67,7 @@ impl Lowrr {
                 log::warn!("Images are of type Gray u16");
                 self.dataset = Dataset::GrayImagesU16(vec![dyn_img.into_dmatrix()]);
             }
+            // Loading of subsequent images
             (DynamicImage::ImageLuma16(_), Dataset::GrayImagesU16(imgs)) => {
                 imgs.push(dyn_img.into_dmatrix());
             }
@@ -75,10 +76,18 @@ impl Lowrr {
                 log::warn!("Images are of type RGB (u8, u8, u8)");
                 self.dataset = Dataset::RgbImages(vec![dyn_img.into_dmatrix()]);
             }
+            // Loading of subsequent images
+            (DynamicImage::ImageRgb8(_), Dataset::RgbImages(imgs)) => {
+                imgs.push(dyn_img.into_dmatrix());
+            }
             // Loading the first image (empty dataset)
             (DynamicImage::ImageRgb16(_), Dataset::Empty) => {
                 log::warn!("Images are of type RGB (u16, u16, u16)");
                 self.dataset = Dataset::RgbImagesU16(vec![dyn_img.into_dmatrix()]);
+            }
+            // Loading of subsequent images
+            (DynamicImage::ImageRgb16(_), Dataset::RgbImagesU16(imgs)) => {
+                imgs.push(dyn_img.into_dmatrix());
             }
             (DynamicImage::ImageBgr8(_), _) => Err("BGR order not supported")?,
             (DynamicImage::ImageBgra8(_), _) => Err("BGR order not supported")?,

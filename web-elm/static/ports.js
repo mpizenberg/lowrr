@@ -42,8 +42,8 @@ export function activatePorts(app, containerSize) {
           height: image.img.height,
         };
         worker.postMessage({ type: "image-loaded", data: workerImage });
-        await sleep((image.width * image.height) / 50000);
-        app.ports.imageDecoded.send(image);
+        // await sleep((image.width * image.height) / 50000);
+        // app.ports.imageDecoded.send(image);
       }
     } catch (error) {
       console.error(error);
