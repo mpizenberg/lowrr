@@ -58,19 +58,22 @@ async function run(params) {
     crop: params.crop,
   };
 
-  let LowrrResult = Lowrr.run(args);
-  // Send back to main thread all cropped images.
-  for (let id of Lowrr.imageIds()) {
-    let croppedImgArrayBuffer = LowrrResult.croppedImgFile(id);
-    // Transfer the array buffer back to main thread.
-    postMessage(
-      {
-        type: "cropped-image",
-        data: { id, arrayBuffer: croppedImgArrayBuffer },
-      },
-      [croppedImgArrayBuffer]
-    );
-  }
+  let motion = Lowrr.run(args);
+  console.log("Retrieved result in JS:", motion);
+  // let LowrrResult = Lowrr.run(args);
+  // // Send back to main thread all cropped images.
+  // for (let id of Lowrr.imageIds()) {
+  //   let croppedImgArrayBuffer = LowrrResult.croppedImgFile(id);
+  //   // Transfer the array buffer back to main thread.
+  //   postMessage(
+  //     {
+  //       type: "cropped-image",
+  //       data: { id, arrayBuffer: croppedImgArrayBuffer },
+  //     },
+  //     [croppedImgArrayBuffer]
+  //   );
+  // }
+
   // Signal that we are done.
   postMessage({ type: "registration-done" });
 }

@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: MPL-2.0
 
+use anyhow::Context;
 use image::{DynamicImage, GenericImageView};
-use nalgebra::DMatrix;
+use nalgebra::{DMatrix, Scalar, Vector6};
 use serde::Deserialize;
 use std::io::Cursor;
 use wasm_bindgen::prelude::*;
@@ -9,6 +10,7 @@ use wasm_bindgen::prelude::*;
 use lowrr::img::crop::{crop, recover_original_motion, Crop};
 use lowrr::img::registration::{self, CanRegister};
 use lowrr::interop::{IntoDMatrix, ToImage};
+use lowrr::utils::CanEqualize;
 
 #[macro_use]
 mod utils; // define console_log! macro
@@ -113,9 +115,80 @@ impl Lowrr {
         Ok(())
     }
 
-    pub fn run(&mut self, params: JsValue) -> Result<(), JsValue> {
+    pub fn run(&mut self, params: JsValue) -> Result<Vec<f32>, JsValue> {
         let args: Args = params.into_serde().map_err(|e| e.to_string())?;
         console_log!("Running inside Rust!");
-        Ok(())
+
+        // Use the algorithm corresponding to the type of data.
+        let motion_vec = match &self.dataset {
+            Dataset::Empty => Vec::new(),
+            Dataset::GrayImages(gray_imgs) => {
+                let (motion_vec_crop, cropped_eq_imgs) =
+                    crop_and_register(&args, gray_imgs.clone(), 40).map_err(|e| e.to_string())?;
+                original_motion(args.crop, motion_vec_crop)
+            }
+            Dataset::GrayImagesU16(gray_imgs) => {
+                let (motion_vec_crop, cropped_eq_imgs) =
+                    crop_and_register(&args, gray_imgs.clone(), 10 * 256)
+                        .map_err(|e| e.to_string())?;
+                original_motion(args.crop, motion_vec_crop)
+            }
+            Dataset::RgbImages(imgs) => {
+                let gray_imgs: Vec<_> = imgs.iter().map(|im| im.map(|(_r, g, _b)| g)).collect();
+                let (motion_vec_crop, cropped_eq_imgs) =
+                    crop_and_register(&args, gray_imgs, 40).map_err(|e| e.to_string())?;
+                original_motion(args.crop, motion_vec_crop)
+            }
+            Dataset::RgbImagesU16(imgs) => {
+                let gray_imgs: Vec<_> = imgs.iter().map(|im| im.map(|(_r, g, _b)| g)).collect();
+                let (motion_vec_crop, cropped_eq_imgs) =
+                    crop_and_register(&args, gray_imgs, 10 * 256).map_err(|e| e.to_string())?;
+                original_motion(args.crop, motion_vec_crop)
+            }
+        };
+
+        console_log!("motion_vec: {:?}", motion_vec);
+
+        let flat_motion_vec = motion_vec.iter().flatten().cloned().collect();
+        Ok(flat_motion_vec)
+    }
+}
+
+#[allow(clippy::type_complexity)]
+fn crop_and_register<T: CanEqualize + CanRegister>(
+    args: &Args,
+    gray_imgs: Vec<DMatrix<T>>,
+    sparse_diff_threshold: <T as CanRegister>::Bigger, // 50
+) -> anyhow::Result<(Vec<Vector6<f32>>, Vec<DMatrix<T>>)>
+where
+    DMatrix<T>: ToImage,
+{
+    // Extract the cropped area from the images.
+    let cropped_imgs: Result<Vec<DMatrix<T>>, _> = match args.crop {
+        None => Ok(gray_imgs),
+        Some(frame) => {
+            log::warn!("Cropping images ...");
+            gray_imgs.iter().map(|im| crop(frame, im)).collect()
+        }
+    };
+    let mut cropped_imgs = cropped_imgs.context("Failed to crop images")?;
+
+    // Equalize mean intensities of cropped area.
+    if let Some(mean_intensity) = args.equalize {
+        log::warn!("Equalizing images mean intensities ...");
+        lowrr::utils::equalize_mean(mean_intensity, &mut cropped_imgs);
+    }
+
+    // Compute the motion of each image for registration.
+    log::error!("Registration of images ...");
+    registration::gray_affine(args.config, cropped_imgs, sparse_diff_threshold)
+        .context("Failed to register images")
+}
+
+fn original_motion(crop: Option<Crop>, motion_vec_crop: Vec<Vector6<f32>>) -> Vec<Vector6<f32>> {
+    // Recover motion parameters in the frame of the full image from the one in the cropped frame.
+    match crop {
+        None => motion_vec_crop.clone(),
+        Some(frame) => recover_original_motion(frame, &motion_vec_crop),
     }
 }
