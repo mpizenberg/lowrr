@@ -10,6 +10,9 @@ export function activatePorts(app, containerSize) {
 
   let worker = new Worker("worker.js");
 
+  // Global variable holding image ids
+  let croppedImages = [];
+
   // Listen to worker messages.
   worker.onmessage = async function (event) {
     if (event.data.type == "log") {
@@ -18,16 +21,14 @@ export function activatePorts(app, containerSize) {
       const image = event.data.data;
       let img = await utils.decodeImage(image.url);
       app.ports.imageDecoded.send({ id: image.id, img });
-    } else if (event.data.type == "cropped-images") {
-      // Build and HTMLImageElement for each cropped image.
-      const decodedImages = await Promise.all(
-        event.data.data.map(async ({ id, url }) => {
-          console.log("map url: " + url);
-          const decodedImg = await utils.decodeImage(url);
-          return { id, img: decodedImg };
-        })
-      );
-      app.ports.receiveCroppedImages.send(decodedImages);
+    } else if (event.data.type == "cropped-image") {
+      // Add the cropped image to the list of cropped images.
+      const { id, arrayBuffer } = event.data.data;
+      const url = URL.createObjectURL(new Blob([arrayBuffer]));
+      const decodedCropped = await utils.decodeImage(url);
+      croppedImages.push({ id, img: decodedImg });
+    } else if (event.data.type == "registration-done") {
+      app.ports.receiveCroppedImages.send(croppedImages);
     } else {
       console.warn("Unknown message type:", event.data.type);
     }
@@ -36,6 +37,7 @@ export function activatePorts(app, containerSize) {
   // Listen for images to decode.
   app.ports.decodeImages.subscribe(async (imgs) => {
     console.log("Received images to decode");
+    croppedImages.length = 0; // reset associated cropped images
     try {
       for (let img of imgs) {
         const url = URL.createObjectURL(img);
