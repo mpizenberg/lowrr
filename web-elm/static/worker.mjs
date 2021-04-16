@@ -33,7 +33,7 @@ onmessage = async function (event) {
 };
 
 // Load image into wasm memory and decode it.
-async function decode({ id, url, width, height }) {
+async function decode({ id, url }) {
   console.log("Loading into wasm: " + id);
   const response = await fetch(url);
   const arrayBuffer = await response.arrayBuffer();
@@ -42,30 +42,22 @@ async function decode({ id, url, width, height }) {
 
 // Main algorithm with the parameters passed as arguments.
 async function run(params) {
-  croppedImages.length = 0;
   console.log("worker running with parameters:", params);
-  for (let img of images) {
-    croppedImages.push(await wasmCrop(img));
-  }
-
+  let LowrrResult = Lowrr.run(params);
   // Send back to main thread all cropped images.
-  postMessage({ type: "cropped-images", data: croppedImages });
-}
-
-// Temporary function just to crop a given image.
-async function wasmCrop(img) {
-  console.log("Cropping image ", img);
-  const response = await fetch(img.url);
-  const arrayBuffer = await response.arrayBuffer();
-  const cropped = crop(new Uint8Array(arrayBuffer));
-  const croppedUrl = URL.createObjectURL(new Blob([cropped]));
-  log(2, `Cropped ${img.id}`);
-  return {
-    id: img.id,
-    url: croppedUrl,
-    width: Math.floor(img.width / 2),
-    height: Math.floor(img.height / 2),
-  };
+  for (let id of LowrrResult.imageIds()) {
+    let croppedImgArrayBuffer = LowrrResult.croppedImgFile(id);
+    // Transfer the array buffer back to main thread.
+    postMessage(
+      {
+        type: "cropped-image",
+        data: { id, arrayBuffer: croppedImgArrayBuffer },
+      },
+      [croppedImgArrayBuffer]
+    );
+  }
+  // Signal that we are done.
+  postMessage({ type: "registration-done" });
 }
 
 // Log something in the interface with the provided verbosity level.
