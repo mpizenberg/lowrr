@@ -40,7 +40,6 @@ export function activatePorts(app, containerSize) {
   // Listen for images to decode.
   app.ports.decodeImages.subscribe(async (imgs) => {
     console.log("Received images to decode");
-    croppedImages.length = 0; // reset associated cropped images
     try {
       for (let img of imgs) {
         const url = URL.createObjectURL(img);
@@ -65,6 +64,7 @@ export function activatePorts(app, containerSize) {
 
   // Run the registration algorithm with the provided parameters.
   app.ports.run.subscribe(async (params) => {
+    croppedImages.length = 0; // reset associated cropped images
     worker.postMessage({ type: "run", data: params });
   });
 
