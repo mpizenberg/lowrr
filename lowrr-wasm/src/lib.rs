@@ -14,6 +14,7 @@ mod utils; // define console_log! macro
 
 #[wasm_bindgen]
 pub struct Lowrr {
+    image_ids: Vec<String>,
     dataset: Dataset,
     args: Option<Args>,
 }
@@ -39,12 +40,13 @@ impl Lowrr {
     pub fn init() -> Self {
         utils::set_panic_hook();
         Self {
+            image_ids: Vec::new(),
             dataset: Dataset::Empty,
             args: None,
         }
     }
 
-    pub fn load(&mut self, img_file: &[u8]) -> Result<(), JsValue> {
+    pub fn load(&mut self, id: String, img_file: &[u8]) -> Result<(), JsValue> {
         console_log!("Loading an image");
         let reader = image::io::Reader::new(Cursor::new(img_file))
             .with_guessed_format()
@@ -57,37 +59,45 @@ impl Lowrr {
             (DynamicImage::ImageLuma8(_), Dataset::Empty) => {
                 log::warn!("Images are of type Gray u8");
                 self.dataset = Dataset::GrayImages(vec![dyn_img.into_dmatrix()]);
+                self.image_ids = vec![id];
             }
             // Loading of subsequent images
             (DynamicImage::ImageLuma8(_), Dataset::GrayImages(imgs)) => {
                 imgs.push(dyn_img.into_dmatrix());
+                self.image_ids.push(id);
             }
             // Loading the first image (empty dataset)
             (DynamicImage::ImageLuma16(_), Dataset::Empty) => {
                 log::warn!("Images are of type Gray u16");
                 self.dataset = Dataset::GrayImagesU16(vec![dyn_img.into_dmatrix()]);
+                self.image_ids = vec![id];
             }
             // Loading of subsequent images
             (DynamicImage::ImageLuma16(_), Dataset::GrayImagesU16(imgs)) => {
                 imgs.push(dyn_img.into_dmatrix());
+                self.image_ids.push(id);
             }
             // Loading the first image (empty dataset)
             (DynamicImage::ImageRgb8(_), Dataset::Empty) => {
                 log::warn!("Images are of type RGB (u8, u8, u8)");
                 self.dataset = Dataset::RgbImages(vec![dyn_img.into_dmatrix()]);
+                self.image_ids = vec![id];
             }
             // Loading of subsequent images
             (DynamicImage::ImageRgb8(_), Dataset::RgbImages(imgs)) => {
                 imgs.push(dyn_img.into_dmatrix());
+                self.image_ids.push(id);
             }
             // Loading the first image (empty dataset)
             (DynamicImage::ImageRgb16(_), Dataset::Empty) => {
                 log::warn!("Images are of type RGB (u16, u16, u16)");
                 self.dataset = Dataset::RgbImagesU16(vec![dyn_img.into_dmatrix()]);
+                self.image_ids = vec![id];
             }
             // Loading of subsequent images
             (DynamicImage::ImageRgb16(_), Dataset::RgbImagesU16(imgs)) => {
                 imgs.push(dyn_img.into_dmatrix());
+                self.image_ids.push(id);
             }
             (DynamicImage::ImageBgr8(_), _) => Err("BGR order not supported")?,
             (DynamicImage::ImageBgra8(_), _) => Err("BGR order not supported")?,

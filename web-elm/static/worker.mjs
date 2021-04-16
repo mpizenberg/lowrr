@@ -37,7 +37,7 @@ async function decode({ id, url }) {
   console.log("Loading into wasm: " + id);
   const response = await fetch(url);
   const arrayBuffer = await response.arrayBuffer();
-  Lowrr.load(new Uint8Array(arrayBuffer));
+  Lowrr.load(id, new Uint8Array(arrayBuffer));
 }
 
 // Main algorithm with the parameters passed as arguments.
@@ -45,7 +45,7 @@ async function run(params) {
   console.log("worker running with parameters:", params);
   let LowrrResult = Lowrr.run(params);
   // Send back to main thread all cropped images.
-  for (let id of LowrrResult.imageIds()) {
+  for (let id of Lowrr.imageIds()) {
     let croppedImgArrayBuffer = LowrrResult.croppedImgFile(id);
     // Transfer the array buffer back to main thread.
     postMessage(
