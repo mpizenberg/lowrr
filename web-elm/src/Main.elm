@@ -699,7 +699,7 @@ update msg model =
             ( { model | registeredImages = Maybe.map goToNextImage model.registeredImages }, Cmd.none )
 
         ( RunAlgorithm params, Config imgs ) ->
-            ( { model | state = Logs imgs }, run (encodeParams params) )
+            ( { model | state = Logs imgs, registeredImages = Nothing }, run (encodeParams params) )
 
         ( Log logData, _ ) ->
             ( { model | logs = logData :: model.logs }, Cmd.none )
