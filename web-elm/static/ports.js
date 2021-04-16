@@ -14,6 +14,10 @@ export function activatePorts(app, containerSize) {
   worker.onmessage = async function (event) {
     if (event.data.type == "log") {
       app.ports.log.send(event.data.data);
+    } else if (event.data.type == "image-decoded") {
+      const image = event.data.data;
+      let img = await utils.decodeImage(image.url);
+      app.ports.imageDecoded.send({ id: image.id, img });
     } else if (event.data.type == "cropped-images") {
       // Build and HTMLImageElement for each cropped image.
       const decodedImages = await Promise.all(
@@ -34,16 +38,11 @@ export function activatePorts(app, containerSize) {
     console.log("Received images to decode");
     try {
       for (let img of imgs) {
-        const image = await utils.createImageObject(img.name, img);
-        const workerImage = {
-          id: img.name,
-          url: image.img.src,
-          width: image.img.width,
-          height: image.img.height,
-        };
-        worker.postMessage({ type: "image-loaded", data: workerImage });
-        // await sleep((image.width * image.height) / 50000);
-        // app.ports.imageDecoded.send(image);
+        const url = URL.createObjectURL(img);
+        worker.postMessage({
+          type: "decode-image",
+          data: { id: img.name, url },
+        });
       }
     } catch (error) {
       console.error(error);
@@ -66,22 +65,6 @@ export function activatePorts(app, containerSize) {
 
   // Replace elm Browser.onAnimationFrameDelta that seems to have timing issues.
   // startAnimationFrameLoop(app.ports.animationFrame);
-
-  // // Transfer archive data to wasm when the file is loaded.
-  // app.ports.loadDataset.subscribe(({file: archive, camera: cam}) => {
-  // 	console.log("Loading tar archive ...");
-  // 	file_reader.readAsArrayBuffer(archive);
-  // });
-
-  // // Transfer archive data to wasm when the file is loaded.
-  // function transferContent(arrayBuffer) {
-  // 	Renderer.wasm_tracker.allocate(arrayBuffer.byteLength);
-  // 	const wasm_buffer = new Uint8Array(Renderer.wasm.memory.buffer);
-  // 	const start = Renderer.wasm_tracker.memory_pos();
-  // 	let file_buffer = new Uint8Array(arrayBuffer);
-  // 	wasm_buffer.set(file_buffer, start);
-  // 	file_buffer = null; arrayBuffer = null; // Free memory.
-  // }
 }
 
 function sleep(ms) {

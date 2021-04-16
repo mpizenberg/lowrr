@@ -20,19 +20,20 @@ console.log("Hello from worker");
 
 // Listener for messages containing data of the shape: { type, data }
 // where type can be one of:
-//   - "image-loaded": received when an image was loaded in the main thread
+//   - "decode-image": decode an image provided with its url
 //   - "run": run the algorithm on all images
 onmessage = async function (event) {
   console.log(`worker message: ${event.data.type}`);
-  if (event.data.type == "image-loaded") {
-    await load(event.data.data);
+  if (event.data.type == "decode-image") {
+    await decode(event.data.data);
+    postMessage({ type: "image-decoded", data: event.data.data });
   } else if (event.data.type == "run") {
     await run(event.data.data);
   }
 };
 
-// Load image into wasm memory.
-async function load({ id, url, width, height }) {
+// Load image into wasm memory and decode it.
+async function decode({ id, url, width, height }) {
   console.log("Loading into wasm: " + id);
   const response = await fetch(url);
   const arrayBuffer = await response.arrayBuffer();
