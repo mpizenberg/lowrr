@@ -7,8 +7,12 @@ use thiserror::Error;
 #[cfg(feature = "wasm-bindgen")]
 use wasm_bindgen::prelude::*;
 
+#[cfg(feature = "serde")]
+use serde::Deserialize;
+
 #[cfg_attr(feature = "wasm-bindgen", wasm_bindgen)]
 #[derive(Debug, Clone, Copy)]
+#[cfg_attr(feature = "serde", derive(Deserialize))]
 pub struct Crop {
     pub left: usize,
     pub top: usize,

@@ -43,7 +43,22 @@ async function decode({ id, url }) {
 // Main algorithm with the parameters passed as arguments.
 async function run(params) {
   console.log("worker running with parameters:", params);
-  let LowrrResult = Lowrr.run(params);
+  // Convert params to what is expected by the Rust code.
+  const args = {
+    config: {
+      lambda: params.lambda,
+      rho: params.rho,
+      max_iterations: params.maxIterations,
+      threshold: params.convergenceThreshold,
+      sparse_ratio_threshold: params.sparse,
+      levels: params.levels,
+      verbosity: 2,
+    },
+    equalize: 0.5,
+    crop: params.crop,
+  };
+
+  let LowrrResult = Lowrr.run(args);
   // Send back to main thread all cropped images.
   for (let id of Lowrr.imageIds()) {
     let croppedImgArrayBuffer = LowrrResult.croppedImgFile(id);

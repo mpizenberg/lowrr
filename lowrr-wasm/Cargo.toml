@@ -12,12 +12,13 @@ crate-type = ["cdylib", "rlib"]
 target = "wasm32-unknown-unknown"
 
 [dependencies]
-lowrr = { path = "../lowrr-lib", features = ["wasm-bindgen"] }
+lowrr = { path = "../lowrr-lib", features = ["wasm-bindgen", "serde"] }
 anyhow = "1.0.38" # error handling in the main program
 nalgebra = "0.25.1"
 image = { version = "0.23.14", default-features = false, features = ["jpeg", "png"] }
 log = { version = "0.4.14", default-features = false }
-wasm-bindgen = "0.2.73"
+wasm-bindgen = { version = "0.2.73", features = ["serde-serialize"] }
+serde = "1.0.125"
 
 # The `console_error_panic_hook` crate provides better debugging of panics by
 # logging them with `console.error`. This is great for development, but requires

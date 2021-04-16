@@ -2,6 +2,7 @@
 
 use image::{DynamicImage, GenericImageView};
 use nalgebra::DMatrix;
+use serde::Deserialize;
 use std::io::Cursor;
 use wasm_bindgen::prelude::*;
 
@@ -28,6 +29,7 @@ enum Dataset {
 }
 
 #[wasm_bindgen]
+#[derive(Deserialize)]
 /// Type holding the algorithm parameters
 pub struct Args {
     pub config: registration::Config,
@@ -111,8 +113,9 @@ impl Lowrr {
         Ok(())
     }
 
-    pub fn run(args: Args) -> Result<(), JsValue> {
-        // TODO: load dataset.
+    pub fn run(&mut self, params: JsValue) -> Result<(), JsValue> {
+        let args: Args = params.into_serde().map_err(|e| e.to_string())?;
+        console_log!("Running inside Rust!");
         Ok(())
     }
 }

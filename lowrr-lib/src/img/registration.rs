@@ -15,9 +15,13 @@ use crate::interop::ToImage;
 #[cfg(feature = "wasm-bindgen")]
 use wasm_bindgen::prelude::*;
 
+#[cfg(feature = "serde")]
+use serde::Deserialize;
+
 /// Configuration (parameters) of the registration algorithm.
 #[cfg_attr(feature = "wasm-bindgen", wasm_bindgen)]
 #[derive(Debug, Clone, Copy)]
+#[cfg_attr(feature = "serde", derive(Deserialize))]
 pub struct Config {
     pub lambda: f32,
     pub rho: f32,

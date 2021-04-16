@@ -13,3 +13,4 @@ indicatif = "0.15.0"
 thiserror = "1.0.24" # error handling in the library
 log = { version = "0.4.14", default-features = false } # for debug logs with -vvv
 wasm-bindgen = { version = "0.2.73", optional = true }
+serde = { version = "1.0.125", optional = true }
