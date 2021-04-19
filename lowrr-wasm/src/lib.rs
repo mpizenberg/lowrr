@@ -20,6 +20,7 @@ pub struct Lowrr {
     image_ids: Vec<String>,
     dataset: Dataset,
     crop_registered: Vec<DMatrix<u8>>,
+    logger: utils::WasmLogger,
 }
 
 enum Dataset {
@@ -47,6 +48,7 @@ impl Lowrr {
             image_ids: Vec::new(),
             dataset: Dataset::Empty,
             crop_registered: Vec::new(),
+            logger: utils::WasmLogger::init(log::Level::Trace).unwrap(),
         }
     }
 

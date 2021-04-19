@@ -16,7 +16,7 @@ lowrr = { path = "../lowrr-lib", features = ["wasm-bindgen", "serde"] }
 anyhow = "1.0.38" # error handling in the main program
 nalgebra = "0.25.1"
 image = { version = "0.23.14", default-features = false, features = ["jpeg", "png"] }
-log = { version = "0.4.14", default-features = false }
+log = { version = "0.4.14", default-features = false, features = ["std"] }
 wasm-bindgen = { version = "0.2.73", features = ["serde-serialize"] }
 serde = "1.0.125"
 serde_json = "1.0.64"

@@ -5,7 +5,7 @@
 // Import and initialize the WebAssembly module.
 // Remark: ES modules are not supported in Web Workers,
 // so you have to process this file with esbuild:
-// esbuild worker.mjs --bundle --outfile=worker.js
+// esbuild worker.mjs --bundle --preserve-symlinks --outfile=worker.js
 import { Lowrr as LowrrWasm, default as init } from "./pkg/lowrr_wasm.js";
 
 // Initialize the wasm module.
@@ -81,7 +81,7 @@ async function run(params) {
 }
 
 // Log something in the interface with the provided verbosity level.
-function log(lvl, content) {
+export function appLog(lvl, content) {
   postMessage({ type: "log", data: { lvl, content } });
 }
 
