@@ -157,7 +157,7 @@ where
         .enumerate()
         .rev()
     {
-        log::warn!("=============  Start level {}  =============", level);
+        log::info!("=============  Start level {}  =============", level);
 
         // Algorithm parameters.
         let (height, width) = lvl_imgs[0].shape();
