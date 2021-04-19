@@ -43,7 +43,8 @@ pub struct Args {
 impl Lowrr {
     pub fn init() -> Self {
         utils::set_panic_hook();
-        utils::WasmLogger::setup(log::LevelFilter::Trace).unwrap();
+        utils::WasmLogger::init().unwrap();
+        utils::WasmLogger::setup(log::LevelFilter::Trace);
         Self {
             image_ids: Vec::new(),
             dataset: Dataset::Empty,
@@ -120,8 +121,8 @@ impl Lowrr {
     // Run the main lowrr registration algorithm.
     pub fn run(&mut self, params: JsValue) -> Result<Vec<f32>, JsValue> {
         self.crop_registered.clear();
-        let args: Args = params.into_serde().map_err(|e| e.to_string())?;
-        console_log!("Running inside Rust!");
+        let args: Args = params.into_serde().unwrap();
+        utils::WasmLogger::setup(utils::verbosity_filter(args.config.verbosity));
 
         // Use the algorithm corresponding to the type of data.
         let motion_vec = match &self.dataset {

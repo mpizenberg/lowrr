@@ -37,8 +37,11 @@ pub struct WasmLogger;
 static LOGGER: WasmLogger = WasmLogger;
 
 impl WasmLogger {
-    pub fn setup(max_level: LevelFilter) -> Result<(), SetLoggerError> {
-        log::set_logger(&LOGGER).map(|_| log::set_max_level(max_level))
+    pub fn init() -> Result<(), SetLoggerError> {
+        log::set_logger(&LOGGER)
+    }
+    pub fn setup(max_level: LevelFilter) {
+        log::set_max_level(max_level)
     }
 }
 
@@ -61,5 +64,15 @@ fn level_u32(level: Level) -> u32 {
         Level::Info => 2,
         Level::Debug => 3,
         Level::Trace => 4,
+    }
+}
+
+pub fn verbosity_filter(verbosity: u32) -> LevelFilter {
+    match verbosity {
+        0 => LevelFilter::Error,
+        1 => LevelFilter::Warn,
+        2 => LevelFilter::Info,
+        3 => LevelFilter::Debug,
+        _ => LevelFilter::Trace,
     }
 }

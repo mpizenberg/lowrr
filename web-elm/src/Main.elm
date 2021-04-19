@@ -121,6 +121,7 @@ type alias Parameters =
     , rho : Float
     , maxIterations : Int
     , convergenceThreshold : Float
+    , maxVerbosity : Int
     }
 
 
@@ -135,6 +136,7 @@ encodeParams params =
         , ( "rho", Json.Encode.float params.rho )
         , ( "maxIterations", Json.Encode.int params.maxIterations )
         , ( "convergenceThreshold", Json.Encode.float params.convergenceThreshold )
+        , ( "maxVerbosity", Json.Encode.int params.maxVerbosity )
         ]
 
 
@@ -169,6 +171,7 @@ type alias ParametersForm =
     , sparse : NumberInput.Field Float NumberInput.FloatError
     , lambda : NumberInput.Field Float NumberInput.FloatError
     , rho : NumberInput.Field Float NumberInput.FloatError
+    , maxVerbosity : NumberInput.Field Int NumberInput.IntError
     }
 
 
@@ -180,6 +183,7 @@ type alias ParametersToggleInfo =
     , sparse : Bool
     , lambda : Bool
     , rho : Bool
+    , maxVerbosity : Bool
     }
 
 
@@ -213,7 +217,7 @@ initialModel size =
     , bboxDrawn = Nothing
     , registeredImages = Nothing
     , logs = []
-    , verbosity = 4
+    , verbosity = 2
     }
 
 
@@ -227,6 +231,7 @@ defaultParams =
     , rho = 0.1
     , maxIterations = 40
     , convergenceThreshold = 0.001
+    , maxVerbosity = 3
     }
 
 
@@ -270,6 +275,9 @@ defaultParamsForm =
         , input = String.fromFloat defaultParams.rho
         , decodedInput = Ok defaultParams.rho
         }
+    , maxVerbosity =
+        { anyInt | min = Just 0, max = Just 4 }
+            |> NumberInput.setDefaultIntValue defaultParams.maxVerbosity
     }
 
 
@@ -282,6 +290,7 @@ defaultParamsInfo =
     , sparse = False
     , lambda = False
     , rho = False
+    , maxVerbosity = False
     }
 
 
@@ -339,6 +348,7 @@ type ViewImgMsg
 type ParamsMsg
     = ToggleEqualize Bool
     | ChangeMaxIter String
+    | ChangeMaxVerbosity String
     | ChangeConvergenceThreshold String
     | ChangeLevels String
     | ChangeSparse String
@@ -354,6 +364,7 @@ type ParamsMsg
 type ParamsInfoMsg
     = ToggleInfoCrop Bool
     | ToggleInfoMaxIterations Bool
+    | ToggleInfoMaxVerbosity Bool
     | ToggleInfoConvergenceThreshold Bool
     | ToggleInfoLevels Bool
     | ToggleInfoSparse Bool
@@ -860,6 +871,24 @@ updateParams msg ({ params, paramsForm } as model) =
         ToggleEqualize equalize ->
             { model | params = { params | equalize = equalize } }
 
+        ChangeMaxVerbosity str ->
+            let
+                updatedField =
+                    NumberInput.updateInt str paramsForm.maxVerbosity
+
+                updatedForm =
+                    { paramsForm | maxVerbosity = updatedField }
+            in
+            case updatedField.decodedInput of
+                Ok maxVerbosity ->
+                    { model
+                        | params = { params | maxVerbosity = maxVerbosity }
+                        , paramsForm = updatedForm
+                    }
+
+                Err _ ->
+                    { model | paramsForm = updatedForm }
+
         ChangeMaxIter str ->
             let
                 updatedField =
@@ -1031,6 +1060,9 @@ updateParamsInfo msg toggleInfo =
 
         ToggleInfoMaxIterations visible ->
             { toggleInfo | maxIterations = visible }
+
+        ToggleInfoMaxVerbosity visible ->
+            { toggleInfo | maxVerbosity = visible }
 
         ToggleInfoConvergenceThreshold visible ->
             { toggleInfo | convergenceThreshold = visible }
@@ -1480,6 +1512,23 @@ viewConfig params paramsForm paramsInfo =
                 , moreInfo paramsInfo.rho "Lagrangian penalty."
                 , floatInput paramsForm.rho (ParamsMsg << ChangeRho) "rho"
                 , displayFloatErrors paramsForm.rho.decodedInput
+                ]
+
+            -- Maximum verbosity
+            , Element.column [ spacing 10 ]
+                [ Element.row [ spacing 10 ]
+                    [ Element.text "Maximum verbosity:"
+                    , Element.Input.checkbox []
+                        { onChange = ParamsInfoMsg << ToggleInfoMaxVerbosity
+                        , icon = infoIcon
+                        , checked = paramsInfo.maxVerbosity
+                        , label = Element.Input.labelHidden "Show detail info about the maximum verbosity."
+                        }
+                    ]
+                , moreInfo paramsInfo.maxVerbosity "Maximum verbosity of logs that can appear in the Logs tab. Setting this higher than its default value enables a very detailed log trace at the price of performance degradations."
+                , Element.text ("(default to " ++ String.fromInt defaultParams.maxVerbosity ++ ")")
+                , intInput paramsForm.maxVerbosity (ParamsMsg << ChangeMaxVerbosity) "Maximum verbosity"
+                , displayIntErrors paramsForm.maxVerbosity.decodedInput
                 ]
             ]
         ]

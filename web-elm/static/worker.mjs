@@ -52,7 +52,7 @@ async function run(params) {
       threshold: params.convergenceThreshold,
       sparse_ratio_threshold: params.sparse,
       levels: params.levels,
-      verbosity: 2,
+      verbosity: params.maxVerbosity,
     },
     equalize: 0.5,
     crop: params.crop,
