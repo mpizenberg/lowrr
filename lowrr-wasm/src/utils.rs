@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MPL-2.0
 
-use log::{Level, Metadata, Record, SetLoggerError};
+use log::{Level, LevelFilter, Metadata, Record, SetLoggerError};
 use wasm_bindgen::prelude::*;
 
 pub fn set_panic_hook() {
@@ -32,29 +32,23 @@ macro_rules! console_log {
 
 // Log implementation
 
-#[derive(Clone, Copy)]
-pub struct WasmLogger {
-    max_level: Level,
-}
+pub struct WasmLogger;
+
+static LOGGER: WasmLogger = WasmLogger;
 
 impl WasmLogger {
-    pub fn init(max_level: Level) -> Result<Self, SetLoggerError> {
-        let wasm_logger = WasmLogger { max_level };
-        log::set_boxed_logger(Box::new(wasm_logger))
-            .map(|_| log::set_max_level(max_level.to_level_filter()))?;
-        Ok(wasm_logger)
+    pub fn setup(max_level: LevelFilter) -> Result<(), SetLoggerError> {
+        log::set_logger(&LOGGER).map(|_| log::set_max_level(max_level))
     }
 }
 
 impl log::Log for WasmLogger {
-    fn enabled(&self, metadata: &Metadata) -> bool {
-        metadata.level() <= self.max_level
+    fn enabled(&self, _metadata: &Metadata) -> bool {
+        true
     }
 
     fn log(&self, record: &Record) {
-        if self.enabled(record.metadata()) {
-            appLog(level_u32(record.level()), &record.args().to_string());
-        }
+        appLog(level_u32(record.level()), &record.args().to_string());
     }
 
     fn flush(&self) {}
