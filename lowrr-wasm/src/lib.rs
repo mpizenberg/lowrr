@@ -63,7 +63,7 @@ impl Lowrr {
         match (&dyn_img, &mut self.dataset) {
             // Loading the first image (empty dataset)
             (DynamicImage::ImageLuma8(_), Dataset::Empty) => {
-                log::warn!("Images are of type Gray u8");
+                log::info!("Images are of type Gray u8");
                 self.dataset = Dataset::GrayImages(vec![dyn_img.into_dmatrix()]);
                 self.image_ids = vec![id];
             }
@@ -74,7 +74,7 @@ impl Lowrr {
             }
             // Loading the first image (empty dataset)
             (DynamicImage::ImageLuma16(_), Dataset::Empty) => {
-                log::warn!("Images are of type Gray u16");
+                log::info!("Images are of type Gray u16");
                 self.dataset = Dataset::GrayImagesU16(vec![dyn_img.into_dmatrix()]);
                 self.image_ids = vec![id];
             }
@@ -85,7 +85,7 @@ impl Lowrr {
             }
             // Loading the first image (empty dataset)
             (DynamicImage::ImageRgb8(_), Dataset::Empty) => {
-                log::warn!("Images are of type RGB (u8, u8, u8)");
+                log::info!("Images are of type RGB (u8, u8, u8)");
                 self.dataset = Dataset::RgbImages(vec![dyn_img.into_dmatrix()]);
                 self.image_ids = vec![id];
             }
@@ -96,7 +96,7 @@ impl Lowrr {
             }
             // Loading the first image (empty dataset)
             (DynamicImage::ImageRgb16(_), Dataset::Empty) => {
-                log::warn!("Images are of type RGB (u16, u16, u16)");
+                log::info!("Images are of type RGB (u16, u16, u16)");
                 self.dataset = Dataset::RgbImagesU16(vec![dyn_img.into_dmatrix()]);
                 self.image_ids = vec![id];
             }
@@ -129,7 +129,7 @@ impl Lowrr {
             Dataset::GrayImages(gray_imgs) => {
                 let (motion_vec_crop, cropped_eq_imgs) =
                     crop_and_register(&args, gray_imgs.clone(), 40).map_err(|e| e.to_string())?;
-                log::warn!("Applying registration on cropped images ...");
+                log::info!("Applying registration on cropped images ...");
                 self.crop_registered =
                     registration::reproject::<u8, f32, u8>(&cropped_eq_imgs, &motion_vec_crop);
                 original_motion(args.crop, motion_vec_crop)
@@ -138,7 +138,7 @@ impl Lowrr {
                 let (motion_vec_crop, cropped_eq_imgs) =
                     crop_and_register(&args, gray_imgs.clone(), 10 * 256)
                         .map_err(|e| e.to_string())?;
-                log::warn!("Applying registration on cropped images ...");
+                log::info!("Applying registration on cropped images ...");
                 let cropped_u8: Vec<_> = cropped_eq_imgs.into_iter().map(into_gray_u8).collect();
                 self.crop_registered =
                     registration::reproject::<u8, f32, u8>(&cropped_u8, &motion_vec_crop);
@@ -148,7 +148,7 @@ impl Lowrr {
                 let gray_imgs: Vec<_> = imgs.iter().map(|im| im.map(|(_r, g, _b)| g)).collect();
                 let (motion_vec_crop, cropped_eq_imgs) =
                     crop_and_register(&args, gray_imgs, 40).map_err(|e| e.to_string())?;
-                log::warn!("Applying registration on cropped images ...");
+                log::info!("Applying registration on cropped images ...");
                 self.crop_registered =
                     registration::reproject::<u8, f32, u8>(&cropped_eq_imgs, &motion_vec_crop);
                 original_motion(args.crop, motion_vec_crop)
@@ -157,7 +157,7 @@ impl Lowrr {
                 let gray_imgs: Vec<_> = imgs.iter().map(|im| im.map(|(_r, g, _b)| g)).collect();
                 let (motion_vec_crop, cropped_eq_imgs) =
                     crop_and_register(&args, gray_imgs, 10 * 256).map_err(|e| e.to_string())?;
-                log::warn!("Applying registration on cropped images ...");
+                log::info!("Applying registration on cropped images ...");
                 let cropped_u8: Vec<_> = cropped_eq_imgs.into_iter().map(into_gray_u8).collect();
                 self.crop_registered =
                     registration::reproject::<u8, f32, u8>(&cropped_u8, &motion_vec_crop);
@@ -198,7 +198,7 @@ where
     let cropped_imgs: Result<Vec<DMatrix<T>>, _> = match args.crop {
         None => Ok(gray_imgs),
         Some(frame) => {
-            log::warn!("Cropping images ...");
+            log::info!("Cropping images ...");
             gray_imgs.iter().map(|im| crop(frame, im)).collect()
         }
     };
@@ -206,12 +206,12 @@ where
 
     // Equalize mean intensities of cropped area.
     if let Some(mean_intensity) = args.equalize {
-        log::warn!("Equalizing images mean intensities ...");
+        log::info!("Equalizing images mean intensities ...");
         lowrr::utils::equalize_mean(mean_intensity, &mut cropped_imgs);
     }
 
     // Compute the motion of each image for registration.
-    log::error!("Registration of images ...");
+    log::info!("Registration of images ...");
     registration::gray_affine(args.config, cropped_imgs, sparse_diff_threshold)
         .context("Failed to register images")
 }
