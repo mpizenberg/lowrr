@@ -59,7 +59,7 @@ impl Lowrr {
             .with_guessed_format()
             .expect("Cursor io never fails");
         // let image = reader.decode().expect("Error decoding the image");
-        let dyn_img = reader.decode().map_err(|e| e.to_string())?;
+        let dyn_img = reader.decode().map_err(utils::report_error)?;
 
         match (&dyn_img, &mut self.dataset) {
             // Loading the first image (empty dataset)
@@ -129,7 +129,7 @@ impl Lowrr {
             Dataset::Empty => Vec::new(),
             Dataset::GrayImages(gray_imgs) => {
                 let (motion_vec_crop, cropped_eq_imgs) =
-                    crop_and_register(&args, gray_imgs.clone(), 40).map_err(|e| e.to_string())?;
+                    crop_and_register(&args, gray_imgs.clone(), 40).map_err(utils::report_error)?;
                 log::info!("Applying registration on cropped images ...");
                 self.crop_registered =
                     registration::reproject::<u8, f32, u8>(&cropped_eq_imgs, &motion_vec_crop);
@@ -138,7 +138,7 @@ impl Lowrr {
             Dataset::GrayImagesU16(gray_imgs) => {
                 let (motion_vec_crop, cropped_eq_imgs) =
                     crop_and_register(&args, gray_imgs.clone(), 10 * 256)
-                        .map_err(|e| e.to_string())?;
+                        .map_err(utils::report_error)?;
                 log::info!("Applying registration on cropped images ...");
                 let cropped_u8: Vec<_> = cropped_eq_imgs.into_iter().map(into_gray_u8).collect();
                 self.crop_registered =
@@ -148,7 +148,7 @@ impl Lowrr {
             Dataset::RgbImages(imgs) => {
                 let gray_imgs: Vec<_> = imgs.iter().map(|im| im.map(|(_r, g, _b)| g)).collect();
                 let (motion_vec_crop, cropped_eq_imgs) =
-                    crop_and_register(&args, gray_imgs, 40).map_err(|e| e.to_string())?;
+                    crop_and_register(&args, gray_imgs, 40).map_err(utils::report_error)?;
                 log::info!("Applying registration on cropped images ...");
                 self.crop_registered =
                     registration::reproject::<u8, f32, u8>(&cropped_eq_imgs, &motion_vec_crop);
@@ -157,7 +157,7 @@ impl Lowrr {
             Dataset::RgbImagesU16(imgs) => {
                 let gray_imgs: Vec<_> = imgs.iter().map(|im| im.map(|(_r, g, _b)| g)).collect();
                 let (motion_vec_crop, cropped_eq_imgs) =
-                    crop_and_register(&args, gray_imgs, 10 * 256).map_err(|e| e.to_string())?;
+                    crop_and_register(&args, gray_imgs, 10 * 256).map_err(utils::report_error)?;
                 log::info!("Applying registration on cropped images ...");
                 let cropped_u8: Vec<_> = cropped_eq_imgs.into_iter().map(into_gray_u8).collect();
                 self.crop_registered =
@@ -172,7 +172,7 @@ impl Lowrr {
 
     // Return the ids of loaded images: [string]
     pub fn image_ids(&self) -> Result<JsValue, JsValue> {
-        JsValue::from_serde(&self.image_ids).map_err(|e| e.to_string().into())
+        JsValue::from_serde(&self.image_ids).map_err(utils::report_error)
     }
 
     // Retrieve the cropped registered images.
@@ -181,7 +181,7 @@ impl Lowrr {
         self.crop_registered[i]
             .to_image()
             .write_to(&mut cropped_buffer, image::ImageOutputFormat::Png)
-            .map_err(|e| e.to_string())?;
+            .map_err(utils::report_error)?;
         Ok(cropped_buffer.into_boxed_slice())
     }
 }
