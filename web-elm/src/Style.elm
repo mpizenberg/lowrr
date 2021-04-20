@@ -1,6 +1,6 @@
 module Style exposing
     ( font, fontMonospace
-    , dropColor, errorColor
+    , dropColor, errorColor, warningColor
     , black, white, almostWhite, lightGrey, green
     )
 
@@ -8,7 +8,7 @@ module Style exposing
 
 @docs font, fontMonospace
 
-@docs dropColor, errorColor
+@docs dropColor, errorColor, warningColor
 
 @docs black, white, almostWhite, lightGrey, green
 
@@ -45,7 +45,12 @@ dropColor =
 
 errorColor : Element.Color
 errorColor =
-    Element.rgb255 150 50 50
+    Element.rgb255 180 50 50
+
+
+warningColor : Element.Color
+warningColor =
+    Element.rgb255 220 120 50
 
 
 lightGrey : Element.Color

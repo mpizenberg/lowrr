@@ -1234,7 +1234,45 @@ viewLogs verbosity logs =
 
 viewLog : { lvl : Int, content : String } -> Element msg
 viewLog { lvl, content } =
-    Element.text content
+    case lvl of
+        0 ->
+            Element.el
+                [ Element.Font.color Style.errorColor
+                , paddingXY 0 12
+                , Element.onLeft
+                    (Element.el [ height fill, paddingXY 0 4 ]
+                        (Element.el
+                            [ height fill
+                            , width (Element.px 4)
+                            , Element.Background.color Style.errorColor
+                            , Element.moveLeft 6
+                            ]
+                            Element.none
+                        )
+                    )
+                ]
+                (Element.text content)
+
+        1 ->
+            Element.el
+                [ Element.Font.color Style.warningColor
+                , paddingXY 0 12
+                , Element.onLeft
+                    (Element.el [ height fill, paddingXY 0 4 ]
+                        (Element.el
+                            [ height fill
+                            , width (Element.px 4)
+                            , Element.Background.color Style.warningColor
+                            , Element.moveLeft 6
+                            ]
+                            Element.none
+                        )
+                    )
+                ]
+                (Element.text content)
+
+        _ ->
+            Element.text content
 
 
 verbositySlider : Int -> Element Msg
