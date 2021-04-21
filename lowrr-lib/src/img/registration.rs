@@ -4,6 +4,7 @@
 
 use image::Primitive;
 use nalgebra::{DMatrix, Matrix3, Matrix6, RealField, Scalar, Vector3, Vector6};
+use std::future::Future;
 use std::ops::{Add, Mul};
 use std::rc::Rc;
 use thiserror::Error;
@@ -270,11 +271,11 @@ where
 /// The input images are passed by value to be used as the first level
 /// of the multi-resolution pyramid.
 #[allow(clippy::type_complexity)]
-pub fn async_gray_affine<T: CanRegister>(
+pub async fn async_gray_affine<T: CanRegister, FB: Future<Output = bool>>(
     config: Config,
     imgs: Vec<DMatrix<T>>,
     sparse_diff_threshold: T::Bigger, // 50
-    should_stop: &mut dyn FnMut(&'static str, Option<u32>) -> bool,
+    should_stop: fn(&'static str, Option<u32>) -> FB,
 ) -> Result<(Vec<Vector6<f32>>, Vec<DMatrix<T>>), RegistrationError>
 where
     DMatrix<T>: ToImage,
@@ -283,7 +284,7 @@ where
     let imgs_count = imgs.len();
 
     // Precompute a hierarchy of multi-resolution images and gradients norm.
-    if should_stop("Precompute multiresolution pyramid", None) {
+    if should_stop("Precompute multiresolution pyramid", None).await {
         return Err(RegistrationError::StoppedByCaller);
     }
     log::debug!("Precompute multiresolution images");
@@ -353,7 +354,7 @@ where
         .rev()
     {
         log::info!("=============  Start level {}  =============", level);
-        if should_stop("level", Some(level as u32)) {
+        if should_stop("level", Some(level as u32)).await {
             return Err(RegistrationError::StoppedByCaller);
         }
 
@@ -441,7 +442,7 @@ where
         // Main loop.
         let mut continuation = Continue::Forward;
         while continuation == Continue::Forward {
-            if should_stop("iteration", Some(loop_state.nb_iter as u32)) {
+            if should_stop("iteration", Some(loop_state.nb_iter as u32)).await {
                 return Err(RegistrationError::StoppedByCaller);
             }
             continuation = loop_state.step(&step_config, &obs)?;

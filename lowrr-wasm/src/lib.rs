@@ -18,7 +18,7 @@ mod utils; // define console_log! macro
 #[wasm_bindgen(raw_module = "../worker.mjs")]
 extern "C" {
     #[wasm_bindgen(js_name = "shouldStop")]
-    fn should_stop(step: &str, progress: Option<u32>) -> bool;
+    async fn should_stop(step: &str, progress: Option<u32>) -> JsValue; // bool
 }
 
 #[wasm_bindgen]
@@ -125,7 +125,8 @@ impl Lowrr {
     }
 
     // Run the main lowrr registration algorithm.
-    pub fn run(&mut self, params: JsValue) -> Result<Vec<f32>, JsValue> {
+    //                                                     Vec<f32>
+    pub async fn run(&mut self, params: JsValue) -> Result<JsValue, JsValue> {
         self.crop_registered.clear();
         let args: Args = params.into_serde().unwrap();
         utils::WasmLogger::setup(utils::verbosity_filter(args.config.verbosity));
@@ -135,7 +136,9 @@ impl Lowrr {
             Dataset::Empty => Vec::new(),
             Dataset::GrayImages(gray_imgs) => {
                 let (motion_vec_crop, cropped_eq_imgs) =
-                    crop_and_register(&args, gray_imgs.clone(), 40).map_err(utils::report_error)?;
+                    crop_and_register(&args, gray_imgs.clone(), 40)
+                        .await
+                        .map_err(utils::report_error)?;
                 log::info!("Applying registration on cropped images ...");
                 self.crop_registered =
                     registration::reproject::<u8, f32, u8>(&cropped_eq_imgs, &motion_vec_crop);
@@ -144,6 +147,7 @@ impl Lowrr {
             Dataset::GrayImagesU16(gray_imgs) => {
                 let (motion_vec_crop, cropped_eq_imgs) =
                     crop_and_register(&args, gray_imgs.clone(), 10 * 256)
+                        .await
                         .map_err(utils::report_error)?;
                 log::info!("Applying registration on cropped images ...");
                 let cropped_u8: Vec<_> = cropped_eq_imgs.into_iter().map(into_gray_u8).collect();
@@ -153,8 +157,9 @@ impl Lowrr {
             }
             Dataset::RgbImages(imgs) => {
                 let gray_imgs: Vec<_> = imgs.iter().map(|im| im.map(|(_r, g, _b)| g)).collect();
-                let (motion_vec_crop, cropped_eq_imgs) =
-                    crop_and_register(&args, gray_imgs, 40).map_err(utils::report_error)?;
+                let (motion_vec_crop, cropped_eq_imgs) = crop_and_register(&args, gray_imgs, 40)
+                    .await
+                    .map_err(utils::report_error)?;
                 log::info!("Applying registration on cropped images ...");
                 self.crop_registered =
                     registration::reproject::<u8, f32, u8>(&cropped_eq_imgs, &motion_vec_crop);
@@ -163,7 +168,9 @@ impl Lowrr {
             Dataset::RgbImagesU16(imgs) => {
                 let gray_imgs: Vec<_> = imgs.iter().map(|im| im.map(|(_r, g, _b)| g)).collect();
                 let (motion_vec_crop, cropped_eq_imgs) =
-                    crop_and_register(&args, gray_imgs, 10 * 256).map_err(utils::report_error)?;
+                    crop_and_register(&args, gray_imgs, 10 * 256)
+                        .await
+                        .map_err(utils::report_error)?;
                 log::info!("Applying registration on cropped images ...");
                 let cropped_u8: Vec<_> = cropped_eq_imgs.into_iter().map(into_gray_u8).collect();
                 self.crop_registered =
@@ -172,8 +179,8 @@ impl Lowrr {
             }
         };
 
-        let flat_motion_vec = motion_vec.iter().flatten().cloned().collect();
-        Ok(flat_motion_vec)
+        let flat_motion_vec: Vec<f32> = motion_vec.iter().flatten().cloned().collect();
+        JsValue::from_serde(&flat_motion_vec).map_err(utils::report_error)
     }
 
     // Return the ids of loaded images: [string]
@@ -193,7 +200,7 @@ impl Lowrr {
 }
 
 #[allow(clippy::type_complexity)]
-fn crop_and_register<T: CanEqualize + CanRegister>(
+async fn crop_and_register<T: CanEqualize + CanRegister>(
     args: &Args,
     gray_imgs: Vec<DMatrix<T>>,
     sparse_diff_threshold: <T as CanRegister>::Bigger,
@@ -223,9 +230,15 @@ where
         args.config,
         cropped_imgs,
         sparse_diff_threshold,
-        &mut should_stop,
+        should_stop_bool,
     )
+    .await
     .context("Failed to register images")
+}
+
+async fn should_stop_bool(step: &str, progress: Option<u32>) -> bool {
+    let js_bool = should_stop(step, progress).await;
+    js_bool.as_bool().unwrap()
 }
 
 fn original_motion(crop: Option<Crop>, motion_vec_crop: Vec<Vector6<f32>>) -> Vec<Vector6<f32>> {
