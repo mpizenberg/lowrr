@@ -16,12 +16,16 @@ let Lowrr;
   Lowrr = LowrrWasm.init();
 })();
 
+// Global module variable recording if the algorithm was asked to stop.
+let stopOrder = false;
+
 console.log("Hello from worker");
 
 // Listener for messages containing data of the shape: { type, data }
 // where type can be one of:
 //   - "decode-image": decode an image provided with its url
 //   - "run": run the algorithm on all images
+//   - "stop": stop the alogorithm
 onmessage = async function (event) {
   console.log(`worker message: ${event.data.type}`);
   if (event.data.type == "decode-image") {
@@ -29,6 +33,9 @@ onmessage = async function (event) {
     postMessage({ type: "image-decoded", data: event.data.data });
   } else if (event.data.type == "run") {
     await run(event.data.data);
+  } else if (event.data.type == "stop") {
+    console.log("Received STOP in worker");
+    stopOrder = true;
   }
 };
 
@@ -59,6 +66,7 @@ async function run(params) {
   };
 
   // Run lowrr main registration algorithm.
+  stopOrder = false;
   let motion = Lowrr.run(args);
 
   // Send back to main thread all cropped images.
@@ -83,6 +91,14 @@ async function run(params) {
 // Log something in the interface with the provided verbosity level.
 export function appLog(lvl, content) {
   postMessage({ type: "log", data: { lvl, content } });
+}
+
+// Function regularly called in the algorithm to check if it should stop.
+export function shouldStop(step, progress) {
+  // (async () => await sleep(0))();
+  // await sleep(0); // Force to give control back.
+  console.warn("called shouldStop?");
+  return stopOrder;
 }
 
 // Small utility function.

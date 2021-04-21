@@ -49,6 +49,9 @@ port capture : Value -> Cmd msg
 port run : Value -> Cmd msg
 
 
+port stop : () -> Cmd msg
+
+
 port log : ({ lvl : Int, content : String } -> msg) -> Sub msg
 
 
@@ -313,6 +316,7 @@ type Msg
     | NavigationMsg NavigationMsg
     | PointerMsg PointerMsg
     | RunAlgorithm Parameters
+    | StopRunning
     | Log { lvl : Int, content : String }
     | VerbosityChange Float
     | ReceiveCroppedImages (List { id : String, img : Value })
@@ -711,6 +715,9 @@ update msg model =
 
         ( RunAlgorithm params, Config imgs ) ->
             ( { model | state = Logs imgs, registeredImages = Nothing }, run (encodeParams params) )
+
+        ( StopRunning, _ ) ->
+            ( model, stop () )
 
         ( Log logData, _ ) ->
             ( { model | logs = logData :: model.logs }, Cmd.none )
@@ -1215,6 +1222,10 @@ viewLogs verbosity logs =
             , ( PageRegistration, False )
             , ( PageLogs, True )
             ]
+        , Element.Input.button []
+            { onPress = Just StopRunning
+            , label = Element.text "stop!"
+            }
         , Element.el [ centerX, paddingXY 0 18 ] (verbositySlider verbosity)
         , Element.column
             [ padding 18

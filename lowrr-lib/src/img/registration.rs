@@ -62,6 +62,8 @@ impl CanRegister for u16 {
 
 #[derive(Error, Debug)]
 pub enum RegistrationError {
+    #[error("The algorithm was stopped by the caller")]
+    StoppedByCaller,
     #[error("Error while trying to inverse the motion of the reference image: {0}")]
     InverseRefMotion(Vector6<f32>),
     #[error("Not enough pixels to perform a direct image alignment estimation: {0}")]
@@ -243,6 +245,205 @@ where
         // Main loop.
         let mut continuation = Continue::Forward;
         while continuation == Continue::Forward {
+            continuation = loop_state.step(&step_config, &obs)?;
+        }
+
+        // Update the motion vec before next level
+        motion_vec = loop_state.motion_vec;
+        motion_vec
+            .iter()
+            .for_each(|v| log::debug!("   {:?}", v.data));
+    } // End of levels
+
+    // Return the final motion vector.
+    // And give back the images at original resolution.
+    let imgs = multires_imgs.into_iter().next().unwrap();
+    Ok((motion_vec, imgs))
+}
+
+/// Affine registration of single channel images.
+///
+/// Internally, this uses a multi-resolution approach,
+/// where the motion vector computed at one resolution serves
+/// as initialization for the next one.
+///
+/// The input images are passed by value to be used as the first level
+/// of the multi-resolution pyramid.
+#[allow(clippy::type_complexity)]
+pub fn async_gray_affine<T: CanRegister>(
+    config: Config,
+    imgs: Vec<DMatrix<T>>,
+    sparse_diff_threshold: T::Bigger, // 50
+    should_stop: &mut dyn FnMut(&'static str, Option<u32>) -> bool,
+) -> Result<(Vec<Vector6<f32>>, Vec<DMatrix<T>>), RegistrationError>
+where
+    DMatrix<T>: ToImage,
+{
+    // Get the number of images to align.
+    let imgs_count = imgs.len();
+
+    // Precompute a hierarchy of multi-resolution images and gradients norm.
+    if should_stop("Precompute multiresolution pyramid", None) {
+        return Err(RegistrationError::StoppedByCaller);
+    }
+    log::debug!("Precompute multiresolution images");
+    log::debug!("Precompute sparse pixels");
+    let mut multires_imgs: Vec<Levels<_>> = Vec::with_capacity(imgs_count);
+    let mut multires_sparse_pixels: Vec<Levels<_>> = Vec::with_capacity(imgs_count);
+    for im in imgs.into_iter() {
+        let pyramid: Levels<DMatrix<T>> = crate::img::multires::mean_pyramid(config.levels, im);
+        let gradients: Levels<DMatrix<T::Bigger>> = pyramid
+            .iter()
+            .map(crate::img::gradients::squared_norm_direct)
+            .collect();
+        let sparse_pixels = crate::img::sparse::select(sparse_diff_threshold, gradients.as_slice());
+        multires_sparse_pixels.push(sparse_pixels);
+        multires_imgs.push(pyramid);
+    }
+
+    // Save multires imgs.
+    // crate::utils::save_imgs("out/multires_imgs", &multires_imgs[0]);
+
+    // Save sparse pixels of first image.
+    let mut multires_sparse_viz: Levels<DMatrix<(u8, u8, u8)>> = Vec::with_capacity(config.levels);
+    for (sparse_mask, img_mat) in multires_sparse_pixels[0]
+        .iter()
+        .zip(multires_imgs[0].iter().rev())
+    {
+        multires_sparse_viz.push(crate::img::viz::mask_overlay(sparse_mask, img_mat));
+    }
+    // crate::utils::save_rgb_imgs::<&str, u8>(
+    //     "out/multires_sparse_img0",
+    //     multires_sparse_viz.as_slice(),
+    // );
+
+    // Transpose the `Vec<Levels<_>>` structure of multires images
+    // into a `Levels<Vec<_>>` to have each level regrouped.
+    let multires_imgs: Levels<Vec<_>> = crate::utils::transpose(multires_imgs);
+    // let multires_sparse_pixels: Levels<Vec<_>> = crate::utils::transpose(multires_sparse_pixels);
+
+    // // Merge sparse pixels by level.
+    // let multires_sparse_pixels: Levels<_> = multires_sparse_pixels
+    //     .iter()
+    //     .map(|v| merge_sparse(v))
+    //     .collect();
+    let multires_sparse_pixels = multires_sparse_pixels[0].clone();
+
+    // // Save merged sparse pixels of all images.
+    // let mut multires_sparse_merged_viz = Vec::with_capacity(config.levels);
+    // for (sparse_mask, img_mat) in multires_sparse_pixels
+    //     .iter()
+    //     .zip(multires_imgs.iter().rev().map(|v| &v[0]))
+    // {
+    //     multires_sparse_merged_viz.push(visualize_mask(sparse_mask, img_mat));
+    // }
+    // crate::utils::save_rgb_imgs("out/multires_sparse_merged", &multires_sparse_merged_viz);
+
+    // Initialize the motion vector.
+    let mut motion_vec = vec![Vector6::zeros(); imgs_count];
+
+    // Multi-resolution algorithm.
+    // Does the same thing at each level for the corresponding images and gradients.
+    // The iterator is reversed to start at last level (lowest resolution).
+    // Level 0 are the initial images.
+    for (level, (lvl_imgs, lvl_sparse_pixels)) in multires_imgs
+        .iter()
+        .zip(multires_sparse_pixels.iter().rev())
+        .enumerate()
+        .rev()
+    {
+        log::info!("=============  Start level {}  =============", level);
+        if should_stop("level", Some(level as u32)) {
+            return Err(RegistrationError::StoppedByCaller);
+        }
+
+        // Algorithm parameters.
+        let (height, width) = lvl_imgs[0].shape();
+        let step_config = StepConfig {
+            lambda: config.lambda,
+            rho: config.rho,
+            max_iterations: config.max_iterations,
+            threshold: config.threshold,
+            verbosity: config.verbosity,
+        };
+
+        // motion_vec is adapted when changing level.
+        for motion in motion_vec.iter_mut() {
+            motion[4] *= 2.0;
+            motion[5] *= 2.0;
+        }
+
+        // Sparse filter.
+        let pixels_count = height * width;
+        let sparse_count: usize = lvl_sparse_pixels
+            .iter()
+            .map(|x| if *x { 1 } else { 0 })
+            .sum();
+        let sparse_ratio = sparse_count as f32 / pixels_count as f32;
+
+        // Choose sparsity.
+        let sparsity: Sparsity;
+        let actual_pixel_count: usize;
+        let pixel_coordinates: Rc<Vec<(usize, usize)>>;
+        if sparse_ratio > config.sparse_ratio_threshold {
+            log::info!(
+                "Sparse ratio: {} / {} = {:.2} >= {:.2}    using DENSE resolution",
+                sparse_count,
+                pixels_count,
+                sparse_ratio,
+                config.sparse_ratio_threshold
+            );
+            sparsity = Sparsity::Full;
+            actual_pixel_count = pixels_count;
+            pixel_coordinates = Rc::new(crate::utils::coords_col_major((height, width)).collect());
+        } else {
+            log::info!(
+                "Sparse ratio: {} / {} = {:.2} <= {:.2}    using SPARSE resolution",
+                sparse_count,
+                pixels_count,
+                sparse_ratio,
+                config.sparse_ratio_threshold
+            );
+            sparsity = Sparsity::Sparse;
+            actual_pixel_count = sparse_count;
+            pixel_coordinates = Rc::new(crate::utils::coordinates_from_mask(lvl_sparse_pixels));
+        }
+
+        // Declare mutable loop state.
+        let mut loop_state;
+        let mut imgs_registered;
+        let obs = Obs {
+            image_size: (width, height),
+            images: lvl_imgs.as_slice(),
+            sparsity,
+            coordinates: pixel_coordinates.as_slice(),
+        };
+
+        // We also recompute the registered images before starting the algorithm loop.
+        imgs_registered = DMatrix::zeros(actual_pixel_count, imgs_count);
+        project_f32(
+            pixel_coordinates.iter().cloned(),
+            &mut imgs_registered,
+            &lvl_imgs,
+            &motion_vec,
+        );
+
+        // Updated state variables for the loops.
+        loop_state = State {
+            nb_iter: 0,
+            imgs_registered,
+            old_imgs_a: DMatrix::zeros(actual_pixel_count, imgs_count),
+            errors: DMatrix::zeros(actual_pixel_count, imgs_count),
+            lagrange_mult_rho: DMatrix::zeros(actual_pixel_count, imgs_count),
+            motion_vec: motion_vec.clone(),
+        };
+
+        // Main loop.
+        let mut continuation = Continue::Forward;
+        while continuation == Continue::Forward {
+            if should_stop("iteration", Some(loop_state.nb_iter as u32)) {
+                return Err(RegistrationError::StoppedByCaller);
+            }
             continuation = loop_state.step(&step_config, &obs)?;
         }
 

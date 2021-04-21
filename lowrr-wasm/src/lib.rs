@@ -15,6 +15,12 @@ use lowrr::utils::CanEqualize;
 #[macro_use]
 mod utils; // define console_log! macro
 
+#[wasm_bindgen(raw_module = "../worker.mjs")]
+extern "C" {
+    #[wasm_bindgen(js_name = "shouldStop")]
+    fn should_stop(step: &str, progress: Option<u32>) -> bool;
+}
+
 #[wasm_bindgen]
 pub struct Lowrr {
     image_ids: Vec<String>,
@@ -213,8 +219,13 @@ where
 
     // Compute the motion of each image for registration.
     log::info!("Registration of images ...");
-    registration::gray_affine(args.config, cropped_imgs, sparse_diff_threshold)
-        .context("Failed to register images")
+    registration::async_gray_affine(
+        args.config,
+        cropped_imgs,
+        sparse_diff_threshold,
+        &mut should_stop,
+    )
+    .context("Failed to register images")
 }
 
 fn original_motion(crop: Option<Crop>, motion_vec_crop: Vec<Vector6<f32>>) -> Vec<Vector6<f32>> {

@@ -68,6 +68,11 @@ export function activatePorts(app, containerSize) {
     worker.postMessage({ type: "run", data: params });
   });
 
+  // Stop a running algorithm.
+  app.ports.stop.subscribe(async () => {
+    worker.postMessage({ type: "stop", data: null });
+  });
+
   // Replace elm Browser.onAnimationFrameDelta that seems to have timing issues.
   // startAnimationFrameLoop(app.ports.animationFrame);
 }
