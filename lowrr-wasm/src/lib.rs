@@ -148,13 +148,13 @@ impl LowrrInner {
                 imgs.push(dyn_img.into_dmatrix());
                 self.image_ids.push(id);
             }
-            (DynamicImage::ImageBgr8(_), _) => Err("BGR order not supported")?,
-            (DynamicImage::ImageBgra8(_), _) => Err("BGR order not supported")?,
-            (DynamicImage::ImageLumaA8(_), _) => Err("Alpha channel not supported")?,
-            (DynamicImage::ImageLumaA16(_), _) => Err("Alpha channel not supported")?,
-            (DynamicImage::ImageRgba8(_), _) => Err("Alpha channel not supported")?,
-            (DynamicImage::ImageRgba16(_), _) => Err("Alpha channel not supported")?,
-            _ => Err("Images are not all of the same type")?,
+            (DynamicImage::ImageBgr8(_), _) => return Err("BGR order not supported".into()),
+            (DynamicImage::ImageBgra8(_), _) => return Err("BGR order not supported".into()),
+            (DynamicImage::ImageLumaA8(_), _) => return Err("Alpha channel not supported".into()),
+            (DynamicImage::ImageLumaA16(_), _) => return Err("Alpha channel not supported".into()),
+            (DynamicImage::ImageRgba8(_), _) => return Err("Alpha channel not supported".into()),
+            (DynamicImage::ImageRgba16(_), _) => return Err("Alpha channel not supported".into()),
+            _ => return Err("Images are not all of the same type".into()),
         }
 
         Ok(())
@@ -280,7 +280,7 @@ async fn should_stop_bool(step: &str, progress: Option<u32>) -> bool {
 fn original_motion(crop: Option<Crop>, motion_vec_crop: Vec<Vector6<f32>>) -> Vec<Vector6<f32>> {
     // Recover motion parameters in the frame of the full image from the one in the cropped frame.
     match crop {
-        None => motion_vec_crop.clone(),
+        None => motion_vec_crop,
         Some(frame) => recover_original_motion(frame, &motion_vec_crop),
     }
 }
