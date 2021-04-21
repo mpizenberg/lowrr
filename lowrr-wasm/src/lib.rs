@@ -4,7 +4,9 @@ use anyhow::Context;
 use image::DynamicImage;
 use nalgebra::{DMatrix, Vector6};
 use serde::Deserialize;
+use std::cell::RefCell;
 use std::io::Cursor;
+use std::rc::Rc;
 use wasm_bindgen::prelude::*;
 
 use lowrr::img::crop::{crop, recover_original_motion, Crop};
@@ -21,8 +23,43 @@ extern "C" {
     async fn should_stop(step: &str, progress: Option<u32>) -> JsValue; // bool
 }
 
+// This wrapper trick is because we cannot have async functions referencing &self.
+// https://github.com/rustwasm/wasm-bindgen/issues/1858
 #[wasm_bindgen]
-pub struct Lowrr {
+pub struct Lowrr(Rc<RefCell<LowrrInner>>);
+
+#[wasm_bindgen]
+impl Lowrr {
+    pub fn init() -> Self {
+        Lowrr(Rc::new(RefCell::new(LowrrInner::init())))
+    }
+    pub fn load(&mut self, id: String, img_file: &[u8]) -> Result<(), JsValue> {
+        let inner = Rc::clone(&self.0);
+        let result = (*inner).borrow_mut().load(id, img_file);
+        result
+    }
+    pub fn run(&mut self, params: JsValue) -> js_sys::Promise {
+        let inner = Rc::clone(&self.0);
+        wasm_bindgen_futures::future_to_promise(async_run_rc(inner, params))
+    }
+    pub fn image_ids(&self) -> Result<JsValue, JsValue> {
+        self.0.borrow().image_ids()
+    }
+    pub fn cropped_img_file(&self, i: usize) -> Result<Box<[u8]>, JsValue> {
+        self.0.borrow().cropped_img_file(i)
+    }
+}
+
+async fn async_run_rc(
+    mutself: Rc<RefCell<LowrrInner>>,
+    params: JsValue,
+) -> Result<JsValue, JsValue> {
+    let mut inner = (*mutself).borrow_mut();
+    let result = inner.run(params);
+    result.await
+}
+
+struct LowrrInner {
     image_ids: Vec<String>,
     dataset: Dataset,
     crop_registered: Vec<DMatrix<u8>>,
@@ -45,8 +82,7 @@ pub struct Args {
     pub crop: Option<Crop>,
 }
 
-#[wasm_bindgen]
-impl Lowrr {
+impl LowrrInner {
     pub fn init() -> Self {
         utils::set_panic_hook();
         utils::WasmLogger::init().unwrap();
@@ -125,8 +161,8 @@ impl Lowrr {
     }
 
     // Run the main lowrr registration algorithm.
-    //                                                     Vec<f32>
-    pub async fn run(&mut self, params: JsValue) -> Result<JsValue, JsValue> {
+    //                                                 Vec<f32>
+    async fn run(&mut self, params: JsValue) -> Result<JsValue, JsValue> {
         self.crop_registered.clear();
         let args: Args = params.into_serde().unwrap();
         utils::WasmLogger::setup(utils::verbosity_filter(args.config.verbosity));

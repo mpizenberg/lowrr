@@ -67,7 +67,7 @@ async function run(params) {
 
   // Run lowrr main registration algorithm.
   stopOrder = false;
-  let motion = Lowrr.run(args);
+  let motion = await Lowrr.run(args);
 
   // Send back to main thread all cropped images.
   const image_ids = Lowrr.image_ids();
@@ -94,9 +94,8 @@ export function appLog(lvl, content) {
 }
 
 // Function regularly called in the algorithm to check if it should stop.
-export function shouldStop(step, progress) {
-  // (async () => await sleep(0))();
-  // await sleep(0); // Force to give control back.
+export async function shouldStop(step, progress) {
+  await sleep(0); // Force to give control back.
   console.warn("called shouldStop?");
   return stopOrder;
 }
