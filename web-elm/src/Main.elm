@@ -1,6 +1,7 @@
 port module Main exposing (main)
 
 import Browser
+import Browser.Dom
 import Canvas
 import Canvas.Settings
 import Canvas.Settings.Advanced
@@ -30,6 +31,7 @@ import Pivot exposing (Pivot)
 import Set exposing (Set)
 import Simple.Transition as Transition
 import Style
+import Task
 import Viewer exposing (Viewer)
 import Viewer.Canvas
 
@@ -82,6 +84,7 @@ type alias Model =
     , registeredImages : Maybe (Pivot Image)
     , logs : List { lvl : Int, content : String }
     , verbosity : Int
+    , autoscroll : Bool
     }
 
 
@@ -220,7 +223,8 @@ initialModel size =
     , bboxDrawn = Nothing
     , registeredImages = Nothing
     , logs = []
-    , verbosity = 2
+    , verbosity = 3
+    , autoscroll = True
     }
 
 
@@ -319,6 +323,8 @@ type Msg
     | StopRunning
     | Log { lvl : Int, content : String }
     | VerbosityChange Float
+    | ScrollLogsToEnd
+    | ToggleAutoScroll Bool
     | ReceiveCroppedImages (List { id : String, img : Value })
 
 
@@ -720,10 +726,28 @@ update msg model =
             ( model, stop () )
 
         ( Log logData, _ ) ->
-            ( { model | logs = logData :: model.logs }, Cmd.none )
+            let
+                newLogs =
+                    logData :: model.logs
+            in
+            if model.autoscroll then
+                ( { model | logs = newLogs }, scrollLogsToEndCmd )
+
+            else
+                ( { model | logs = newLogs }, Cmd.none )
 
         ( VerbosityChange floatVerbosity, _ ) ->
             ( { model | verbosity = round floatVerbosity }, Cmd.none )
+
+        ( ScrollLogsToEnd, Logs _ ) ->
+            ( model, scrollLogsToEndCmd )
+
+        ( ToggleAutoScroll activate, _ ) ->
+            if activate then
+                ( { model | autoscroll = True }, scrollLogsToEndCmd )
+
+            else
+                ( { model | autoscroll = False }, Cmd.none )
 
         ( ReceiveCroppedImages croppedImages, _ ) ->
             case List.filterMap imageFromValue croppedImages of
@@ -765,6 +789,11 @@ update msg model =
 
         _ ->
             ( model, Cmd.none )
+
+
+scrollLogsToEndCmd : Cmd Msg
+scrollLogsToEndCmd =
+    Task.attempt (\_ -> NoMsg) (Browser.Dom.setViewportOf "logs" 0 1.0e14)
 
 
 imageFromValue : { id : String, img : Value } -> Maybe Image
@@ -1116,7 +1145,7 @@ viewElmUI model =
             viewRegistration model.registeredImages model.registeredViewer
 
         Logs { images } ->
-            viewLogs model.verbosity model.logs
+            viewLogs model.autoscroll model.verbosity model.logs
 
 
 
@@ -1213,8 +1242,8 @@ pageHeaderElement current page =
 -- Logs
 
 
-viewLogs : Int -> List { lvl : Int, content : String } -> Element Msg
-viewLogs verbosity logs =
+viewLogs : Bool -> Int -> List { lvl : Int, content : String } -> Element Msg
+viewLogs autoscroll verbosity logs =
     Element.column [ width fill, height fill ]
         [ headerBar
             [ ( PageImages, False )
@@ -1226,6 +1255,10 @@ viewLogs verbosity logs =
             { onPress = Just StopRunning
             , label = Element.text "stop!"
             }
+        , Element.row [ spacing 12 ]
+            [ Element.text "auto scroll:"
+            , toggle ToggleAutoScroll autoscroll 18 "autoscroll"
+            ]
         , Element.el [ centerX, paddingXY 0 18 ] (verbositySlider verbosity)
         , Element.column
             [ padding 18
@@ -1235,6 +1268,7 @@ viewLogs verbosity logs =
             , Style.fontMonospace
             , Element.Font.size 18
             , Element.scrollbars
+            , Element.htmlAttribute (Html.Attributes.id "logs")
             ]
             (List.filter (\l -> l.lvl <= verbosity) logs
                 |> List.reverse
