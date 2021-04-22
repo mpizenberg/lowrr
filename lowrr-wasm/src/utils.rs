@@ -78,7 +78,7 @@ pub fn verbosity_filter(verbosity: u32) -> LevelFilter {
 }
 
 pub fn report_error<E: Into<anyhow::Error>>(error: E) -> JsValue {
-    let str_error = error.into().to_string();
-    log::error!("{}", &str_error);
-    str_error.into()
+    let error_msg = format!("{:?}", error.into());
+    log::error!("{}", &error_msg);
+    error_msg.into()
 }
