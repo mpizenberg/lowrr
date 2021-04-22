@@ -74,6 +74,7 @@ async function run(params) {
   const imgCount = image_ids.length;
   console.log(`Encoding ${imgCount} cropped aligned images:`);
   for (let i = 0; i < imgCount; i++) {
+    await shouldStop("encoding", i);
     const id = image_ids[i];
     console.log("   Encoding ", id, " ...");
     let croppedImgArrayU8 = Lowrr.cropped_img_file(i);
@@ -86,6 +87,7 @@ async function run(params) {
       [croppedImgArrayU8.buffer]
     );
   }
+  await shouldStop("done", null);
 }
 
 // Log something in the interface with the provided verbosity level.

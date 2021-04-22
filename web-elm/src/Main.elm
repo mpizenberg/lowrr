@@ -99,6 +99,8 @@ type RunStep
     | StepLevel Int
     | StepIteration Int Int
     | StepApplying Int
+    | StepEncoding Int
+    | StepDone
 
 
 type alias BBox =
@@ -761,6 +763,12 @@ update msg model =
                         ( _, "Reproject", Just im ) ->
                             StepApplying im
 
+                        ( _, "encoding", Just im ) ->
+                            StepEncoding im
+
+                        ( _, "done", _ ) ->
+                            StepDone
+
                         _ ->
                             StepNotStarted
             in
@@ -1303,17 +1311,24 @@ estimateProgress model =
         StepMultiresPyramid ->
             0.0
 
-        -- Say 10% to 90% to share for all levels
+        -- Say 10% to 80% to share for all levels
         -- We can imagine each next level 2 times slower (approximation)
         StepLevel level ->
-            0.1 + 0.8 * levelProgress level
+            0.1 + 0.7 * levelProgress level
 
         StepIteration level iter ->
-            0.1 + 0.8 * levelProgress level + 0.8 / toFloat lvlCount * subprogress iter model.params.maxIterations
+            0.1 + 0.7 * levelProgress level + 0.7 / toFloat lvlCount * subprogress iter model.params.maxIterations
 
-        -- Say 90% to 100% for applying registration to cropped images
+        -- Say 80% to 90% for applying registration to cropped images
         StepApplying img ->
-            min 1.0 (0.9 + 0.1 * subprogress img model.imagesCount)
+            0.8 + 0.1 * subprogress img model.imagesCount
+
+        -- Say 90% to 100% for encoding the registered cropped images
+        StepEncoding img ->
+            0.9 + 0.1 * subprogress img model.imagesCount
+
+        StepDone ->
+            1.0
 
 
 runProgressBar : Element.Color -> Float -> Element Msg
