@@ -57,6 +57,9 @@ port stop : () -> Cmd msg
 port log : ({ lvl : Int, content : String } -> msg) -> Sub msg
 
 
+port updateRunStep : ({ step : String, progress : Maybe Int } -> msg) -> Sub msg
+
+
 port receiveCroppedImages : (List { id : String, img : Value } -> msg) -> Sub msg
 
 
@@ -85,7 +88,17 @@ type alias Model =
     , logs : List { lvl : Int, content : String }
     , verbosity : Int
     , autoscroll : Bool
+    , runStep : RunStep
+    , imagesCount : Int
     }
+
+
+type RunStep
+    = StepNotStarted
+    | StepMultiresPyramid
+    | StepLevel Int
+    | StepIteration Int Int
+    | StepApplying Int
 
 
 type alias BBox =
@@ -225,6 +238,8 @@ initialModel size =
     , logs = []
     , verbosity = 3
     , autoscroll = True
+    , runStep = StepNotStarted
+    , imagesCount = 0
     }
 
 
@@ -321,6 +336,7 @@ type Msg
     | PointerMsg PointerMsg
     | RunAlgorithm Parameters
     | StopRunning
+    | UpdateRunStep { step : String, progress : Maybe Int }
     | Log { lvl : Int, content : String }
     | VerbosityChange Float
     | ScrollLogsToEnd
@@ -399,16 +415,16 @@ subscriptions model =
             Sub.batch [ resizes WindowResizes, log Log, imageDecoded ImageDecoded ]
 
         ViewImgs _ ->
-            Sub.batch [ resizes WindowResizes, log Log, receiveCroppedImages ReceiveCroppedImages, Keyboard.downs KeyDown ]
+            Sub.batch [ resizes WindowResizes, log Log, receiveCroppedImages ReceiveCroppedImages, updateRunStep UpdateRunStep, Keyboard.downs KeyDown ]
 
         Config _ ->
-            Sub.batch [ resizes WindowResizes, log Log, receiveCroppedImages ReceiveCroppedImages ]
+            Sub.batch [ resizes WindowResizes, log Log, receiveCroppedImages ReceiveCroppedImages, updateRunStep UpdateRunStep ]
 
         Registration _ ->
-            Sub.batch [ resizes WindowResizes, log Log, receiveCroppedImages ReceiveCroppedImages, Keyboard.downs KeyDown ]
+            Sub.batch [ resizes WindowResizes, log Log, receiveCroppedImages ReceiveCroppedImages, updateRunStep UpdateRunStep, Keyboard.downs KeyDown ]
 
         Logs _ ->
-            Sub.batch [ resizes WindowResizes, log Log, receiveCroppedImages ReceiveCroppedImages ]
+            Sub.batch [ resizes WindowResizes, log Log, receiveCroppedImages ReceiveCroppedImages, updateRunStep UpdateRunStep ]
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -474,6 +490,7 @@ update msg model =
                             | state = ViewImgs { images = Pivot.fromCons firstImage otherImages }
                             , viewer = Viewer.fitImage 1.0 ( toFloat firstImage.width, toFloat firstImage.height ) model.viewer
                             , paramsForm = { oldParamsForm | crop = CropForm.withSize firstImage.width firstImage.height }
+                            , imagesCount = Set.size names
                           }
                         , Cmd.none
                         )
@@ -720,10 +737,34 @@ update msg model =
             ( { model | registeredImages = Maybe.map goToNextImage model.registeredImages }, Cmd.none )
 
         ( RunAlgorithm params, Config imgs ) ->
-            ( { model | state = Logs imgs, registeredImages = Nothing }, run (encodeParams params) )
+            ( { model | state = Logs imgs, registeredImages = Nothing, runStep = StepNotStarted }, run (encodeParams params) )
 
         ( StopRunning, _ ) ->
-            ( model, stop () )
+            ( { model | runStep = StepNotStarted }, stop () )
+
+        ( UpdateRunStep { step, progress }, _ ) ->
+            let
+                runStep =
+                    case ( model.runStep, step, progress ) of
+                        ( _, "Precompute multiresolution pyramid", _ ) ->
+                            StepMultiresPyramid
+
+                        ( _, "level", Just lvl ) ->
+                            StepLevel lvl
+
+                        ( StepLevel lvl, "iteration", Just iter ) ->
+                            StepIteration lvl iter
+
+                        ( StepIteration lvl _, "iteration", Just iter ) ->
+                            StepIteration lvl iter
+
+                        ( _, "Reproject", Just im ) ->
+                            StepApplying im
+
+                        _ ->
+                            StepNotStarted
+            in
+            ( { model | runStep = runStep }, Cmd.none )
 
         ( Log logData, _ ) ->
             let
@@ -1145,7 +1186,7 @@ viewElmUI model =
             viewRegistration model.registeredImages model.registeredViewer
 
         Logs { images } ->
-            viewLogs model.autoscroll model.verbosity model.logs
+            viewLogs model
 
 
 
@@ -1239,11 +1280,64 @@ pageHeaderElement current page =
 
 
 
+-- Run progress
+
+
+estimateProgress : Model -> Float
+estimateProgress model =
+    let
+        subprogress n nCount =
+            toFloat n / toFloat nCount
+
+        lvlCount =
+            model.params.levels
+
+        levelProgress lvl =
+            subprogress (lvlCount - lvl - 1) lvlCount
+    in
+    case model.runStep of
+        StepNotStarted ->
+            0.0
+
+        -- 0 to 10% for pyramid
+        StepMultiresPyramid ->
+            0.0
+
+        -- Say 10% to 90% to share for all levels
+        -- We can imagine each next level 2 times slower (approximation)
+        StepLevel level ->
+            0.1 + 0.8 * levelProgress level
+
+        StepIteration level iter ->
+            0.1 + 0.8 * levelProgress level + 0.8 / toFloat lvlCount * subprogress iter model.params.maxIterations
+
+        -- Say 90% to 100% for applying registration to cropped images
+        StepApplying img ->
+            min 1.0 (0.9 + 0.1 * subprogress img model.imagesCount)
+
+
+runProgressBar : Element.Color -> Float -> Element Msg
+runProgressBar color progressRatio =
+    let
+        scaleX =
+            "scaleX(" ++ String.fromFloat progressRatio ++ ")"
+    in
+    Element.el
+        [ width fill
+        , height fill
+        , Element.Background.color color
+        , Element.htmlAttribute (Html.Attributes.style "transform-origin" "top left")
+        , Element.htmlAttribute (Html.Attributes.style "transform" scaleX)
+        ]
+        Element.none
+
+
+
 -- Logs
 
 
-viewLogs : Bool -> Int -> List { lvl : Int, content : String } -> Element Msg
-viewLogs autoscroll verbosity logs =
+viewLogs : Model -> Element Msg
+viewLogs ({ autoscroll, verbosity, logs } as model) =
     Element.column [ width fill, height fill ]
         [ headerBar
             [ ( PageImages, False )
@@ -1251,6 +1345,14 @@ viewLogs autoscroll verbosity logs =
             , ( PageRegistration, False )
             , ( PageLogs, True )
             ]
+        , Element.el
+            [ width fill
+            , height (Element.px 32)
+            , Element.Font.size 12
+            , Element.behindContent (runProgressBar Style.almostWhite 1.0)
+            , Element.behindContent (runProgressBar Style.runProgressColor <| estimateProgress model)
+            ]
+            (Element.el [ centerX, centerY ] (Element.text "progress"))
         , Element.Input.button []
             { onPress = Just StopRunning
             , label = Element.text "stop!"

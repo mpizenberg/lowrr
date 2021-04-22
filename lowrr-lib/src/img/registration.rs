@@ -576,6 +576,28 @@ where
     imgs.iter().zip(motion_vec).map(warp_pair).collect()
 }
 
+/// Async version of reproject.
+pub async fn reproject_may_stop<T, V, O, FB: Future<Output = bool>>(
+    imgs: &[DMatrix<T>],
+    motion_vec: &[Vector6<f32>],
+    should_stop: fn(&'static str, Option<u32>) -> FB,
+) -> Result<Vec<DMatrix<O>>, RegistrationError>
+where
+    O: Scalar,
+    V: Add<Output = V>,
+    f32: Mul<V, Output = V>,
+    T: Scalar + Copy + CanLinearInterpolate<V, O>,
+{
+    let mut reprojected = Vec::with_capacity(imgs.len());
+    for (id, (img, motion)) in imgs.iter().zip(motion_vec).enumerate() {
+        reprojected.push(warp(img, motion));
+        if should_stop("Reproject", Some(id as u32)).await {
+            return Err(RegistrationError::StoppedByCaller);
+        }
+    }
+    Ok(reprojected)
+}
+
 pub fn warp<T, V, O>(img: &DMatrix<T>, motion_params: &Vector6<f32>) -> DMatrix<O>
 where
     O: Scalar,

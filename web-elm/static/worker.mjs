@@ -95,8 +95,8 @@ export function appLog(lvl, content) {
 
 // Function regularly called in the algorithm to check if it should stop.
 export async function shouldStop(step, progress) {
+  postMessage({ type: "should-stop", data: { step, progress } });
   await sleep(0); // Force to give control back.
-  console.warn("called shouldStop?");
   return stopOrder;
 }
 

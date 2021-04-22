@@ -176,8 +176,13 @@ impl LowrrInner {
                         .await
                         .map_err(utils::report_error)?;
                 log::info!("Applying registration on cropped images ...");
-                self.crop_registered =
-                    registration::reproject::<u8, f32, u8>(&cropped_eq_imgs, &motion_vec_crop);
+                self.crop_registered = registration::reproject_may_stop::<u8, f32, u8, _>(
+                    &cropped_eq_imgs,
+                    &motion_vec_crop,
+                    should_stop_bool,
+                )
+                .await
+                .map_err(utils::report_error)?;
                 original_motion(args.crop, motion_vec_crop)
             }
             Dataset::GrayImagesU16(gray_imgs) => {
@@ -187,8 +192,13 @@ impl LowrrInner {
                         .map_err(utils::report_error)?;
                 log::info!("Applying registration on cropped images ...");
                 let cropped_u8: Vec<_> = cropped_eq_imgs.into_iter().map(into_gray_u8).collect();
-                self.crop_registered =
-                    registration::reproject::<u8, f32, u8>(&cropped_u8, &motion_vec_crop);
+                self.crop_registered = registration::reproject_may_stop::<u8, f32, u8, _>(
+                    &cropped_u8,
+                    &motion_vec_crop,
+                    should_stop_bool,
+                )
+                .await
+                .map_err(utils::report_error)?;
                 original_motion(args.crop, motion_vec_crop)
             }
             Dataset::RgbImages(imgs) => {
@@ -197,8 +207,13 @@ impl LowrrInner {
                     .await
                     .map_err(utils::report_error)?;
                 log::info!("Applying registration on cropped images ...");
-                self.crop_registered =
-                    registration::reproject::<u8, f32, u8>(&cropped_eq_imgs, &motion_vec_crop);
+                self.crop_registered = registration::reproject_may_stop::<u8, f32, u8, _>(
+                    &cropped_eq_imgs,
+                    &motion_vec_crop,
+                    should_stop_bool,
+                )
+                .await
+                .map_err(utils::report_error)?;
                 original_motion(args.crop, motion_vec_crop)
             }
             Dataset::RgbImagesU16(imgs) => {
@@ -209,8 +224,13 @@ impl LowrrInner {
                         .map_err(utils::report_error)?;
                 log::info!("Applying registration on cropped images ...");
                 let cropped_u8: Vec<_> = cropped_eq_imgs.into_iter().map(into_gray_u8).collect();
-                self.crop_registered =
-                    registration::reproject::<u8, f32, u8>(&cropped_u8, &motion_vec_crop);
+                self.crop_registered = registration::reproject_may_stop::<u8, f32, u8, _>(
+                    &cropped_u8,
+                    &motion_vec_crop,
+                    should_stop_bool,
+                )
+                .await
+                .map_err(utils::report_error)?;
                 original_motion(args.crop, motion_vec_crop)
             }
         };

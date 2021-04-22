@@ -32,6 +32,12 @@ export function activatePorts(app, containerSize) {
         console.log(`Registration done, there are ${imgCount} cropped images.`);
         app.ports.receiveCroppedImages.send(croppedImages);
       }
+    } else if (event.data.type == "should-stop") {
+      console.warn("should-stop:", event.data.data);
+      let { step, progress } = event.data.data;
+      // Convert undefined to null to be a valid Elm "Maybe Int"
+      progress = progress === undefined ? null : progress;
+      app.ports.updateRunStep.send({ step, progress });
     } else {
       console.warn("Unknown message type:", event.data.type);
     }

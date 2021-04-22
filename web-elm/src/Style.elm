@@ -1,6 +1,6 @@
 module Style exposing
     ( font, fontMonospace
-    , dropColor, errorColor, warningColor
+    , dropColor, runProgressColor, errorColor, warningColor
     , black, white, almostWhite, lightGrey, green
     )
 
@@ -8,7 +8,7 @@ module Style exposing
 
 @docs font, fontMonospace
 
-@docs dropColor, errorColor, warningColor
+@docs dropColor, runProgressColor, errorColor, warningColor
 
 @docs black, white, almostWhite, lightGrey, green
 
@@ -41,6 +41,11 @@ fontMonospace =
 dropColor : Element.Color
 dropColor =
     Element.rgb255 50 50 250
+
+
+runProgressColor : Element.Color
+runProgressColor =
+    Element.rgb255 211 199 255
 
 
 errorColor : Element.Color
