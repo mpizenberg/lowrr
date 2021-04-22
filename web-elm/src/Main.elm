@@ -1291,6 +1291,31 @@ pageHeaderElement current page =
 -- Run progress
 
 
+progressMessage : Model -> String
+progressMessage model =
+    case model.runStep of
+        StepNotStarted ->
+            ""
+
+        StepMultiresPyramid ->
+            "Building multi-resolution pyramid"
+
+        StepLevel level ->
+            "Registering at level " ++ String.fromInt level
+
+        StepIteration level iter ->
+            "Registering at level " ++ String.fromInt level ++ "    iteration " ++ String.fromInt iter ++ " / " ++ String.fromInt model.params.maxIterations
+
+        StepApplying img ->
+            "Applying warp to cropped image " ++ String.fromInt img ++ " / " ++ String.fromInt model.imagesCount
+
+        StepEncoding img ->
+            "Encoding registered cropped image " ++ String.fromInt img ++ " / " ++ String.fromInt model.imagesCount
+
+        StepDone ->
+            "Done :)"
+
+
 estimateProgress : Model -> Float
 estimateProgress model =
     let
@@ -1367,7 +1392,7 @@ viewLogs ({ autoscroll, verbosity, logs } as model) =
             , Element.behindContent (runProgressBar Style.almostWhite 1.0)
             , Element.behindContent (runProgressBar Style.runProgressColor <| estimateProgress model)
             ]
-            (Element.el [ centerX, centerY ] (Element.text "progress"))
+            (Element.el [ centerX, centerY ] (Element.text <| progressMessage model))
         , Element.Input.button []
             { onPress = Just StopRunning
             , label = Element.text "stop!"
