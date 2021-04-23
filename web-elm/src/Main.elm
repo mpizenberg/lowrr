@@ -1727,7 +1727,7 @@ viewRegistration ({ registeredImages, registeredViewer } as model) =
 
 viewConfig : Model -> Element Msg
 viewConfig ({ params, paramsForm, paramsInfo } as model) =
-    Element.column [ width fill ]
+    Element.column [ width fill, height fill ]
         [ headerBar
             [ ( PageImages, False )
             , ( PageConfig, True )
@@ -1735,162 +1735,164 @@ viewConfig ({ params, paramsForm, paramsInfo } as model) =
             , ( PageLogs, False )
             ]
         , runProgressBar model
-        , Element.column [ paddingXY 20 32, spacing 32, centerX ]
-            [ -- Title
-              Element.el [ Element.Font.center, Element.Font.size 32 ] (Element.text "Algorithm parameters")
+        , Element.column [ width fill, height fill, Element.scrollbars ]
+            [ Element.column [ paddingXY 20 32, spacing 32, centerX ]
+                [ -- Title
+                  Element.el [ Element.Font.center, Element.Font.size 32 ] (Element.text "Algorithm parameters")
 
-            -- Cropped working frame
-            , Element.column [ spacing 10 ]
-                [ Element.row [ spacing 10 ]
-                    [ Element.text "Cropped working frame:"
-                    , Element.Input.checkbox []
-                        { onChange = ParamsInfoMsg << ToggleInfoCrop
-                        , icon = infoIcon
-                        , checked = paramsInfo.crop
-                        , label = Element.Input.labelHidden "Show detail info about cropped working frame"
+                -- Cropped working frame
+                , Element.column [ spacing 10 ]
+                    [ Element.row [ spacing 10 ]
+                        [ Element.text "Cropped working frame:"
+                        , Element.Input.checkbox []
+                            { onChange = ParamsInfoMsg << ToggleInfoCrop
+                            , icon = infoIcon
+                            , checked = paramsInfo.crop
+                            , label = Element.Input.labelHidden "Show detail info about cropped working frame"
+                            }
+                        ]
+                    , moreInfo paramsInfo.crop "Instead of using the whole image to estimate the registration, it is often faster and as accurate to focus the algorithm attention on a smaller frame in the image. The parameters here are the left, top, right and bottom coordinates of that cropped frame on which we want the algorithm to focus when estimating the alignment parameters."
+                    , Element.row [ spacing 10 ]
+                        [ Element.text "off"
+                        , toggle (ParamsMsg << ToggleCrop) paramsForm.crop.active 30 "Toggle cropped working frame"
+                        , Element.text "on"
+                        ]
+                    , CropForm.boxEditor
+                        { changeLeft = ParamsMsg << ChangeCropLeft
+                        , changeTop = ParamsMsg << ChangeCropTop
+                        , changeRight = ParamsMsg << ChangeCropRight
+                        , changeBottom = ParamsMsg << ChangeCropBottom
                         }
+                        paramsForm.crop
+                    , displayErrors (CropForm.errors paramsForm.crop)
                     ]
-                , moreInfo paramsInfo.crop "Instead of using the whole image to estimate the registration, it is often faster and as accurate to focus the algorithm attention on a smaller frame in the image. The parameters here are the left, top, right and bottom coordinates of that cropped frame on which we want the algorithm to focus when estimating the alignment parameters."
-                , Element.row [ spacing 10 ]
-                    [ Element.text "off"
-                    , toggle (ParamsMsg << ToggleCrop) paramsForm.crop.active 30 "Toggle cropped working frame"
-                    , Element.text "on"
-                    ]
-                , CropForm.boxEditor
-                    { changeLeft = ParamsMsg << ChangeCropLeft
-                    , changeTop = ParamsMsg << ChangeCropTop
-                    , changeRight = ParamsMsg << ChangeCropRight
-                    , changeBottom = ParamsMsg << ChangeCropBottom
-                    }
-                    paramsForm.crop
-                , displayErrors (CropForm.errors paramsForm.crop)
-                ]
 
-            -- Equalize mean intensities
-            , Element.column [ spacing 10 ]
-                [ Element.text "Equalize mean intensities:"
-                , Element.row [ spacing 10 ]
-                    [ Element.text "off"
-                    , toggle (ParamsMsg << ToggleEqualize) params.equalize 30 "Toggle mean intensities equalization"
-                    , Element.text "on"
+                -- Equalize mean intensities
+                , Element.column [ spacing 10 ]
+                    [ Element.text "Equalize mean intensities:"
+                    , Element.row [ spacing 10 ]
+                        [ Element.text "off"
+                        , toggle (ParamsMsg << ToggleEqualize) params.equalize 30 "Toggle mean intensities equalization"
+                        , Element.text "on"
+                        ]
                     ]
-                ]
 
-            -- Maximum number of iterations
-            , Element.column [ spacing 10 ]
-                [ Element.row [ spacing 10 ]
-                    [ Element.text "Maximum number of iterations:"
-                    , Element.Input.checkbox []
-                        { onChange = ParamsInfoMsg << ToggleInfoMaxIterations
-                        , icon = infoIcon
-                        , checked = paramsInfo.maxIterations
-                        , label = Element.Input.labelHidden "Show detail info about the maximum number of iterations"
-                        }
+                -- Maximum number of iterations
+                , Element.column [ spacing 10 ]
+                    [ Element.row [ spacing 10 ]
+                        [ Element.text "Maximum number of iterations:"
+                        , Element.Input.checkbox []
+                            { onChange = ParamsInfoMsg << ToggleInfoMaxIterations
+                            , icon = infoIcon
+                            , checked = paramsInfo.maxIterations
+                            , label = Element.Input.labelHidden "Show detail info about the maximum number of iterations"
+                            }
+                        ]
+                    , moreInfo paramsInfo.maxIterations "This is the maximum number of iterations allowed per level. If this is reached, the algorithm stops whether it converged or not."
+                    , Element.text ("(default to " ++ String.fromInt defaultParams.maxIterations ++ ")")
+                    , intInput paramsForm.maxIterations (ParamsMsg << ChangeMaxIter) "Maximum number of iterations"
+                    , displayIntErrors paramsForm.maxIterations.decodedInput
                     ]
-                , moreInfo paramsInfo.maxIterations "This is the maximum number of iterations allowed per level. If this is reached, the algorithm stops whether it converged or not."
-                , Element.text ("(default to " ++ String.fromInt defaultParams.maxIterations ++ ")")
-                , intInput paramsForm.maxIterations (ParamsMsg << ChangeMaxIter) "Maximum number of iterations"
-                , displayIntErrors paramsForm.maxIterations.decodedInput
-                ]
 
-            -- Convergence threshold
-            , Element.column [ spacing 10 ]
-                [ Element.row [ spacing 10 ]
-                    [ Element.text "Convergence threshold:"
-                    , Element.Input.checkbox []
-                        { onChange = ParamsInfoMsg << ToggleInfoConvergenceThreshold
-                        , icon = infoIcon
-                        , checked = paramsInfo.convergenceThreshold
-                        , label = Element.Input.labelHidden "Show detail info about the convergence threshold parameter"
-                        }
+                -- Convergence threshold
+                , Element.column [ spacing 10 ]
+                    [ Element.row [ spacing 10 ]
+                        [ Element.text "Convergence threshold:"
+                        , Element.Input.checkbox []
+                            { onChange = ParamsInfoMsg << ToggleInfoConvergenceThreshold
+                            , icon = infoIcon
+                            , checked = paramsInfo.convergenceThreshold
+                            , label = Element.Input.labelHidden "Show detail info about the convergence threshold parameter"
+                            }
+                        ]
+                    , moreInfo paramsInfo.convergenceThreshold "The algorithm stops when the relative error difference between to estimates falls below this value."
+                    , Element.text ("(default to " ++ String.fromFloat defaultParams.convergenceThreshold ++ ")")
+                    , floatInput paramsForm.convergenceThreshold (ParamsMsg << ChangeConvergenceThreshold) "Convergence threshold"
+                    , displayFloatErrors paramsForm.convergenceThreshold.decodedInput
                     ]
-                , moreInfo paramsInfo.convergenceThreshold "The algorithm stops when the relative error difference between to estimates falls below this value."
-                , Element.text ("(default to " ++ String.fromFloat defaultParams.convergenceThreshold ++ ")")
-                , floatInput paramsForm.convergenceThreshold (ParamsMsg << ChangeConvergenceThreshold) "Convergence threshold"
-                , displayFloatErrors paramsForm.convergenceThreshold.decodedInput
-                ]
 
-            -- Multi-resolution pyramid levels
-            , Element.column [ spacing 10 ]
-                [ Element.row [ spacing 10 ]
-                    [ Element.text "Number of pyramid levels:"
-                    , Element.Input.checkbox []
-                        { onChange = ParamsInfoMsg << ToggleInfoLevels
-                        , icon = infoIcon
-                        , checked = paramsInfo.levels
-                        , label = Element.Input.labelHidden "Show detail info about the levels parameter"
-                        }
+                -- Multi-resolution pyramid levels
+                , Element.column [ spacing 10 ]
+                    [ Element.row [ spacing 10 ]
+                        [ Element.text "Number of pyramid levels:"
+                        , Element.Input.checkbox []
+                            { onChange = ParamsInfoMsg << ToggleInfoLevels
+                            , icon = infoIcon
+                            , checked = paramsInfo.levels
+                            , label = Element.Input.labelHidden "Show detail info about the levels parameter"
+                            }
+                        ]
+                    , moreInfo paramsInfo.levels "The number of levels for the multi-resolution approach. Each level halves/doubles the resolution of the previous one. The algorithm starts at the lowest resolution and transfers the converged parameters at one resolution to the initialization of the next. Increasing the number of levels enables better convergence for bigger movements but too many levels might make it definitively drift away. Targetting a lowest resolution of about 100x100 is generally good enough. The number of levels also has a joint interaction with the sparse threshold parameter so keep that in mind while changing this parameter."
+                    , Element.text ("(default to " ++ String.fromInt defaultParams.levels ++ ")")
+                    , intInput paramsForm.levels (ParamsMsg << ChangeLevels) "Number of pyramid levels"
+                    , displayIntErrors paramsForm.levels.decodedInput
                     ]
-                , moreInfo paramsInfo.levels "The number of levels for the multi-resolution approach. Each level halves/doubles the resolution of the previous one. The algorithm starts at the lowest resolution and transfers the converged parameters at one resolution to the initialization of the next. Increasing the number of levels enables better convergence for bigger movements but too many levels might make it definitively drift away. Targetting a lowest resolution of about 100x100 is generally good enough. The number of levels also has a joint interaction with the sparse threshold parameter so keep that in mind while changing this parameter."
-                , Element.text ("(default to " ++ String.fromInt defaultParams.levels ++ ")")
-                , intInput paramsForm.levels (ParamsMsg << ChangeLevels) "Number of pyramid levels"
-                , displayIntErrors paramsForm.levels.decodedInput
-                ]
 
-            -- Sparse ratio threshold
-            , Element.column [ spacing 10 ]
-                [ Element.row [ spacing 10 ]
-                    [ Element.text "Sparse ratio threshold to switch:"
-                    , Element.Input.checkbox []
-                        { onChange = ParamsInfoMsg << ToggleInfoSparse
-                        , icon = infoIcon
-                        , checked = paramsInfo.sparse
-                        , label = Element.Input.labelHidden "Show detail info about the sparse parameter"
-                        }
+                -- Sparse ratio threshold
+                , Element.column [ spacing 10 ]
+                    [ Element.row [ spacing 10 ]
+                        [ Element.text "Sparse ratio threshold to switch:"
+                        , Element.Input.checkbox []
+                            { onChange = ParamsInfoMsg << ToggleInfoSparse
+                            , icon = infoIcon
+                            , checked = paramsInfo.sparse
+                            , label = Element.Input.labelHidden "Show detail info about the sparse parameter"
+                            }
+                        ]
+                    , moreInfo paramsInfo.sparse "Sparse ratio threshold to switch between dense and sparse registration. At each pyramid level only the pixels with the highest gradient intensities are kept, making each level sparser than the previous one. Once the ratio of selected pixels goes below this sparse ratio parameter, the algorithm performs a sparse registration, using only the selected points at that level. If you want to use a dense registration at every level, you can set this parameter to 0."
+                    , Element.text ("(default to " ++ String.fromFloat defaultParams.sparse ++ ")")
+                    , floatInput paramsForm.sparse (ParamsMsg << ChangeSparse) "Sparse ratio threshold to switch"
+                    , displayFloatErrors paramsForm.sparse.decodedInput
                     ]
-                , moreInfo paramsInfo.sparse "Sparse ratio threshold to switch between dense and sparse registration. At each pyramid level only the pixels with the highest gradient intensities are kept, making each level sparser than the previous one. Once the ratio of selected pixels goes below this sparse ratio parameter, the algorithm performs a sparse registration, using only the selected points at that level. If you want to use a dense registration at every level, you can set this parameter to 0."
-                , Element.text ("(default to " ++ String.fromFloat defaultParams.sparse ++ ")")
-                , floatInput paramsForm.sparse (ParamsMsg << ChangeSparse) "Sparse ratio threshold to switch"
-                , displayFloatErrors paramsForm.sparse.decodedInput
-                ]
 
-            -- lambda
-            , Element.column [ spacing 10 ]
-                [ Element.row [ spacing 10 ]
-                    [ Element.text ("lambda: (default to " ++ String.fromFloat defaultParams.lambda ++ ")")
-                    , Element.Input.checkbox []
-                        { onChange = ParamsInfoMsg << ToggleInfoLambda
-                        , icon = infoIcon
-                        , checked = paramsInfo.lambda
-                        , label = Element.Input.labelHidden "Show detail info about the lambda parameter"
-                        }
+                -- lambda
+                , Element.column [ spacing 10 ]
+                    [ Element.row [ spacing 10 ]
+                        [ Element.text ("lambda: (default to " ++ String.fromFloat defaultParams.lambda ++ ")")
+                        , Element.Input.checkbox []
+                            { onChange = ParamsInfoMsg << ToggleInfoLambda
+                            , icon = infoIcon
+                            , checked = paramsInfo.lambda
+                            , label = Element.Input.labelHidden "Show detail info about the lambda parameter"
+                            }
+                        ]
+                    , moreInfo paramsInfo.lambda "Weight of the L1 term (high means no correction)."
+                    , floatInput paramsForm.lambda (ParamsMsg << ChangeLambda) "lambda"
+                    , displayFloatErrors paramsForm.lambda.decodedInput
                     ]
-                , moreInfo paramsInfo.lambda "Weight of the L1 term (high means no correction)."
-                , floatInput paramsForm.lambda (ParamsMsg << ChangeLambda) "lambda"
-                , displayFloatErrors paramsForm.lambda.decodedInput
-                ]
 
-            -- rho
-            , Element.column [ spacing 10 ]
-                [ Element.row [ spacing 10 ]
-                    [ Element.text ("rho: (default to " ++ String.fromFloat defaultParams.rho ++ ")")
-                    , Element.Input.checkbox []
-                        { onChange = ParamsInfoMsg << ToggleInfoRho
-                        , icon = infoIcon
-                        , checked = paramsInfo.rho
-                        , label = Element.Input.labelHidden "Show detail info about the rho parameter"
-                        }
+                -- rho
+                , Element.column [ spacing 10 ]
+                    [ Element.row [ spacing 10 ]
+                        [ Element.text ("rho: (default to " ++ String.fromFloat defaultParams.rho ++ ")")
+                        , Element.Input.checkbox []
+                            { onChange = ParamsInfoMsg << ToggleInfoRho
+                            , icon = infoIcon
+                            , checked = paramsInfo.rho
+                            , label = Element.Input.labelHidden "Show detail info about the rho parameter"
+                            }
+                        ]
+                    , moreInfo paramsInfo.rho "Lagrangian penalty."
+                    , floatInput paramsForm.rho (ParamsMsg << ChangeRho) "rho"
+                    , displayFloatErrors paramsForm.rho.decodedInput
                     ]
-                , moreInfo paramsInfo.rho "Lagrangian penalty."
-                , floatInput paramsForm.rho (ParamsMsg << ChangeRho) "rho"
-                , displayFloatErrors paramsForm.rho.decodedInput
-                ]
 
-            -- Maximum verbosity
-            , Element.column [ spacing 10 ]
-                [ Element.row [ spacing 10 ]
-                    [ Element.text "Maximum verbosity:"
-                    , Element.Input.checkbox []
-                        { onChange = ParamsInfoMsg << ToggleInfoMaxVerbosity
-                        , icon = infoIcon
-                        , checked = paramsInfo.maxVerbosity
-                        , label = Element.Input.labelHidden "Show detail info about the maximum verbosity."
-                        }
+                -- Maximum verbosity
+                , Element.column [ spacing 10 ]
+                    [ Element.row [ spacing 10 ]
+                        [ Element.text "Maximum verbosity:"
+                        , Element.Input.checkbox []
+                            { onChange = ParamsInfoMsg << ToggleInfoMaxVerbosity
+                            , icon = infoIcon
+                            , checked = paramsInfo.maxVerbosity
+                            , label = Element.Input.labelHidden "Show detail info about the maximum verbosity."
+                            }
+                        ]
+                    , moreInfo paramsInfo.maxVerbosity "Maximum verbosity of logs that can appear in the Logs tab. Setting this higher than its default value enables a very detailed log trace at the price of performance degradations."
+                    , Element.text ("(default to " ++ String.fromInt defaultParams.maxVerbosity ++ ")")
+                    , intInput paramsForm.maxVerbosity (ParamsMsg << ChangeMaxVerbosity) "Maximum verbosity"
+                    , displayIntErrors paramsForm.maxVerbosity.decodedInput
                     ]
-                , moreInfo paramsInfo.maxVerbosity "Maximum verbosity of logs that can appear in the Logs tab. Setting this higher than its default value enables a very detailed log trace at the price of performance degradations."
-                , Element.text ("(default to " ++ String.fromInt defaultParams.maxVerbosity ++ ")")
-                , intInput paramsForm.maxVerbosity (ParamsMsg << ChangeMaxVerbosity) "Maximum verbosity"
-                , displayIntErrors paramsForm.maxVerbosity.decodedInput
                 ]
             ]
         ]
