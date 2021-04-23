@@ -1197,7 +1197,7 @@ viewElmUI model =
             viewImgs model.pointerMode model.bboxDrawn model.viewer images
 
         Config { images } ->
-            viewConfig model.params model.paramsForm model.paramsInfo
+            viewConfig model
 
         Registration { images } ->
             viewRegistration model.registeredImages model.registeredViewer
@@ -1676,8 +1676,8 @@ viewRegistration maybeImages viewer =
 -- Parameters config
 
 
-viewConfig : Parameters -> ParametersForm -> ParametersToggleInfo -> Element Msg
-viewConfig params paramsForm paramsInfo =
+viewConfig : Model -> Element Msg
+viewConfig ({ params, paramsForm, paramsInfo } as model) =
     Element.column [ width fill ]
         [ headerBar
             [ ( PageImages, False )
@@ -1685,6 +1685,7 @@ viewConfig params paramsForm paramsInfo =
             , ( PageRegistration, False )
             , ( PageLogs, False )
             ]
+        , runProgressBar model
         , Element.column [ paddingXY 20 32, spacing 32, centerX ]
             [ -- Title
               Element.el [ Element.Font.center, Element.Font.size 32 ] (Element.text "Algorithm parameters")
