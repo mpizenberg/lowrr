@@ -1313,6 +1313,13 @@ runProgressBar model =
 
                 _ ->
                     Element.none
+
+        progressBarStopButton =
+            if model.runStep == StepNotStarted || model.runStep == StepDone then
+                Element.none
+
+            else
+                stopButton
     in
     Element.el
         [ width fill
@@ -1321,9 +1328,9 @@ runProgressBar model =
         , Element.behindContent (progressBar Style.almostWhite 1.0)
         , Element.behindContent (progressBar Style.runProgressColor <| estimateProgress model)
         , Element.inFront progressBarRunButton
+        , Element.inFront progressBarStopButton
         ]
         (Element.el [ centerX, centerY ] (Element.text <| progressMessage model))
-
 
 
 runButton : String -> Parameters -> ParametersForm -> Element Msg
@@ -1368,6 +1375,20 @@ isOk result =
 
         Ok _ ->
             True
+
+
+stopButton : Element Msg
+stopButton =
+    Element.Input.button
+        [ alignRight
+        , padding 12
+        , Element.Border.solid
+        , Element.Border.width 1
+        , Element.Border.rounded 4
+        ]
+        { onPress = Just StopRunning
+        , label = Element.text "Stop!"
+        }
 
 
 progressMessage : Model -> String
@@ -1465,10 +1486,6 @@ viewLogs ({ autoscroll, verbosity, logs } as model) =
             , ( PageLogs, True )
             ]
         , runProgressBar model
-        , Element.Input.button []
-            { onPress = Just StopRunning
-            , label = Element.text "stop!"
-            }
         , Element.row [ spacing 12 ]
             [ Element.text "auto scroll:"
             , toggle ToggleAutoScroll autoscroll 18 "autoscroll"
@@ -1872,8 +1889,6 @@ infoIcon detailsVisible =
             , Element.Border.dashed
             ]
             (Element.text "?")
-
-
 
 
 
