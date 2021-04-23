@@ -232,8 +232,8 @@ initialModel size =
     , params = defaultParams
     , paramsForm = defaultParamsForm
     , paramsInfo = defaultParamsInfo
-    , viewer = Viewer.withSize ( size.width, size.height - toFloat headerHeight )
-    , registeredViewer = Viewer.withSize ( size.width, size.height - toFloat headerHeight )
+    , viewer = Viewer.withSize ( size.width, size.height - toFloat (headerHeight + progressBarHeight) )
+    , registeredViewer = Viewer.withSize ( size.width, size.height - toFloat (headerHeight + progressBarHeight) )
     , pointerMode = WaitingMove
     , bboxDrawn = Nothing
     , registeredImages = Nothing
@@ -438,8 +438,8 @@ update msg model =
         ( WindowResizes size, _ ) ->
             ( { model
                 | device = Device.classify size
-                , viewer = Viewer.resize ( size.width, size.height - toFloat headerHeight ) model.viewer
-                , registeredViewer = Viewer.resize ( size.width, size.height - toFloat headerHeight ) model.registeredViewer
+                , viewer = Viewer.resize ( size.width, size.height - toFloat (headerHeight + progressBarHeight) ) model.viewer
+                , registeredViewer = Viewer.resize ( size.width, size.height - toFloat (headerHeight + progressBarHeight) ) model.registeredViewer
               }
             , Cmd.none
             )
@@ -1194,13 +1194,13 @@ viewElmUI model =
             viewLoading loadData
 
         ViewImgs { images } ->
-            viewImgs model.pointerMode model.bboxDrawn model.viewer images
+            viewImgs model images
 
         Config { images } ->
             viewConfig model
 
         Registration { images } ->
-            viewRegistration model.registeredImages model.registeredViewer
+            viewRegistration model
 
         Logs { images } ->
             viewLogs model
@@ -1300,6 +1300,13 @@ pageHeaderElement current page =
 -- Run progress
 
 
+{-| WARNING: this has to be kept consistent with the viewer size
+-}
+progressBarHeight : Int
+progressBarHeight =
+    38
+
+
 runProgressBar : Model -> Element Msg
 runProgressBar model =
     let
@@ -1323,7 +1330,7 @@ runProgressBar model =
     in
     Element.el
         [ width fill
-        , height (Element.px 38)
+        , height (Element.px progressBarHeight)
         , Element.Font.size 12
         , Element.behindContent (progressBar Style.almostWhite 1.0)
         , Element.behindContent (progressBar Style.runProgressColor <| estimateProgress model)
@@ -1582,8 +1589,8 @@ verbositySlider verbosity =
 -- Registration
 
 
-viewRegistration : Maybe (Pivot Image) -> Viewer -> Element Msg
-viewRegistration maybeImages viewer =
+viewRegistration : Model -> Element Msg
+viewRegistration ({ registeredImages, registeredViewer } as model) =
     Element.column [ width fill, height fill ]
         [ headerBar
             [ ( PageImages, False )
@@ -1591,11 +1598,12 @@ viewRegistration maybeImages viewer =
             , ( PageRegistration, True )
             , ( PageLogs, False )
             ]
+        , runProgressBar model
         , Element.html <|
             Html.node "style"
                 []
                 [ Html.text ".pixelated { image-rendering: pixelated; image-rendering: crisp-edges; }" ]
-        , case maybeImages of
+        , case registeredImages of
             Nothing ->
                 Element.el [ centerX, centerY ]
                     (Element.text "Registration not done yet")
@@ -1626,7 +1634,7 @@ viewRegistration maybeImages viewer =
                             ]
 
                     ( viewerWidth, viewerHeight ) =
-                        viewer.size
+                        registeredViewer.size
 
                     clearCanvas : Canvas.Renderable
                     clearCanvas =
@@ -1635,7 +1643,7 @@ viewRegistration maybeImages viewer =
                     renderedImage : Canvas.Renderable
                     renderedImage =
                         Canvas.texture
-                            [ Viewer.Canvas.transform viewer
+                            [ Viewer.Canvas.transform registeredViewer
                             , Canvas.Settings.Advanced.imageSmoothing False
                             ]
                             ( 0, 0 )
@@ -1645,7 +1653,7 @@ viewRegistration maybeImages viewer =
                         Canvas.toHtml ( round viewerWidth, round viewerHeight )
                             [ Html.Attributes.id "theCanvas"
                             , Html.Attributes.style "display" "block"
-                            , Wheel.onWheel (zoomWheelMsg viewer)
+                            , Wheel.onWheel (zoomWheelMsg registeredViewer)
                             , msgOn "pointerdown" (Json.Decode.map (PointerMsg << PointerDownRaw) Json.Decode.value)
                             , Pointer.onUp (\e -> PointerMsg (PointerUp e.pointer.offsetPos))
                             , Html.Attributes.style "touch-action" "none"
@@ -2151,8 +2159,8 @@ toggleCheckboxWidget { offColor, onColor, sliderColor, toggleWidth, toggleHeight
 -- View Images
 
 
-viewImgs : PointerMode -> Maybe BBox -> Viewer -> Pivot Image -> Element Msg
-viewImgs pointerMode bboxDrawn viewer images =
+viewImgs : Model -> Pivot Image -> Element Msg
+viewImgs ({ pointerMode, bboxDrawn, viewer } as model) images =
     let
         img =
             Pivot.getC images
@@ -2286,6 +2294,7 @@ viewImgs pointerMode bboxDrawn viewer images =
             , ( PageRegistration, False )
             , ( PageLogs, False )
             ]
+        , runProgressBar model
         , Element.html <|
             Html.node "style"
                 []
