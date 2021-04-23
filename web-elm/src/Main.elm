@@ -1356,8 +1356,8 @@ estimateProgress model =
             1.0
 
 
-runProgressBar : Element.Color -> Float -> Element Msg
-runProgressBar color progressRatio =
+progressBar : Element.Color -> Float -> Element Msg
+progressBar color progressRatio =
     let
         scaleX =
             "scaleX(" ++ String.fromFloat progressRatio ++ ")"
@@ -1389,8 +1389,8 @@ viewLogs ({ autoscroll, verbosity, logs } as model) =
             [ width fill
             , height (Element.px 32)
             , Element.Font.size 12
-            , Element.behindContent (runProgressBar Style.almostWhite 1.0)
-            , Element.behindContent (runProgressBar Style.runProgressColor <| estimateProgress model)
+            , Element.behindContent (progressBar Style.almostWhite 1.0)
+            , Element.behindContent (progressBar Style.runProgressColor <| estimateProgress model)
             ]
             (Element.el [ centerX, centerY ] (Element.text <| progressMessage model))
         , Element.Input.button []
