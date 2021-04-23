@@ -1493,25 +1493,29 @@ viewLogs ({ autoscroll, verbosity, logs } as model) =
             , ( PageLogs, True )
             ]
         , runProgressBar model
-        , Element.row [ spacing 12 ]
-            [ Element.text "auto scroll:"
-            , toggle ToggleAutoScroll autoscroll 18 "autoscroll"
+        , Element.column [ width fill, height fill, paddingXY 0 18, spacing 18 ]
+            [ Element.el [ centerX ] (verbositySlider verbosity)
+            , Element.row [ centerX, spacing 18 ]
+                [ Element.el [ centerY ] (Element.text "auto scroll:")
+                , Element.el [ centerY ] (Element.text "off")
+                , toggle ToggleAutoScroll autoscroll 24 "autoscroll"
+                , Element.el [ centerY ] (Element.text "on")
+                ]
+            , Element.column
+                [ padding 18
+                , height fill
+                , width fill
+                , centerX
+                , Style.fontMonospace
+                , Element.Font.size 18
+                , Element.scrollbars
+                , Element.htmlAttribute (Html.Attributes.id "logs")
+                ]
+                (List.filter (\l -> l.lvl <= verbosity) logs
+                    |> List.reverse
+                    |> List.map viewLog
+                )
             ]
-        , Element.el [ centerX, paddingXY 0 18 ] (verbositySlider verbosity)
-        , Element.column
-            [ padding 18
-            , height fill
-            , width fill
-            , centerX
-            , Style.fontMonospace
-            , Element.Font.size 18
-            , Element.scrollbars
-            , Element.htmlAttribute (Html.Attributes.id "logs")
-            ]
-            (List.filter (\l -> l.lvl <= verbosity) logs
-                |> List.reverse
-                |> List.map viewLog
-            )
         ]
 
 
