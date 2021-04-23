@@ -738,7 +738,16 @@ update msg model =
         ( ClickNextImage, Registration _ ) ->
             ( { model | registeredImages = Maybe.map goToNextImage model.registeredImages }, Cmd.none )
 
+        ( RunAlgorithm params, ViewImgs imgs ) ->
+            ( { model | state = Logs imgs, registeredImages = Nothing, runStep = StepNotStarted }, run (encodeParams params) )
+
         ( RunAlgorithm params, Config imgs ) ->
+            ( { model | state = Logs imgs, registeredImages = Nothing, runStep = StepNotStarted }, run (encodeParams params) )
+
+        ( RunAlgorithm params, Registration imgs ) ->
+            ( { model | state = Logs imgs, registeredImages = Nothing, runStep = StepNotStarted }, run (encodeParams params) )
+
+        ( RunAlgorithm params, Logs imgs ) ->
             ( { model | state = Logs imgs, registeredImages = Nothing, runStep = StepNotStarted }, run (encodeParams params) )
 
         ( StopRunning, _ ) ->
@@ -1293,14 +1302,72 @@ pageHeaderElement current page =
 
 runProgressBar : Model -> Element Msg
 runProgressBar model =
+    let
+        progressBarRunButton =
+            case model.runStep of
+                StepNotStarted ->
+                    runButton "Run ▶" model.params model.paramsForm
+
+                StepDone ->
+                    runButton "Rerun ▶" model.params model.paramsForm
+
+                _ ->
+                    Element.none
+    in
     Element.el
         [ width fill
-        , height (Element.px 32)
+        , height (Element.px 38)
         , Element.Font.size 12
         , Element.behindContent (progressBar Style.almostWhite 1.0)
         , Element.behindContent (progressBar Style.runProgressColor <| estimateProgress model)
+        , Element.inFront progressBarRunButton
         ]
         (Element.el [ centerX, centerY ] (Element.text <| progressMessage model))
+
+
+
+runButton : String -> Parameters -> ParametersForm -> Element Msg
+runButton content params paramsForm =
+    let
+        hasNoError =
+            List.isEmpty (CropForm.errors paramsForm.crop)
+                && isOk paramsForm.maxIterations.decodedInput
+                && isOk paramsForm.convergenceThreshold.decodedInput
+                && isOk paramsForm.levels.decodedInput
+                && isOk paramsForm.sparse.decodedInput
+                && isOk paramsForm.lambda.decodedInput
+                && isOk paramsForm.rho.decodedInput
+    in
+    if hasNoError then
+        Element.Input.button
+            [ centerX
+            , padding 12
+            , Element.Border.solid
+            , Element.Border.width 1
+            , Element.Border.rounded 4
+            ]
+            { onPress = Just (RunAlgorithm params), label = Element.text content }
+
+    else
+        Element.Input.button
+            [ centerX
+            , padding 12
+            , Element.Border.solid
+            , Element.Border.width 1
+            , Element.Border.rounded 4
+            , Element.Font.color Style.lightGrey
+            ]
+            { onPress = Nothing, label = Element.text content }
+
+
+isOk : Result err ok -> Bool
+isOk result =
+    case result of
+        Err _ ->
+            False
+
+        Ok _ ->
+            True
 
 
 progressMessage : Model -> String
@@ -1325,7 +1392,7 @@ progressMessage model =
             "Encoding registered cropped image " ++ String.fromInt img ++ " / " ++ String.fromInt model.imagesCount
 
         StepDone ->
-            "Done :)"
+            ""
 
 
 estimateProgress : Model -> Float
@@ -1602,10 +1669,8 @@ viewConfig params paramsForm paramsInfo =
             , ( PageLogs, False )
             ]
         , Element.column [ paddingXY 20 32, spacing 32, centerX ]
-            [ runButton params paramsForm
-
-            -- Title
-            , Element.el [ Element.Font.center, Element.Font.size 32 ] (Element.text "Algorithm parameters")
+            [ -- Title
+              Element.el [ Element.Font.center, Element.Font.size 32 ] (Element.text "Algorithm parameters")
 
             -- Cropped working frame
             , Element.column [ spacing 10 ]
@@ -1809,52 +1874,6 @@ infoIcon detailsVisible =
             (Element.text "?")
 
 
-
--- Run button
-
-
-runButton : Parameters -> ParametersForm -> Element Msg
-runButton params paramsForm =
-    let
-        hasNoError =
-            List.isEmpty (CropForm.errors paramsForm.crop)
-                && isOk paramsForm.maxIterations.decodedInput
-                && isOk paramsForm.convergenceThreshold.decodedInput
-                && isOk paramsForm.levels.decodedInput
-                && isOk paramsForm.sparse.decodedInput
-                && isOk paramsForm.lambda.decodedInput
-                && isOk paramsForm.rho.decodedInput
-    in
-    if hasNoError then
-        Element.Input.button
-            [ centerX
-            , padding 12
-            , Element.Border.solid
-            , Element.Border.width 1
-            , Element.Border.rounded 4
-            ]
-            { onPress = Just (RunAlgorithm params), label = Element.text "Run ▶" }
-
-    else
-        Element.Input.button
-            [ centerX
-            , padding 12
-            , Element.Border.solid
-            , Element.Border.width 1
-            , Element.Border.rounded 4
-            , Element.Font.color Style.lightGrey
-            ]
-            { onPress = Nothing, label = Element.text "Run ▶" }
-
-
-isOk : Result err ok -> Bool
-isOk result =
-    case result of
-        Err _ ->
-            False
-
-        Ok _ ->
-            True
 
 
 
