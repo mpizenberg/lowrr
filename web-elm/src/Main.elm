@@ -1560,28 +1560,65 @@ viewLog { lvl, content } =
 
 verbositySlider : Int -> Element Msg
 verbositySlider verbosity =
+    let
+        thumbSize =
+            32
+
+        circle color size =
+            [ Element.Border.color color
+            , width (Element.px size)
+            , height (Element.px size)
+            , Element.Border.rounded (size // 2)
+            , Element.Border.width 2
+            ]
+    in
     Element.Input.slider
         [ width (Element.px 200)
+        , height (Element.px thumbSize)
         , spacing 18
 
         -- Here is where we're creating/styling the "track"
         , Element.behindContent <|
-            Element.el
-                [ width fill
-                , height (Element.px 2)
-                , centerY
-                , Element.Background.color Style.lightGrey
-                , Element.Border.rounded 2
+            Element.row [ width fill, centerY ]
+                [ Element.el (circle Style.errorColor thumbSize) Element.none
+                , Element.el [ width fill ] Element.none
+                , Element.el (circle Style.warningColor thumbSize) Element.none
+                , Element.el [ width fill ] Element.none
+                , Element.el (circle Style.lightGrey thumbSize) Element.none
+                , Element.el [ width fill ] Element.none
+                , Element.el (circle Style.lightGrey thumbSize) Element.none
+                , Element.el [ width fill ] Element.none
+                , Element.el (circle Style.lightGrey thumbSize) Element.none
                 ]
-                Element.none
         ]
         { onChange = VerbosityChange
-        , label = Element.Input.labelLeft [ centerY, Element.Font.size 18 ] (Element.text "Verbosity")
+        , label =
+            Element.Input.labelLeft [ centerY, Element.Font.size 18 ]
+                (Element.el [] (Element.text "  Verbosity\n(min -> max)"))
         , min = 0
         , max = 4
         , step = Just 1
         , value = toFloat verbosity
-        , thumb = Element.Input.defaultThumb
+
+        -- Here is where we're creating the "thumb"
+        , thumb =
+            let
+                color =
+                    if verbosity == 0 then
+                        Style.errorColor
+
+                    else if verbosity == 1 then
+                        Style.warningColor
+
+                    else
+                        Style.lightGrey
+            in
+            Element.Input.thumb
+                [ Element.Background.color color
+                , width (Element.px thumbSize)
+                , height (Element.px thumbSize)
+                , Element.Border.rounded (thumbSize // 2)
+                ]
         }
 
 
