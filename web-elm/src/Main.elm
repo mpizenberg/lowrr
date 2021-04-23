@@ -1291,6 +1291,18 @@ pageHeaderElement current page =
 -- Run progress
 
 
+runProgressBar : Model -> Element Msg
+runProgressBar model =
+    Element.el
+        [ width fill
+        , height (Element.px 32)
+        , Element.Font.size 12
+        , Element.behindContent (progressBar Style.almostWhite 1.0)
+        , Element.behindContent (progressBar Style.runProgressColor <| estimateProgress model)
+        ]
+        (Element.el [ centerX, centerY ] (Element.text <| progressMessage model))
+
+
 progressMessage : Model -> String
 progressMessage model =
     case model.runStep of
@@ -1385,14 +1397,7 @@ viewLogs ({ autoscroll, verbosity, logs } as model) =
             , ( PageRegistration, False )
             , ( PageLogs, True )
             ]
-        , Element.el
-            [ width fill
-            , height (Element.px 32)
-            , Element.Font.size 12
-            , Element.behindContent (progressBar Style.almostWhite 1.0)
-            , Element.behindContent (progressBar Style.runProgressColor <| estimateProgress model)
-            ]
-            (Element.el [ centerX, centerY ] (Element.text <| progressMessage model))
+        , runProgressBar model
         , Element.Input.button []
             { onPress = Just StopRunning
             , label = Element.text "stop!"
