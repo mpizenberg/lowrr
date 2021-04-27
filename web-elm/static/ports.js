@@ -58,6 +58,22 @@ export function activatePorts(app, containerSize) {
     }
   });
 
+  // Listen for images to load and decode.
+  app.ports.loadImagesFromUrls.subscribe(async (urls) => {
+    console.log("Received images to load from urls");
+    try {
+      for (let url of urls) {
+        const img = await utils.decodeImage(url);
+        worker.postMessage({
+          type: "decode-image",
+          data: { id: url, url },
+        });
+      }
+    } catch (error) {
+      console.error(error);
+    }
+  });
+
   // Capture pointer events to detect a pointerup even outside the area.
   app.ports.capture.subscribe((event) => {
     event.target.setPointerCapture(event.pointerId);

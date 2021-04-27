@@ -42,6 +42,9 @@ port resizes : (Device.Size -> msg) -> Sub msg
 port decodeImages : List Value -> Cmd msg
 
 
+port loadImagesFromUrls : List String -> Cmd msg
+
+
 port imageDecoded : ({ id : String, img : Value } -> msg) -> Sub msg
 
 
@@ -326,6 +329,7 @@ type Msg
     = NoMsg
     | WindowResizes Device.Size
     | DragDropMsg DragDropMsg
+    | LoadExampleImages (List String)
     | ImageDecoded { id : String, img : Value }
     | KeyDown RawKey
     | ClickPreviousImage
@@ -461,6 +465,11 @@ update msg model =
 
         ( DragDropMsg DragLeave, Home _ ) ->
             ( { model | state = Home Idle }, Cmd.none )
+
+        ( LoadExampleImages urls, _ ) ->
+            ( { model | state = Loading { names = Set.fromList urls, loaded = Dict.empty } }
+            , loadImagesFromUrls urls
+            )
 
         ( ImageDecoded ({ id } as imgValue), Loading { names, loaded } ) ->
             let
@@ -2454,7 +2463,7 @@ dropAndLoadArea draggingState =
                     Element.Border.solid
 
         dropOrLoadText =
-            Element.row []
+            Element.row [ centerX ]
                 [ Element.text "Drop images or "
                 , Element.html
                     (File.hiddenInputMultiple
@@ -2469,11 +2478,31 @@ dropAndLoadArea draggingState =
                         )
                     )
                 ]
+
+        useDirectlyProvided =
+            Element.paragraph [ centerX, Element.Font.center ]
+                [ Element.text "You can also directly use "
+                , Element.Input.button [ Element.Font.underline ]
+                    { onPress =
+                        Just
+                            (LoadExampleImages
+                                [ "/img/bd_caen/01.jpg"
+                                , "/img/bd_caen/02.jpg"
+                                , "/img/bd_caen/03.jpg"
+                                , "/img/bd_caen/04.jpg"
+                                , "/img/bd_caen/05.jpg"
+                                , "/img/bd_caen/06.jpg"
+                                ]
+                            )
+                    , label = Element.text "this example set of 6 images"
+                    }
+                ]
     in
     Element.el [ width fill, height fill ]
         (Element.column [ centerX, centerY, spacing 32 ]
             [ Element.el (dropIconBorderAttributes borderStyle) (Icon.arrowDown 48)
             , dropOrLoadText
+            , useDirectlyProvided
             ]
         )
 
