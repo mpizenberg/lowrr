@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MPL-2.0
 
-use anyhow::Context;
+use anyhow::{anyhow, Context};
 use image::DynamicImage;
 use nalgebra::{DMatrix, Vector6};
 use serde::Deserialize;
@@ -48,6 +48,9 @@ impl Lowrr {
     pub fn cropped_img_file(&self, i: usize) -> Result<Box<[u8]>, JsValue> {
         self.0.borrow().cropped_img_file(i)
     }
+    pub fn register_and_save(&self, i: usize) -> Result<Box<[u8]>, JsValue> {
+        self.0.borrow().register_and_save(i)
+    }
 }
 
 async fn async_run_rc(
@@ -63,6 +66,7 @@ struct LowrrInner {
     image_ids: Vec<String>,
     dataset: Dataset,
     crop_registered: Vec<DMatrix<u8>>,
+    motion_vec: Option<Vec<Vector6<f32>>>,
 }
 
 enum Dataset {
@@ -91,6 +95,7 @@ impl LowrrInner {
             image_ids: Vec::new(),
             dataset: Dataset::Empty,
             crop_registered: Vec::new(),
+            motion_vec: None,
         }
     }
 
@@ -163,6 +168,7 @@ impl LowrrInner {
     // Run the main lowrr registration algorithm.
     //                                                 Vec<f32>
     async fn run(&mut self, params: JsValue) -> Result<JsValue, JsValue> {
+        self.motion_vec = None;
         self.crop_registered.clear();
         let args: Args = params.into_serde().unwrap();
         utils::WasmLogger::setup(utils::verbosity_filter(args.config.verbosity));
@@ -236,6 +242,7 @@ impl LowrrInner {
         };
 
         let flat_motion_vec: Vec<f32> = motion_vec.iter().flatten().cloned().collect();
+        self.motion_vec = Some(motion_vec);
         JsValue::from_serde(&flat_motion_vec).map_err(utils::report_error)
     }
 
@@ -246,13 +253,51 @@ impl LowrrInner {
 
     // Retrieve the cropped registered images.
     pub fn cropped_img_file(&self, i: usize) -> Result<Box<[u8]>, JsValue> {
-        let mut cropped_buffer: Vec<u8> = Vec::new();
-        self.crop_registered[i]
-            .to_image()
-            .write_to(&mut cropped_buffer, image::ImageOutputFormat::Png)
-            .map_err(utils::report_error)?;
-        Ok(cropped_buffer.into_boxed_slice())
+        encode(i, &self.crop_registered[i]).map_err(utils::report_error)
     }
+
+    // Register and save that image.
+    pub fn register_and_save(&self, i: usize) -> Result<Box<[u8]>, JsValue> {
+        log::info!("Registering image {}", i);
+        match (&self.motion_vec, &self.dataset) {
+            (_, Dataset::Empty) => {
+                return Err(anyhow!("Images not loaded yet")).map_err(utils::report_error)
+            }
+            (None, _) => {
+                return Err(anyhow!("Registration parameters unknown")).map_err(utils::report_error)
+            }
+            (Some(all_motion), Dataset::GrayImages(images)) => {
+                let registered: DMatrix<u8> =
+                    lowrr::img::registration::warp(&images[i], &all_motion[i]);
+                encode(i, &registered).map_err(utils::report_error)
+            }
+            (Some(all_motion), Dataset::GrayImagesU16(images)) => {
+                let registered: DMatrix<u16> =
+                    lowrr::img::registration::warp(&images[i], &all_motion[i]);
+                encode(i, &registered).map_err(utils::report_error)
+            }
+            (Some(all_motion), Dataset::RgbImages(images)) => {
+                let registered: DMatrix<(u8, u8, u8)> =
+                    lowrr::img::registration::warp(&images[i], &all_motion[i]);
+                encode(i, &registered).map_err(utils::report_error)
+            }
+            (Some(all_motion), Dataset::RgbImagesU16(images)) => {
+                let registered: DMatrix<(u16, u16, u16)> =
+                    lowrr::img::registration::warp(&images[i], &all_motion[i]);
+                encode(i, &registered).map_err(utils::report_error)
+            }
+        }
+    }
+}
+
+fn encode<Im: ToImage>(i: usize, mat: &Im) -> anyhow::Result<Box<[u8]>> {
+    log::debug!("Encoding image {}", i);
+    let img = mat.to_image();
+    std::mem::drop(mat); // release memory early.
+    let mut buffer: Vec<u8> = Vec::new();
+    img.write_to(&mut buffer, image::ImageOutputFormat::Png)?;
+    std::mem::drop(img); // release memory early.
+    Ok(buffer.into_boxed_slice())
 }
 
 #[allow(clippy::type_complexity)]
