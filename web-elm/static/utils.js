@@ -5,18 +5,20 @@
 const utils = (function () {
   // Download a file through an href temporary DOM element.
   // example use: download( str, "selection.json", "text/plain" )
-  function download(data, name, data_type) {
+  function download(data, name, mimeType) {
     const a = document.createElement("a");
-    const data_file = new Blob([data], { type: data_type });
-    a.addEventListener("click", (event) => {
-      a.href = window.URL.createObjectURL(data_file);
-      a.download = name;
-    });
-    const click = (node) => {
-      const event = new MouseEvent("click");
-      node.dispatchEvent(event);
-    };
+    const blob = new Blob([data], { type: mimeType });
+    const objectUrl = window.URL.createObjectURL(blob);
+    a.href = objectUrl;
+    a.download = name;
     click(a);
+    window.URL.revokeObjectURL(objectUrl);
+  }
+
+  // Simple click emulation function.
+  function click(node) {
+    const event = new MouseEvent("click");
+    node.dispatchEvent(event);
   }
 
   // Read JSON file as text

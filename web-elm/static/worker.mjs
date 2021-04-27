@@ -33,6 +33,8 @@ onmessage = async function (event) {
     postMessage({ type: "image-decoded", data: event.data.data });
   } else if (event.data.type == "run") {
     await run(event.data.data);
+  } else if (event.data.type == "warp-encode") {
+    await warpEncode(event.data.data);
   } else if (event.data.type == "stop") {
     console.log("Received STOP in worker");
     stopOrder = true;
@@ -85,6 +87,32 @@ async function run(params) {
         data: { id, arrayBuffer: croppedImgArrayU8.buffer, imgCount },
       },
       [croppedImgArrayU8.buffer]
+    );
+  }
+  await shouldStop("done", null);
+}
+
+// Warp and encode images that have just been registered.
+async function warpEncode({ imgCount }) {
+  stopOrder = false;
+  console.log("Warping and encoding registered images");
+  for (let i = 0; i < imgCount; i++) {
+    if (await shouldStop("saving", i)) {
+      // If the user asked to stop the saving of images,
+      // reset the runStep state to "done" and stop.
+      appLog(0, "Saving stopped by user");
+      await shouldStop("done", null);
+      break;
+    }
+    // Warp and encode image in wasm.
+    let imgArrayU8 = Lowrr.register_and_save(i);
+    // Transfer the array buffer back to main thread.
+    postMessage(
+      {
+        type: "registered-image",
+        data: { index: i, arrayBuffer: imgArrayU8.buffer, imgCount },
+      },
+      [imgArrayU8.buffer]
     );
   }
   await shouldStop("done", null);

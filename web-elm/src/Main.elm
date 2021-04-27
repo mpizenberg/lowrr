@@ -57,6 +57,9 @@ port run : Value -> Cmd msg
 port stop : () -> Cmd msg
 
 
+port saveRegisteredImages : Int -> Cmd msg
+
+
 port log : ({ lvl : Int, content : String } -> msg) -> Sub msg
 
 
@@ -104,6 +107,7 @@ type RunStep
     | StepApplying Int
     | StepEncoding Int
     | StepDone
+    | StepSaving Int
 
 
 type alias BBox =
@@ -348,6 +352,7 @@ type Msg
     | ScrollLogsToEnd
     | ToggleAutoScroll Bool
     | ReceiveCroppedImages (List { id : String, img : Value })
+    | SaveRegisteredImages
 
 
 type DragDropMsg
@@ -787,6 +792,9 @@ update msg model =
                         ( _, "done", _ ) ->
                             StepDone
 
+                        ( _, "saving", Just im ) ->
+                            StepSaving im
+
                         _ ->
                             StepNotStarted
             in
@@ -853,6 +861,9 @@ update msg model =
 
                 _ ->
                     ( model, Cmd.none )
+
+        ( SaveRegisteredImages, _ ) ->
+            ( model, saveRegisteredImages model.imagesCount )
 
         _ ->
             ( model, Cmd.none )
@@ -1336,6 +1347,13 @@ runProgressBar model =
 
             else
                 stopButton
+
+        progressBarSaveButton =
+            if model.runStep == StepDone then
+                saveButton
+
+            else
+                Element.none
     in
     Element.el
         [ width fill
@@ -1345,6 +1363,7 @@ runProgressBar model =
         , Element.behindContent (progressBar Style.runProgressColor <| estimateProgress model)
         , Element.inFront progressBarRunButton
         , Element.inFront progressBarStopButton
+        , Element.inFront progressBarSaveButton
         ]
         (Element.el [ centerX, centerY ] (Element.text <| progressMessage model))
 
@@ -1407,6 +1426,20 @@ stopButton =
         }
 
 
+saveButton : Element Msg
+saveButton =
+    Element.Input.button
+        [ alignRight
+        , padding 12
+        , Element.Border.solid
+        , Element.Border.width 1
+        , Element.Border.rounded 4
+        ]
+        { onPress = Just SaveRegisteredImages
+        , label = Element.text "Save registered images"
+        }
+
+
 progressMessage : Model -> String
 progressMessage model =
     case model.runStep of
@@ -1430,6 +1463,9 @@ progressMessage model =
 
         StepDone ->
             ""
+
+        StepSaving img ->
+            "Warping and encoding image " ++ String.fromInt img ++ " / " ++ String.fromInt model.imagesCount
 
 
 estimateProgress : Model -> Float
@@ -1470,6 +1506,9 @@ estimateProgress model =
 
         StepDone ->
             1.0
+
+        StepSaving img ->
+            subprogress img model.imagesCount
 
 
 progressBar : Element.Color -> Float -> Element Msg

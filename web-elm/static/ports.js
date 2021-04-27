@@ -12,6 +12,7 @@ export function activatePorts(app, containerSize) {
 
   // Global variable holding image ids
   let croppedImages = [];
+  let registeredImages = [];
 
   // Listen to worker messages.
   worker.onmessage = async function (event) {
@@ -31,6 +32,18 @@ export function activatePorts(app, containerSize) {
       if (croppedImages.length == imgCount) {
         console.log(`Registration done, there are ${imgCount} cropped images.`);
         app.ports.receiveCroppedImages.send(croppedImages);
+      }
+    } else if (event.data.type == "registered-image") {
+      // Add the registered image to the list of registered images.
+      const { index, arrayBuffer, imgCount } = event.data.data;
+      console.log("Received registered image in main thread:", index);
+      registeredImages.push(arrayBuffer);
+      if (registeredImages.length == imgCount) {
+        console.log(`Warping and encoding of all ${imgCount} images done.`);
+        for (let i = 0; i < imgCount; i++) {
+          utils.download(registeredImages[i], `${i}.png`, "image/png");
+        }
+        console.log("All images downloaded!");
       }
     } else if (event.data.type == "should-stop") {
       let { step, progress } = event.data.data;
@@ -87,6 +100,12 @@ export function activatePorts(app, containerSize) {
   app.ports.run.subscribe(async (params) => {
     croppedImages.length = 0; // reset associated cropped images
     worker.postMessage({ type: "run", data: params });
+  });
+
+  // Save registered images.
+  app.ports.saveRegisteredImages.subscribe(async (imgCount) => {
+    registeredImages.length = 0; // reset associated registered images
+    worker.postMessage({ type: "warp-encode", data: { imgCount } });
   });
 
   // Stop a running algorithm.
