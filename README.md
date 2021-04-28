@@ -2,7 +2,7 @@
 
 Low-rank registration of slightly misaligned images for photometric stereo.
 This repository holds the `lowrr` library, a `lowrr` command-line executable,
-and the `https://lowrr.pizenberg.fr` demo web application.
+and the [`https://lowrr.pizenberg.fr`][webapp] demo web application.
 
 > Matthieu Pizenberg, Yvain Quéau, Abderrahim Elmoataz,
 > "Low-rank registration of images captured under unknown, varying lighting".
@@ -32,6 +32,7 @@ The previous figure showcases the improvement on both the 3D reconstruction,
 and the recovered albedo after an alignment of handheld photometric stereo images
 of the Bayeux Tapestry.
 
+[webapp]: https://lowrr.pizenberg.fr
 [lowrr-animated]: https://mpizenberg.github.io/resources/lowrr/lowrr-animated.gif
 [handheld]: https://mpizenberg.github.io/resources/lowrr/handheld.jpg
 
