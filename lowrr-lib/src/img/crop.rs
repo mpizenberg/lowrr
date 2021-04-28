@@ -4,12 +4,20 @@ use nalgebra::{DMatrix, Scalar, Vector6};
 use std::convert::TryFrom;
 use thiserror::Error;
 
+#[cfg(feature = "wasm-bindgen")]
+use wasm_bindgen::prelude::*;
+
+#[cfg(feature = "serde")]
+use serde::Deserialize;
+
+#[cfg_attr(feature = "wasm-bindgen", wasm_bindgen)]
 #[derive(Debug, Clone, Copy)]
+#[cfg_attr(feature = "serde", derive(Deserialize))]
 pub struct Crop {
-    left: usize,
-    top: usize,
-    right: usize,
-    bottom: usize,
+    pub left: usize,
+    pub top: usize,
+    pub right: usize,
+    pub bottom: usize,
 }
 
 #[derive(Error, Debug)]
@@ -24,9 +32,10 @@ pub enum CropError {
     Parse(#[from] std::num::ParseIntError),
 }
 
-impl TryFrom<clap::Values<'_>> for Crop {
+impl TryFrom<Vec<&str>> for Crop {
     type Error = CropError;
-    fn try_from(mut vs: clap::Values) -> Result<Self, Self::Error> {
+    fn try_from(vs: Vec<&str>) -> Result<Self, Self::Error> {
+        let mut vs = vs.iter();
         match (vs.next(), vs.next(), vs.next(), vs.next(), vs.next()) {
             (None, _, _, _, _) => Err(CropError::NotEnoughArgs(0)),
             (_, None, _, _, _) => Err(CropError::NotEnoughArgs(1)),

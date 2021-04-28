@@ -1,0 +1,18 @@
+[package]
+name = "warp-crop"
+version = "0.2.0"
+authors = ["Matthieu Pizenberg <matthieu.pizenberg@gmail.com>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+lowrr = { path = "../lowrr-lib" }
+glob = "0.3.0"
+clap = "2.33.3"
+nalgebra = "0.25.1"
+image = "0.23.14"
+indicatif = "0.15.0"
+anyhow = "1.0.38" # error handling in the main program
+log = { version = "0.4.14", default-features = false } # for debug logs with -vvv
+stderrlog = { version = "0.5.1", default-features = false }

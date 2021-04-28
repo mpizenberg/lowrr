@@ -15,8 +15,7 @@ where
     T: Copy + Scalar + std::cmp::PartialOrd + std::ops::Add<Output = T>,
 {
     let (nrows, ncols) = gradients.last().unwrap().shape();
-    let mut init_sparse = Vec::new();
-    init_sparse.push(DMatrix::repeat(nrows, ncols, true));
+    let init_sparse = vec![DMatrix::repeat(nrows, ncols, true)];
     let prune = |a, b, c, d| prune_with_thresh(diff_threshold, a, b, c, d);
     gradients
         .iter()

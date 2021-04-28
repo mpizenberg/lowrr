@@ -141,3 +141,33 @@ jobs:
           RUSTFLAGS: -D warnings
         with:
           command: clippy
+
+  elm-build:
+    name: Build the Elm Web application
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install elm, elm-format and cache the ELM_HOME directory
+        working-directory: ./web-elm
+        uses: mpizenberg/elm-tooling-action@v1.1
+        with:
+          cache-key: elm-build-${{ hashFiles('elm-tooling.json', 'elm.json') }}
+          cache-restore-key: elm-build
+
+      - name: Build the app
+        working-directory: ./web-elm
+        run: elm make src/Main.elm --optimize --output=static/Elm.js
+
+  elm-format:
+    name: Check Elm formatting
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install elm, elm-format and cache the ELM_HOME directory
+        working-directory: ./web-elm
+        uses: mpizenberg/elm-tooling-action@v1.1
+        with:
+          cache-key: elm-format-${{ hashFiles('elm-tooling.json') }}
+          cache-restore-key: elm-format
+
+      - name: Check formatting
+        working-directory: ./web-elm
+        run: elm-format src --validate

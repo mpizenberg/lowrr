@@ -71,8 +71,7 @@ pub fn limited_sequence<F: Fn(&T) -> Option<T>, T>(max_length: usize, data: T, f
 /// Recursively apply a function transforming data
 /// until it's not possible anymore.
 pub fn sequence<F: FnMut(&T) -> Option<T>, T>(data: T, mut f: F) -> Vec<T> {
-    let mut s = Vec::new();
-    s.push(data);
+    let mut s = vec![data];
     while let Some(new_data) = f(s.last().unwrap()) {
         s.push(new_data);
     }
