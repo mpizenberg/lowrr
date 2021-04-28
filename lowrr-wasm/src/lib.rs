@@ -261,10 +261,10 @@ impl LowrrInner {
         log::info!("Registering image {}", i);
         match (&self.motion_vec, &self.dataset) {
             (_, Dataset::Empty) => {
-                return Err(anyhow!("Images not loaded yet")).map_err(utils::report_error)
+                Err(anyhow!("Images not loaded yet")).map_err(utils::report_error)
             }
             (None, _) => {
-                return Err(anyhow!("Registration parameters unknown")).map_err(utils::report_error)
+                Err(anyhow!("Registration parameters unknown")).map_err(utils::report_error)
             }
             (Some(all_motion), Dataset::GrayImages(images)) => {
                 let registered: DMatrix<u8> =
@@ -293,10 +293,8 @@ impl LowrrInner {
 fn encode<Im: ToImage>(i: usize, mat: &Im) -> anyhow::Result<Box<[u8]>> {
     log::debug!("Encoding image {}", i);
     let img = mat.to_image();
-    std::mem::drop(mat); // release memory early.
     let mut buffer: Vec<u8> = Vec::new();
     img.write_to(&mut buffer, image::ImageOutputFormat::Png)?;
-    std::mem::drop(img); // release memory early.
     Ok(buffer.into_boxed_slice())
 }
 
