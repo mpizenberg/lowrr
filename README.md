@@ -1,7 +1,8 @@
 # Low-rank registration (lowrr)
 
 Low-rank registration of slightly misaligned images for photometric stereo.
-This repository holds both the `lowrr` library, and a `lowrr` command-line executable.
+This repository holds the `lowrr` library, a `lowrr` command-line executable,
+and the `https://lowrr.pizenberg.fr` demo web application.
 
 > Matthieu Pizenberg, Yvain Quéau, Abderrahim Elmoataz,
 > "Low-rank registration of images captured under unknown, varying lighting".
@@ -133,7 +134,7 @@ All saved images will be located in the `out/` directory.
 In addition to the `lowrr` executable compiled from `lowrr-bin/src/main.rs`,
 we also provide the code in the form of a library,
 so that it can easily be re-used for other Rust applications.
-The API documentation of the library is available at
+The API documentation of the library is available at (stale, todo: change location)
 https://matthieu.pizenberg.pages.unicaen.fr/low-rank-registration
 
 ## Unfamiliar with Rust?
@@ -206,8 +207,10 @@ To compile the source code yourself, you just need to install [Rust][rust],
 and then run the command `cargo build --release` at the root of this project.
 Cargo is Rust build tool, it will automatically download dependencies
 and compile all the code.
-The resulting binary will be located in `target/release/`.
+The resulting binaries will be located in `target/release/`.
 The first compilation may take a little while, but then will be pretty fast.
+
+To build the Web application, follow instructions in `lowrr-wasm/README.md` and then in `web-elm/README.md`.
 
 [rust]: https://www.rust-lang.org/tools/install
 
