@@ -353,6 +353,7 @@ type Msg
     | ToggleAutoScroll Bool
     | ReceiveCroppedImages (List { id : String, img : Value })
     | SaveRegisteredImages
+    | ClearLogs
 
 
 type DragDropMsg
@@ -864,6 +865,17 @@ update msg model =
 
         ( SaveRegisteredImages, _ ) ->
             ( model, saveRegisteredImages model.imagesCount )
+
+        ( ClearLogs, _ ) ->
+            ( { model
+                | logs =
+                    [ { content = "Logs Cleared"
+                      , lvl = 3
+                      }
+                    ]
+              }
+            , Cmd.none
+            )
 
         _ ->
             ( model, Cmd.none )
@@ -1531,6 +1543,18 @@ progressBar color progressRatio =
 -- Logs
 
 
+clearLogsButton : Element Msg
+clearLogsButton = Element.row [ centerX, spacing 15 ]
+                        [ Element.Input.button 
+                                [ Element.Background.color Style.almostWhite
+                                , padding 10
+                                ]
+                                { onPress = Just ClearLogs
+                                , label = Icon.trash 24
+                                }
+                        , Element.el [ centerY ] (Element.text "Clean all logs")
+                        ]
+
 viewLogs : Model -> Element Msg
 viewLogs ({ autoscroll, verbosity, logs } as model) =
     Element.column [ width fill, height fill ]
@@ -1549,6 +1573,7 @@ viewLogs ({ autoscroll, verbosity, logs } as model) =
                 , toggle ToggleAutoScroll autoscroll 24 "autoscroll"
                 , Element.el [ centerY ] (Element.text "on")
                 ]
+            , clearLogsButton
             , Element.column
                 [ padding 18
                 , height fill
@@ -2450,6 +2475,7 @@ viewLoading { names, loaded } =
                 , Element.el [ centerX ] (Element.text ("Loading " ++ String.fromInt totalCount ++ " images"))
                 ]
             )
+                               , clearLogsButton
         ]
 
 
