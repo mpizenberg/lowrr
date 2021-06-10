@@ -1544,16 +1544,18 @@ progressBar color progressRatio =
 
 
 clearLogsButton : Element Msg
-clearLogsButton = Element.row [ centerX, spacing 15 ]
-                        [ Element.Input.button 
-                                [ Element.Background.color Style.almostWhite
-                                , padding 10
-                                ]
-                                { onPress = Just ClearLogs
-                                , label = Icon.trash 24
-                                }
-                        , Element.el [ centerY ] (Element.text "Clean all logs")
-                        ]
+clearLogsButton =
+    Element.row [ centerX, spacing 15 ]
+        [ Element.Input.button
+            [ Element.Background.color Style.almostWhite
+            , padding 10
+            ]
+            { onPress = Just ClearLogs
+            , label = Icon.trash 24
+            }
+        , Element.el [ centerY ] (Element.text "Clean all logs")
+        ]
+
 
 viewLogs : Model -> Element Msg
 viewLogs ({ autoscroll, verbosity, logs } as model) =
@@ -2475,7 +2477,7 @@ viewLoading { names, loaded } =
                 , Element.el [ centerX ] (Element.text ("Loading " ++ String.fromInt totalCount ++ " images"))
                 ]
             )
-                               , clearLogsButton
+        , clearLogsButton
         ]
 
 
