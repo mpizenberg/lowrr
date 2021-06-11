@@ -348,12 +348,12 @@ type Msg
     | StopRunning
     | UpdateRunStep { step : String, progress : Maybe Int }
     | Log { lvl : Int, content : String }
+    | ClearLogs
     | VerbosityChange Float
     | ScrollLogsToEnd
     | ToggleAutoScroll Bool
     | ReceiveCroppedImages (List { id : String, img : Value })
     | SaveRegisteredImages
-    | ClearLogs
 
 
 type DragDropMsg
