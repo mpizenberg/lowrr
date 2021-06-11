@@ -869,7 +869,7 @@ update msg model =
         ( ClearLogs, _ ) ->
             ( { model
                 | logs =
-                    [ { content = "Logs Cleared"
+                    [ { content = "Logs cleared"
                       , lvl = 3
                       }
                     ]
