@@ -1590,7 +1590,7 @@ clearLogsButton =
             { onPress = Just ClearLogs
             , label = Icon.trash 24
             }
-        , Element.el [ centerY ] (Element.text "Clean all logs")
+        , Element.el [ centerY ] (Element.text "Clear logs")
         ]
 
 
