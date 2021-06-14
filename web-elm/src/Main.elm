@@ -26,6 +26,7 @@ import Icon
 import Json.Decode exposing (Decoder, Value)
 import Json.Encode exposing (Value)
 import Keyboard exposing (RawKey)
+import Maybe.Extra exposing (isJust)
 import NumberInput
 import Pivot exposing (Pivot)
 import Set exposing (Set)
@@ -1256,17 +1257,17 @@ headerHeight =
     40
 
 
-headerBar : List ( PageHeader, Bool ) -> Element Msg
-headerBar pages =
+headerBar : Bool -> Int -> List ( PageHeader, Bool ) -> Element Msg
+headerBar registrationState logsState pages =
     Element.row
         [ height (Element.px headerHeight)
         , centerX
         ]
-        (List.map (\( page, current ) -> pageHeaderElement current page) pages)
+        (List.map (\( page, current ) -> pageHeaderElement registrationState logsState current page) pages)
 
 
-pageHeaderElement : Bool -> PageHeader -> Element Msg
-pageHeaderElement current page =
+pageHeaderElement : Bool -> Int -> Bool -> PageHeader -> Element Msg
+pageHeaderElement registrationState logsState current page =
     let
         bgColor =
             if current then
@@ -1280,6 +1281,34 @@ pageHeaderElement current page =
             , Element.htmlAttribute <| Html.Attributes.style "box-shadow" "none"
             , padding 10
             , height (Element.px headerHeight)
+            ]
+
+        borderColor =
+            case logsState of
+                0 ->
+                    Style.errorColor
+
+                1 ->
+                    Style.warningColor
+
+                _ ->
+                    Style.black
+
+        attributesRegistration =
+            [ Element.Background.color Style.green
+            , padding 10
+            , height (Element.px headerHeight)
+            , Element.htmlAttribute <| Html.Attributes.style "box-shadow" "none"
+            ]
+
+        attributesLogs =
+            [ Element.Background.color bgColor
+            , padding 10
+            , height (Element.px headerHeight)
+            , Element.Border.width 4
+            , Element.Border.color borderColor
+            , Element.Border.dotted
+            , Element.htmlAttribute <| Html.Attributes.style "box-shadow" "none"
             ]
     in
     case page of
@@ -1306,7 +1335,13 @@ pageHeaderElement current page =
                 }
 
         PageRegistration ->
-            Element.Input.button attributes
+            Element.Input.button
+                (if registrationState then
+                    attributesRegistration
+
+                 else
+                    attributes
+                )
                 { onPress =
                     if current then
                         Nothing
@@ -1317,7 +1352,13 @@ pageHeaderElement current page =
                 }
 
         PageLogs ->
-            Element.Input.button attributes
+            Element.Input.button
+                (if logsState == 2 then
+                    attributes
+
+                 else
+                    attributesLogs
+                )
                 { onPress =
                     if current then
                         Nothing
@@ -1544,9 +1585,10 @@ progressBar color progressRatio =
 
 
 viewLogs : Model -> Element Msg
-viewLogs ({ autoscroll, verbosity, logs } as model) =
+viewLogs ({ autoscroll, verbosity, logs, registeredImages } as model) =
     Element.column [ width fill, height fill ]
-        [ headerBar
+        [ headerBar (Maybe.Extra.isJust registeredImages)
+            (getMaxLevel logs)
             [ ( PageImages, False )
             , ( PageConfig, False )
             , ( PageRegistration, False )
@@ -1706,9 +1748,10 @@ verbositySlider verbosity =
 
 
 viewRegistration : Model -> Element Msg
-viewRegistration ({ registeredImages, registeredViewer } as model) =
+viewRegistration ({ registeredImages, registeredViewer, logs } as model) =
     Element.column [ width fill, height fill ]
-        [ headerBar
+        [ headerBar (Maybe.Extra.isJust registeredImages)
+            (getMaxLevel logs)
             [ ( PageImages, False )
             , ( PageConfig, False )
             , ( PageRegistration, True )
@@ -1801,9 +1844,10 @@ viewRegistration ({ registeredImages, registeredViewer } as model) =
 
 
 viewConfig : Model -> Element Msg
-viewConfig ({ params, paramsForm, paramsInfo } as model) =
+viewConfig ({ params, paramsForm, paramsInfo, logs, registeredImages } as model) =
     Element.column [ width fill, height fill ]
-        [ headerBar
+        [ headerBar (Maybe.Extra.isJust registeredImages)
+            (getMaxLevel logs)
             [ ( PageImages, False )
             , ( PageConfig, True )
             , ( PageRegistration, False )
@@ -2278,7 +2322,7 @@ toggleCheckboxWidget { offColor, onColor, sliderColor, toggleWidth, toggleHeight
 
 
 viewImgs : Model -> Pivot Image -> Element Msg
-viewImgs ({ pointerMode, bboxDrawn, viewer } as model) images =
+viewImgs ({ pointerMode, bboxDrawn, viewer, logs, registeredImages } as model) images =
     let
         img =
             Pivot.getC images
@@ -2406,7 +2450,8 @@ viewImgs ({ pointerMode, bboxDrawn, viewer } as model) images =
                 [ clearCanvas, renderedImage, renderedBbox ]
     in
     Element.column [ height fill ]
-        [ headerBar
+        [ headerBar (Maybe.Extra.isJust registeredImages)
+            (getMaxLevel logs)
             [ ( PageImages, True )
             , ( PageConfig, False )
             , ( PageRegistration, False )
@@ -2430,6 +2475,36 @@ viewImgs ({ pointerMode, bboxDrawn, viewer } as model) images =
             ]
             (Element.html canvasViewer)
         ]
+
+
+getLevel : { lvl : Int, content : String } -> Int
+getLevel { lvl, content } =
+    lvl
+
+
+{-| Morally get the most important type of error :
+-- 0 if there is an error
+-- 1 if there is no error but at least one warning
+-- 2 if there is no logs (less than one, because there is an auto-log at the begining)
+-- else 3
+-}
+getMaxLevel : List { lvl : Int, content : String } -> Int
+getMaxLevel logs =
+    let
+        l =
+            List.map getLevel logs
+    in
+    if List.member 0 l then
+        0
+
+    else if List.member 1 l then
+        1
+
+    else if List.length l <= 1 then
+        2
+
+    else
+        3
 
 
 msgOn : String -> Decoder msg -> Html.Attribute msg
