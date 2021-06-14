@@ -348,6 +348,7 @@ type Msg
     | StopRunning
     | UpdateRunStep { step : String, progress : Maybe Int }
     | Log { lvl : Int, content : String }
+    | ClearLogs
     | VerbosityChange Float
     | ScrollLogsToEnd
     | ToggleAutoScroll Bool
@@ -864,6 +865,17 @@ update msg model =
 
         ( SaveRegisteredImages, _ ) ->
             ( model, saveRegisteredImages model.imagesCount )
+
+        ( ClearLogs, _ ) ->
+            ( { model
+                | logs =
+                    [ { content = "Logs cleared"
+                      , lvl = 3
+                      }
+                    ]
+              }
+            , Cmd.none
+            )
 
         _ ->
             ( model, Cmd.none )
@@ -1549,6 +1561,7 @@ viewLogs ({ autoscroll, verbosity, logs } as model) =
                 , toggle ToggleAutoScroll autoscroll 24 "autoscroll"
                 , Element.el [ centerY ] (Element.text "on")
                 ]
+            , clearLogsButton
             , Element.column
                 [ padding 18
                 , height fill
@@ -1564,6 +1577,20 @@ viewLogs ({ autoscroll, verbosity, logs } as model) =
                     |> List.map viewLog
                 )
             ]
+        ]
+
+
+clearLogsButton : Element Msg
+clearLogsButton =
+    Element.row [ centerX, spacing 15 ]
+        [ Element.Input.button
+            [ Element.Background.color Style.almostWhite
+            , padding 10
+            ]
+            { onPress = Just ClearLogs
+            , label = Icon.trash 24
+            }
+        , Element.el [ centerY ] (Element.text "Clear logs")
         ]
 
 
@@ -2450,6 +2477,7 @@ viewLoading { names, loaded } =
                 , Element.el [ centerX ] (Element.text ("Loading " ++ String.fromInt totalCount ++ " images"))
                 ]
             )
+        , clearLogsButton
         ]
 
 
