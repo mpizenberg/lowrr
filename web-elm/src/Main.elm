@@ -2016,11 +2016,7 @@ verbositySlider verbosity =
 
 
 viewRegistration : Model -> Element Msg
-viewRegistration ({ registeredImages, registeredViewer, seenLogs, notSeenLogs } as model) =
-    let
-        logs =
-            List.concat [ seenLogs, notSeenLogs ]
-    in
+viewRegistration ({ registeredImages, registeredViewer, notSeenLogs } as model) =
     Element.column [ width fill, height fill ]
         [ headerBar
             [ imagesHeaderTab False
@@ -2115,11 +2111,7 @@ viewRegistration ({ registeredImages, registeredViewer, seenLogs, notSeenLogs } 
 
 
 viewConfig : Model -> Element Msg
-viewConfig ({ params, paramsForm, paramsInfo, seenLogs, notSeenLogs, registeredImages } as model) =
-    let
-        logs =
-            List.concat [ seenLogs, notSeenLogs ]
-    in
+viewConfig ({ params, paramsForm, paramsInfo, notSeenLogs, registeredImages } as model) =
     Element.column [ width fill, height fill ]
         [ headerBar
             [ imagesHeaderTab False
@@ -2596,11 +2588,8 @@ toggleCheckboxWidget { offColor, onColor, sliderColor, toggleWidth, toggleHeight
 
 
 viewImgs : Model -> Pivot Image -> Element Msg
-viewImgs ({ pointerMode, bboxDrawn, viewer, seenLogs, notSeenLogs, registeredImages } as model) images =
+viewImgs ({ pointerMode, bboxDrawn, viewer, notSeenLogs, registeredImages } as model) images =
     let
-        logs =
-            List.concat [ seenLogs, notSeenLogs ]
-
         img =
             Pivot.getC images
 
