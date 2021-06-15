@@ -31,6 +31,8 @@ import Pivot exposing (Pivot)
 import Set exposing (Set)
 import Simple.Transition as Transition
 import Style
+import Svg exposing (Svg)
+import Svg.Attributes
 import Task
 import Viewer exposing (Viewer)
 import Viewer.Canvas
@@ -91,7 +93,8 @@ type alias Model =
     , pointerMode : PointerMode
     , bboxDrawn : Maybe BBox
     , registeredImages : Maybe (Pivot Image)
-    , logs : List { lvl : Int, content : String }
+    , seenLogs : List { lvl : Int, content : String }
+    , notSeenLogs : List { lvl : Int, content : String }
     , verbosity : Int
     , autoscroll : Bool
     , runStep : RunStep
@@ -244,7 +247,8 @@ initialModel size =
     , pointerMode = WaitingMove
     , bboxDrawn = Nothing
     , registeredImages = Nothing
-    , logs = []
+    , seenLogs = []
+    , notSeenLogs = []
     , verbosity = 2
     , autoscroll = True
     , runStep = StepNotStarted
@@ -417,6 +421,13 @@ type NavigationMsg
     | GoToPageLogs
 
 
+type LogsState
+    = ErrorLogs
+    | WarningLogs
+    | NoLogs
+    | RegularLogs
+
+
 subscriptions : Model -> Sub Msg
 subscriptions model =
     case model.state of
@@ -544,16 +555,16 @@ update msg model =
             ( { model | paramsInfo = updateParamsInfo paramsInfoMsg model.paramsInfo }, Cmd.none )
 
         ( NavigationMsg navMsg, ViewImgs data ) ->
-            ( goTo navMsg model data, Cmd.none )
+            ( goTo navMsg data model, Cmd.none )
 
         ( NavigationMsg navMsg, Config data ) ->
-            ( goTo navMsg model data, Cmd.none )
+            ( goTo navMsg data model, Cmd.none )
 
         ( NavigationMsg navMsg, Registration data ) ->
-            ( goTo navMsg model data, Cmd.none )
+            ( goTo navMsg data model, Cmd.none )
 
         ( NavigationMsg navMsg, Logs data ) ->
-            ( goTo navMsg model data, Cmd.none )
+            ( goTo navMsg data model, Cmd.none )
 
         ( ZoomMsg zoomMsg, ViewImgs _ ) ->
             ( { model | viewer = zoomViewer zoomMsg model.viewer }, Cmd.none )
@@ -754,16 +765,24 @@ update msg model =
             ( { model | registeredImages = Maybe.map goToNextImage model.registeredImages }, Cmd.none )
 
         ( RunAlgorithm params, ViewImgs imgs ) ->
-            ( { model | state = Logs imgs, registeredImages = Nothing, runStep = StepNotStarted }, run (encodeParams params) )
+            ( runAndSwitchToLogsPage imgs model
+            , run (encodeParams params)
+            )
 
         ( RunAlgorithm params, Config imgs ) ->
-            ( { model | state = Logs imgs, registeredImages = Nothing, runStep = StepNotStarted }, run (encodeParams params) )
+            ( runAndSwitchToLogsPage imgs model
+            , run (encodeParams params)
+            )
 
         ( RunAlgorithm params, Registration imgs ) ->
-            ( { model | state = Logs imgs, registeredImages = Nothing, runStep = StepNotStarted }, run (encodeParams params) )
+            ( runAndSwitchToLogsPage imgs model
+            , run (encodeParams params)
+            )
 
         ( RunAlgorithm params, Logs imgs ) ->
-            ( { model | state = Logs imgs, registeredImages = Nothing, runStep = StepNotStarted }, run (encodeParams params) )
+            ( runAndSwitchToLogsPage imgs model
+            , run (encodeParams params)
+            )
 
         ( StopRunning, _ ) ->
             ( { model | runStep = StepNotStarted }, stop () )
@@ -801,16 +820,27 @@ update msg model =
             in
             ( { model | runStep = runStep }, Cmd.none )
 
+        ( Log logData, Logs _ ) ->
+            let
+                newLogs =
+                    logData :: model.seenLogs
+            in
+            if model.autoscroll then
+                ( { model | seenLogs = newLogs }, scrollLogsToEndCmd )
+
+            else
+                ( { model | seenLogs = newLogs }, Cmd.none )
+
         ( Log logData, _ ) ->
             let
                 newLogs =
-                    logData :: model.logs
+                    logData :: model.notSeenLogs
             in
             if model.autoscroll then
-                ( { model | logs = newLogs }, scrollLogsToEndCmd )
+                ( { model | notSeenLogs = newLogs }, scrollLogsToEndCmd )
 
             else
-                ( { model | logs = newLogs }, Cmd.none )
+                ( { model | notSeenLogs = newLogs }, Cmd.none )
 
         ( VerbosityChange floatVerbosity, _ ) ->
             ( { model | verbosity = round floatVerbosity }, Cmd.none )
@@ -868,17 +898,23 @@ update msg model =
 
         ( ClearLogs, _ ) ->
             ( { model
-                | logs =
+                | seenLogs =
                     [ { content = "Logs cleared"
                       , lvl = 3
                       }
                     ]
+                , notSeenLogs = []
               }
             , Cmd.none
             )
 
         _ ->
             ( model, Cmd.none )
+
+
+runAndSwitchToLogsPage : { images : Pivot Image } -> Model -> Model
+runAndSwitchToLogsPage imgs model =
+    goTo GoToPageLogs imgs { model | registeredImages = Nothing, runStep = StepNotStarted }
 
 
 scrollLogsToEndCmd : Cmd Msg
@@ -975,8 +1011,8 @@ zoomViewer msg viewer =
             Viewer.zoomAwayFrom coordinates viewer
 
 
-goTo : NavigationMsg -> Model -> { images : Pivot Image } -> Model
-goTo msg model data =
+goTo : NavigationMsg -> { images : Pivot Image } -> Model -> Model
+goTo msg data model =
     case msg of
         GoToPageImages ->
             { model | state = ViewImgs data, pointerMode = WaitingMove }
@@ -988,7 +1024,11 @@ goTo msg model data =
             { model | state = Registration data, pointerMode = WaitingMove }
 
         GoToPageLogs ->
-            { model | state = Logs data }
+            { model
+                | state = Logs data
+                , seenLogs = List.concat [ model.notSeenLogs, model.seenLogs ]
+                , notSeenLogs = []
+            }
 
 
 updateParams : ParamsMsg -> Model -> Model
@@ -1242,13 +1282,6 @@ viewElmUI model =
 -- Header
 
 
-type PageHeader
-    = PageImages
-    | PageConfig
-    | PageRegistration
-    | PageLogs
-
-
 {-| WARNING: this has to be kept consistent with the text size in the header
 -}
 headerHeight : Int
@@ -1256,17 +1289,59 @@ headerHeight =
     40
 
 
-headerBar : List ( PageHeader, Bool ) -> Element Msg
+headerBar : List (Element Msg) -> Element Msg
 headerBar pages =
     Element.row
         [ height (Element.px headerHeight)
         , centerX
         ]
-        (List.map (\( page, current ) -> pageHeaderElement current page) pages)
+        pages
 
 
-pageHeaderElement : Bool -> PageHeader -> Element Msg
-pageHeaderElement current page =
+imagesHeaderTab : Bool -> Element Msg
+imagesHeaderTab current =
+    let
+        bgColor =
+            if current then
+                Style.almostWhite
+
+            else
+                Style.white
+    in
+    Element.Input.button (baseTabAttributes bgColor)
+        { onPress =
+            if current then
+                Nothing
+
+            else
+                Just (NavigationMsg GoToPageImages)
+        , label = Element.text "Images"
+        }
+
+
+configHeaderTab : Bool -> Element Msg
+configHeaderTab current =
+    let
+        bgColor =
+            if current then
+                Style.almostWhite
+
+            else
+                Style.white
+    in
+    Element.Input.button (baseTabAttributes bgColor)
+        { onPress =
+            if current then
+                Nothing
+
+            else
+                Just (NavigationMsg GoToPageConfig)
+        , label = Element.text "Config"
+        }
+
+
+registrationHeaderTab : Bool -> Maybe (Pivot Image) -> Element Msg
+registrationHeaderTab current registeredImages =
     let
         bgColor =
             if current then
@@ -1275,57 +1350,96 @@ pageHeaderElement current page =
             else
                 Style.white
 
-        attributes =
-            [ Element.Background.color bgColor
-            , Element.htmlAttribute <| Html.Attributes.style "box-shadow" "none"
-            , padding 10
-            , height (Element.px headerHeight)
-            ]
+        buttonAttributes =
+            if registeredImages == Nothing then
+                baseTabAttributes bgColor
+
+            else
+                Element.inFront (Element.el [ alignRight, padding 2 ] (littleDot "green" |> Element.html))
+                    :: baseTabAttributes bgColor
     in
-    case page of
-        PageImages ->
-            Element.Input.button attributes
-                { onPress =
-                    if current then
-                        Nothing
+    Element.Input.button buttonAttributes
+        { onPress =
+            if current then
+                Nothing
 
-                    else
-                        Just (NavigationMsg GoToPageImages)
-                , label = Element.text "Images"
-                }
+            else
+                Just (NavigationMsg GoToPageRegistration)
+        , label = Element.text "Registration"
+        }
 
-        PageConfig ->
-            Element.Input.button attributes
-                { onPress =
-                    if current then
-                        Nothing
 
-                    else
-                        Just (NavigationMsg GoToPageConfig)
-                , label = Element.text "Config"
-                }
+logsHeaderTab : Bool -> List { lvl : Int, content : String } -> Element Msg
+logsHeaderTab current logs =
+    let
+        bgColor =
+            if current then
+                Style.almostWhite
 
-        PageRegistration ->
-            Element.Input.button attributes
-                { onPress =
-                    if current then
-                        Nothing
+            else
+                Style.white
 
-                    else
-                        Just (NavigationMsg GoToPageRegistration)
-                , label = Element.text "Registration"
-                }
+        logsState =
+            getMaxLevel logs
 
-        PageLogs ->
-            Element.Input.button attributes
-                { onPress =
-                    if current then
-                        Nothing
+        fillColor =
+            case logsState of
+                -- Style.errorColor
+                ErrorLogs ->
+                    "rgb(180,50,50)"
 
-                    else
-                        Just (NavigationMsg GoToPageLogs)
-                , label = Element.text "Logs"
-                }
+                -- Style.warningColor
+                WarningLogs ->
+                    "rgb(220,120,50)"
+
+                -- Style.darkGrey
+                _ ->
+                    "rgb(50,50,50)"
+
+        buttonAttributes =
+            case logsState of
+                NoLogs ->
+                    baseTabAttributes bgColor
+
+                _ ->
+                    Element.inFront (Element.el [ alignRight, padding 2 ] (littleDot fillColor |> Element.html))
+                        :: baseTabAttributes bgColor
+    in
+    Element.Input.button buttonAttributes
+        { onPress =
+            if current then
+                Nothing
+
+            else
+                Just (NavigationMsg GoToPageLogs)
+        , label = Element.text "Logs"
+        }
+
+
+baseTabAttributes : Element.Color -> List (Element.Attribute msg)
+baseTabAttributes bgColor =
+    [ Element.Background.color bgColor
+    , Element.htmlAttribute <| Html.Attributes.style "box-shadow" "none"
+    , padding 10
+    , height (Element.px headerHeight)
+    ]
+
+
+littleDot : String -> Html msg
+littleDot fillColor =
+    Svg.svg
+        [ Svg.Attributes.viewBox "0 0 10 10"
+        , Svg.Attributes.width "10"
+        , Svg.Attributes.height "10"
+        ]
+        [ Svg.circle
+            [ Svg.Attributes.cx "5"
+            , Svg.Attributes.cy "5"
+            , Svg.Attributes.r "5"
+            , Svg.Attributes.fill fillColor
+            ]
+            []
+        ]
 
 
 
@@ -1544,13 +1658,13 @@ progressBar color progressRatio =
 
 
 viewLogs : Model -> Element Msg
-viewLogs ({ autoscroll, verbosity, logs } as model) =
+viewLogs ({ autoscroll, verbosity, seenLogs, notSeenLogs, registeredImages } as model) =
     Element.column [ width fill, height fill ]
         [ headerBar
-            [ ( PageImages, False )
-            , ( PageConfig, False )
-            , ( PageRegistration, False )
-            , ( PageLogs, True )
+            [ imagesHeaderTab False
+            , configHeaderTab False
+            , registrationHeaderTab False registeredImages
+            , logsHeaderTab True notSeenLogs
             ]
         , runProgressBar model
         , Element.column [ width fill, height fill, paddingXY 0 18, spacing 18 ]
@@ -1572,7 +1686,7 @@ viewLogs ({ autoscroll, verbosity, logs } as model) =
                 , Element.scrollbars
                 , Element.htmlAttribute (Html.Attributes.id "logs")
                 ]
-                (List.filter (\l -> l.lvl <= verbosity) logs
+                (List.filter (\l -> l.lvl <= verbosity) seenLogs
                     |> List.reverse
                     |> List.map viewLog
                 )
@@ -1706,13 +1820,13 @@ verbositySlider verbosity =
 
 
 viewRegistration : Model -> Element Msg
-viewRegistration ({ registeredImages, registeredViewer } as model) =
+viewRegistration ({ registeredImages, registeredViewer, notSeenLogs } as model) =
     Element.column [ width fill, height fill ]
         [ headerBar
-            [ ( PageImages, False )
-            , ( PageConfig, False )
-            , ( PageRegistration, True )
-            , ( PageLogs, False )
+            [ imagesHeaderTab False
+            , configHeaderTab False
+            , registrationHeaderTab True registeredImages
+            , logsHeaderTab False notSeenLogs
             ]
         , runProgressBar model
         , Element.html <|
@@ -1801,13 +1915,13 @@ viewRegistration ({ registeredImages, registeredViewer } as model) =
 
 
 viewConfig : Model -> Element Msg
-viewConfig ({ params, paramsForm, paramsInfo } as model) =
+viewConfig ({ params, paramsForm, paramsInfo, notSeenLogs, registeredImages } as model) =
     Element.column [ width fill, height fill ]
         [ headerBar
-            [ ( PageImages, False )
-            , ( PageConfig, True )
-            , ( PageRegistration, False )
-            , ( PageLogs, False )
+            [ imagesHeaderTab False
+            , configHeaderTab True
+            , registrationHeaderTab False registeredImages
+            , logsHeaderTab False notSeenLogs
             ]
         , runProgressBar model
         , Element.column [ width fill, height fill, Element.scrollbars ]
@@ -2278,7 +2392,7 @@ toggleCheckboxWidget { offColor, onColor, sliderColor, toggleWidth, toggleHeight
 
 
 viewImgs : Model -> Pivot Image -> Element Msg
-viewImgs ({ pointerMode, bboxDrawn, viewer } as model) images =
+viewImgs ({ pointerMode, bboxDrawn, viewer, notSeenLogs, registeredImages } as model) images =
     let
         img =
             Pivot.getC images
@@ -2407,10 +2521,10 @@ viewImgs ({ pointerMode, bboxDrawn, viewer } as model) images =
     in
     Element.column [ height fill ]
         [ headerBar
-            [ ( PageImages, True )
-            , ( PageConfig, False )
-            , ( PageRegistration, False )
-            , ( PageLogs, False )
+            [ imagesHeaderTab True
+            , configHeaderTab False
+            , registrationHeaderTab False registeredImages
+            , logsHeaderTab False notSeenLogs
             ]
         , runProgressBar model
         , Element.html <|
@@ -2430,6 +2544,36 @@ viewImgs ({ pointerMode, bboxDrawn, viewer } as model) images =
             ]
             (Element.html canvasViewer)
         ]
+
+
+getLevel : { lvl : Int, content : String } -> Int
+getLevel { lvl, content } =
+    lvl
+
+
+{-| Morally get the most important type of error :
+-- 0 if there is an error
+-- 1 if there is no error but at least one warning
+-- 2 if there is no logs (less than one, because there is an auto-log at the begining)
+-- else 3
+-}
+getMaxLevel : List { lvl : Int, content : String } -> LogsState
+getMaxLevel logs =
+    let
+        l =
+            List.map getLevel logs
+    in
+    if List.member 0 l then
+        ErrorLogs
+
+    else if List.member 1 l then
+        WarningLogs
+
+    else if List.length l < 1 then
+        NoLogs
+
+    else
+        RegularLogs
 
 
 msgOn : String -> Decoder msg -> Html.Attribute msg
