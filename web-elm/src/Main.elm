@@ -1351,27 +1351,12 @@ registrationHeaderTab current registeredImages =
             else
                 Style.white
 
-        littleDot =
-            Svg.svg
-                [ Svg.Attributes.viewBox "0 0 10 10"
-                , Svg.Attributes.width "10"
-                , Svg.Attributes.height "10"
-                ]
-                [ Svg.circle
-                    [ Svg.Attributes.cx "5"
-                    , Svg.Attributes.cy "5"
-                    , Svg.Attributes.r "5"
-                    , Svg.Attributes.fill "green"
-                    ]
-                    []
-                ]
-
         attributesRegistration =
             [ Element.Background.color bgColor
             , padding 10
             , height (Element.px headerHeight)
             , Element.htmlAttribute <| Html.Attributes.style "box-shadow" "none"
-            , Element.inFront (Element.el [ alignRight, padding 2 ] (littleDot |> Element.html))
+            , Element.inFront (Element.el [ alignRight, padding 2 ] (littleDot "green" |> Element.html))
             ]
     in
     Element.Input.button
@@ -1404,40 +1389,26 @@ logsHeaderTab current logs =
         logsState =
             getMaxLevel logs
 
-        littleDot =
-            Svg.svg
-                [ Svg.Attributes.viewBox "0 0 10 10"
-                , Svg.Attributes.width "10"
-                , Svg.Attributes.height "10"
-                ]
-                [ Svg.circle
-                    [ Svg.Attributes.cx "5"
-                    , Svg.Attributes.cy "5"
-                    , Svg.Attributes.r "5"
-                    , Svg.Attributes.fill
-                        (case logsState of
-                            -- Style.errorColor
-                            ErrorLogs ->
-                                "rgb(180,50,50)"
+        fillColor =
+            case logsState of
+                -- Style.errorColor
+                ErrorLogs ->
+                    "rgb(180,50,50)"
 
-                            -- Style.warningColor
-                            WarningLogs ->
-                                "rgb(220,120,50)"
+                -- Style.warningColor
+                WarningLogs ->
+                    "rgb(220,120,50)"
 
-                            -- Style.darkGrey
-                            _ ->
-                                "rgb(50,50,50)"
-                        )
-                    ]
-                    []
-                ]
+                -- Style.darkGrey
+                _ ->
+                    "rgb(50,50,50)"
 
         attributesLogs =
             [ Element.Background.color bgColor
             , padding 10
             , height (Element.px headerHeight)
             , Element.htmlAttribute <| Html.Attributes.style "box-shadow" "none"
-            , Element.inFront (Element.el [ alignRight, padding 2 ] (littleDot |> Element.html))
+            , Element.inFront (Element.el [ alignRight, padding 2 ] (littleDot fillColor |> Element.html))
             ]
     in
     Element.Input.button
@@ -1465,6 +1436,23 @@ baseTabAttributes bgColor =
     , padding 10
     , height (Element.px headerHeight)
     ]
+
+
+littleDot : String -> Html msg
+littleDot fillColor =
+    Svg.svg
+        [ Svg.Attributes.viewBox "0 0 10 10"
+        , Svg.Attributes.width "10"
+        , Svg.Attributes.height "10"
+        ]
+        [ Svg.circle
+            [ Svg.Attributes.cx "5"
+            , Svg.Attributes.cy "5"
+            , Svg.Attributes.r "5"
+            , Svg.Attributes.fill fillColor
+            ]
+            []
+        ]
 
 
 
