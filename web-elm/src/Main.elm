@@ -1297,16 +1297,6 @@ headerHeight =
     40
 
 
-
--- | -- headerBar : Bool -> Int -> List ( PageHeader, Bool ) -> Element Msg
--- | -- headerBar registrationState logsState pages =
--- | --     Element.row
--- | --         [ height (Element.px headerHeight)
--- | --         , centerX
--- | --         ]
--- | --         (List.map (\( page, current ) -> pageHeaderElement registrationState logsState current page) pages)
-
-
 headerBar : List (Element Msg) -> Element Msg
 headerBar pages =
     Element.row
