@@ -766,46 +766,22 @@ update msg model =
             ( { model | registeredImages = Maybe.map goToNextImage model.registeredImages }, Cmd.none )
 
         ( RunAlgorithm params, ViewImgs imgs ) ->
-            ( { model
-                | state = Logs imgs
-                , registeredImages = Nothing
-                , runStep = StepNotStarted
-                , seenLogs = List.concat [ model.seenLogs, model.notSeenLogs ]
-                , notSeenLogs = []
-              }
+            ( switchToLogsPage imgs model
             , run (encodeParams params)
             )
 
         ( RunAlgorithm params, Config imgs ) ->
-            ( { model
-                | state = Logs imgs
-                , registeredImages = Nothing
-                , runStep = StepNotStarted
-                , seenLogs = List.concat [ model.seenLogs, model.notSeenLogs ]
-                , notSeenLogs = []
-              }
+            ( switchToLogsPage imgs model
             , run (encodeParams params)
             )
 
         ( RunAlgorithm params, Registration imgs ) ->
-            ( { model
-                | state = Logs imgs
-                , registeredImages = Nothing
-                , runStep = StepNotStarted
-                , seenLogs = List.concat [ model.seenLogs, model.notSeenLogs ]
-                , notSeenLogs = []
-              }
+            ( switchToLogsPage imgs model
             , run (encodeParams params)
             )
 
         ( RunAlgorithm params, Logs imgs ) ->
-            ( { model
-                | state = Logs imgs
-                , registeredImages = Nothing
-                , runStep = StepNotStarted
-                , seenLogs = List.concat [ model.seenLogs, model.notSeenLogs ]
-                , notSeenLogs = []
-              }
+            ( switchToLogsPage imgs model
             , run (encodeParams params)
             )
 
@@ -935,6 +911,17 @@ update msg model =
 
         _ ->
             ( model, Cmd.none )
+
+
+switchToLogsPage : { images : Pivot Image } -> Model -> Model
+switchToLogsPage imgs model =
+    { model
+        | state = Logs imgs
+        , registeredImages = Nothing
+        , runStep = StepNotStarted
+        , seenLogs = List.concat [ model.seenLogs, model.notSeenLogs ]
+        , notSeenLogs = []
+    }
 
 
 scrollLogsToEndCmd : Cmd Msg
