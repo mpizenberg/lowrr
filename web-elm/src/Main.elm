@@ -766,22 +766,22 @@ update msg model =
             ( { model | registeredImages = Maybe.map goToNextImage model.registeredImages }, Cmd.none )
 
         ( RunAlgorithm params, ViewImgs imgs ) ->
-            ( switchToLogsPage imgs model
+            ( runAndSwitchToLogsPage imgs model
             , run (encodeParams params)
             )
 
         ( RunAlgorithm params, Config imgs ) ->
-            ( switchToLogsPage imgs model
+            ( runAndSwitchToLogsPage imgs model
             , run (encodeParams params)
             )
 
         ( RunAlgorithm params, Registration imgs ) ->
-            ( switchToLogsPage imgs model
+            ( runAndSwitchToLogsPage imgs model
             , run (encodeParams params)
             )
 
         ( RunAlgorithm params, Logs imgs ) ->
-            ( switchToLogsPage imgs model
+            ( runAndSwitchToLogsPage imgs model
             , run (encodeParams params)
             )
 
@@ -913,15 +913,9 @@ update msg model =
             ( model, Cmd.none )
 
 
-switchToLogsPage : { images : Pivot Image } -> Model -> Model
-switchToLogsPage imgs model =
-    { model
-        | state = Logs imgs
-        , registeredImages = Nothing
-        , runStep = StepNotStarted
-        , seenLogs = List.concat [ model.seenLogs, model.notSeenLogs ]
-        , notSeenLogs = []
-    }
+runAndSwitchToLogsPage : { images : Pivot Image } -> Model -> Model
+runAndSwitchToLogsPage imgs model =
+    goTo GoToPageLogs imgs { model | registeredImages = Nothing, runStep = StepNotStarted }
 
 
 scrollLogsToEndCmd : Cmd Msg
