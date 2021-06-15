@@ -1350,15 +1350,16 @@ registrationHeaderTab current registeredImages =
 
             else
                 Style.white
-    in
-    Element.Input.button
-        (if Maybe.Extra.isJust registeredImages then
-            Element.inFront (Element.el [ alignRight, padding 2 ] (littleDot "green" |> Element.html))
-                :: baseTabAttributes bgColor
 
-         else
-            baseTabAttributes bgColor
-        )
+        buttonAttributes =
+            if Maybe.Extra.isJust registeredImages then
+                Element.inFront (Element.el [ alignRight, padding 2 ] (littleDot "green" |> Element.html))
+                    :: baseTabAttributes bgColor
+
+            else
+                baseTabAttributes bgColor
+    in
+    Element.Input.button buttonAttributes
         { onPress =
             if current then
                 Nothing
@@ -1395,16 +1396,17 @@ logsHeaderTab current logs =
                 -- Style.darkGrey
                 _ ->
                     "rgb(50,50,50)"
-    in
-    Element.Input.button
-        (case logsState of
-            NoLogs ->
-                baseTabAttributes bgColor
 
-            _ ->
-                Element.inFront (Element.el [ alignRight, padding 2 ] (littleDot fillColor |> Element.html))
-                    :: baseTabAttributes bgColor
-        )
+        buttonAttributes =
+            case logsState of
+                NoLogs ->
+                    baseTabAttributes bgColor
+
+                _ ->
+                    Element.inFront (Element.el [ alignRight, padding 2 ] (littleDot fillColor |> Element.html))
+                        :: baseTabAttributes bgColor
+    in
+    Element.Input.button buttonAttributes
         { onPress =
             if current then
                 Nothing
