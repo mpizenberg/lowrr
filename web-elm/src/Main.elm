@@ -1444,17 +1444,17 @@ logsHeaderTab current logs =
                     , Svg.Attributes.r "5"
                     , Svg.Attributes.fill
                         (case logsState of
+                            -- Style.errorColor
                             ErrorLogs ->
                                 "rgb(180,50,50)"
 
-                            -- Style.errorColor
+                            -- Style.warningColor
                             WarningLogs ->
                                 "rgb(220,120,50)"
 
-                            -- Style.warningColor
+                            -- Style.darkGrey
                             _ ->
                                 "rgb(50,50,50)"
-                         -- Style.darkGrey
                         )
                     ]
                     []
