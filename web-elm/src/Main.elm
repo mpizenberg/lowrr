@@ -556,16 +556,16 @@ update msg model =
             ( { model | paramsInfo = updateParamsInfo paramsInfoMsg model.paramsInfo }, Cmd.none )
 
         ( NavigationMsg navMsg, ViewImgs data ) ->
-            ( goTo navMsg model data, Cmd.none )
+            ( goTo navMsg data model, Cmd.none )
 
         ( NavigationMsg navMsg, Config data ) ->
-            ( goTo navMsg model data, Cmd.none )
+            ( goTo navMsg data model, Cmd.none )
 
         ( NavigationMsg navMsg, Registration data ) ->
-            ( goTo navMsg model data, Cmd.none )
+            ( goTo navMsg data model, Cmd.none )
 
         ( NavigationMsg navMsg, Logs data ) ->
-            ( goTo navMsg model data, Cmd.none )
+            ( goTo navMsg data model, Cmd.none )
 
         ( ZoomMsg zoomMsg, ViewImgs _ ) ->
             ( { model | viewer = zoomViewer zoomMsg model.viewer }, Cmd.none )
@@ -1018,8 +1018,8 @@ zoomViewer msg viewer =
             Viewer.zoomAwayFrom coordinates viewer
 
 
-goTo : NavigationMsg -> Model -> { images : Pivot Image } -> Model
-goTo msg model data =
+goTo : NavigationMsg -> { images : Pivot Image } -> Model -> Model
+goTo msg data model =
     case msg of
         GoToPageImages ->
             { model | state = ViewImgs data, pointerMode = WaitingMove }
