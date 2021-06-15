@@ -777,13 +777,37 @@ update msg model =
             )
 
         ( RunAlgorithm params, Config imgs ) ->
-            ( { model | state = Logs imgs, registeredImages = Nothing, runStep = StepNotStarted, seenLogs = List.concat [ model.seenLogs, model.notSeenLogs ], notSeenLogs = [] }, run (encodeParams params) )
+            ( { model
+                | state = Logs imgs
+                , registeredImages = Nothing
+                , runStep = StepNotStarted
+                , seenLogs = List.concat [ model.seenLogs, model.notSeenLogs ]
+                , notSeenLogs = []
+              }
+            , run (encodeParams params)
+            )
 
         ( RunAlgorithm params, Registration imgs ) ->
-            ( { model | state = Logs imgs, registeredImages = Nothing, runStep = StepNotStarted, seenLogs = List.concat [ model.seenLogs, model.notSeenLogs ], notSeenLogs = [] }, run (encodeParams params) )
+            ( { model
+                | state = Logs imgs
+                , registeredImages = Nothing
+                , runStep = StepNotStarted
+                , seenLogs = List.concat [ model.seenLogs, model.notSeenLogs ]
+                , notSeenLogs = []
+              }
+            , run (encodeParams params)
+            )
 
         ( RunAlgorithm params, Logs imgs ) ->
-            ( { model | state = Logs imgs, registeredImages = Nothing, runStep = StepNotStarted, seenLogs = List.concat [ model.seenLogs, model.notSeenLogs ], notSeenLogs = [] }, run (encodeParams params) )
+            ( { model
+                | state = Logs imgs
+                , registeredImages = Nothing
+                , runStep = StepNotStarted
+                , seenLogs = List.concat [ model.seenLogs, model.notSeenLogs ]
+                , notSeenLogs = []
+              }
+            , run (encodeParams params)
+            )
 
         ( StopRunning, _ ) ->
             ( { model | runStep = StepNotStarted }, stop () )
