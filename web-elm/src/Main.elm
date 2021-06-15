@@ -94,7 +94,8 @@ type alias Model =
     , pointerMode : PointerMode
     , bboxDrawn : Maybe BBox
     , registeredImages : Maybe (Pivot Image)
-    , logs : List { lvl : Int, content : String }
+    , seenLogs : List { lvl : Int, content : String }
+    , notSeenLogs : List { lvl : Int, content : String }
     , verbosity : Int
     , autoscroll : Bool
     , runStep : RunStep
@@ -247,7 +248,8 @@ initialModel size =
     , pointerMode = WaitingMove
     , bboxDrawn = Nothing
     , registeredImages = Nothing
-    , logs = []
+    , seenLogs = []
+    , notSeenLogs = []
     , verbosity = 2
     , autoscroll = True
     , runStep = StepNotStarted
@@ -804,16 +806,27 @@ update msg model =
             in
             ( { model | runStep = runStep }, Cmd.none )
 
+        ( Log logData, Logs _ ) ->
+            let
+                newLogs =
+                    logData :: model.seenLogs
+            in
+            if model.autoscroll then
+                ( { model | seenLogs = newLogs }, scrollLogsToEndCmd )
+
+            else
+                ( { model | seenLogs = newLogs }, Cmd.none )
+
         ( Log logData, _ ) ->
             let
                 newLogs =
-                    logData :: model.logs
+                    logData :: model.notSeenLogs
             in
             if model.autoscroll then
-                ( { model | logs = newLogs }, scrollLogsToEndCmd )
+                ( { model | notSeenLogs = newLogs }, scrollLogsToEndCmd )
 
             else
-                ( { model | logs = newLogs }, Cmd.none )
+                ( { model | notSeenLogs = newLogs }, Cmd.none )
 
         ( VerbosityChange floatVerbosity, _ ) ->
             ( { model | verbosity = round floatVerbosity }, Cmd.none )
@@ -871,11 +884,12 @@ update msg model =
 
         ( ClearLogs, _ ) ->
             ( { model
-                | logs =
+                | seenLogs =
                     [ { content = "Logs cleared"
                       , lvl = 3
                       }
                     ]
+                , notSeenLogs = []
               }
             , Cmd.none
             )
@@ -991,7 +1005,11 @@ goTo msg model data =
             { model | state = Registration data, pointerMode = WaitingMove }
 
         GoToPageLogs ->
-            { model | state = Logs data }
+            { model 
+            | state = Logs data
+            , seenLogs = List.concat [model.seenLogs, model.notSeenLogs]
+            , notSeenLogs = []
+            }
 
 
 updateParams : ParamsMsg -> Model -> Model
@@ -1795,13 +1813,16 @@ progressBar color progressRatio =
 
 
 viewLogs : Model -> Element Msg
-viewLogs ({ autoscroll, verbosity, logs, registeredImages } as model) =
+viewLogs ({ autoscroll, verbosity, seenLogs, notSeenLogs, registeredImages } as model) =
+    let
+        logs = List.concat [seenLogs, notSeenLogs]
+    in
     Element.column [ width fill, height fill ]
         [ headerBar
             [ imagesHeaderTab       False
             , configHeaderTab       False
             , registrationHeaderTab False registeredImages
-            , logsHeaderTab         True  logs
+            , logsHeaderTab         True  notSeenLogs
             ]
         , runProgressBar model
         , Element.column [ width fill, height fill, paddingXY 0 18, spacing 18 ]
@@ -1957,13 +1978,16 @@ verbositySlider verbosity =
 
 
 viewRegistration : Model -> Element Msg
-viewRegistration ({ registeredImages, registeredViewer, logs } as model) =
+viewRegistration ({ registeredImages, registeredViewer, seenLogs, notSeenLogs } as model) =
+    let
+        logs = List.concat [seenLogs, notSeenLogs]
+    in
     Element.column [ width fill, height fill ]
         [ headerBar
             [ imagesHeaderTab       False
             , configHeaderTab       False
             , registrationHeaderTab True  registeredImages
-            , logsHeaderTab         False logs
+            , logsHeaderTab         False notSeenLogs
             ]
         , runProgressBar model
         , Element.html <|
@@ -2052,13 +2076,16 @@ viewRegistration ({ registeredImages, registeredViewer, logs } as model) =
 
 
 viewConfig : Model -> Element Msg
-viewConfig ({ params, paramsForm, paramsInfo, logs, registeredImages } as model) =
+viewConfig ({ params, paramsForm, paramsInfo, seenLogs, notSeenLogs, registeredImages } as model) =
+    let
+        logs = List.concat [seenLogs, notSeenLogs]
+    in
     Element.column [ width fill, height fill ]
         [ headerBar
             [ imagesHeaderTab       False
             , configHeaderTab       True
             , registrationHeaderTab False registeredImages
-            , logsHeaderTab         False logs
+            , logsHeaderTab         False notSeenLogs
             ]
         , runProgressBar model
         , Element.column [ width fill, height fill, Element.scrollbars ]
@@ -2529,8 +2556,9 @@ toggleCheckboxWidget { offColor, onColor, sliderColor, toggleWidth, toggleHeight
 
 
 viewImgs : Model -> Pivot Image -> Element Msg
-viewImgs ({ pointerMode, bboxDrawn, viewer, logs, registeredImages } as model) images =
+viewImgs ({ pointerMode, bboxDrawn, viewer, seenLogs, notSeenLogs, registeredImages } as model) images =
     let
+        logs = List.concat [seenLogs, notSeenLogs]
         img =
             Pivot.getC images
 
@@ -2661,7 +2689,7 @@ viewImgs ({ pointerMode, bboxDrawn, viewer, logs, registeredImages } as model) i
             [ imagesHeaderTab       True
             , configHeaderTab       False
             , registrationHeaderTab False registeredImages
-            , logsHeaderTab         False logs
+            , logsHeaderTab         False notSeenLogs
             ]
         , runProgressBar model
         , Element.html <|
@@ -2706,7 +2734,7 @@ getMaxLevel logs =
     else if List.member 1 l then
         1
 
-    else if List.length l <= 1 then
+    else if List.length l < 1 then
         2
 
     else
