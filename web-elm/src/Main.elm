@@ -1308,15 +1308,8 @@ imagesHeaderTab current =
 
             else
                 Style.white
-
-        attributes =
-            [ Element.Background.color bgColor
-            , Element.htmlAttribute <| Html.Attributes.style "box-shadow" "none"
-            , padding 10
-            , height (Element.px headerHeight)
-            ]
     in
-    Element.Input.button attributes
+    Element.Input.button (baseTabAttributes bgColor)
         { onPress =
             if current then
                 Nothing
@@ -1336,15 +1329,8 @@ configHeaderTab current =
 
             else
                 Style.white
-
-        attributes =
-            [ Element.Background.color bgColor
-            , Element.htmlAttribute <| Html.Attributes.style "box-shadow" "none"
-            , padding 10
-            , height (Element.px headerHeight)
-            ]
     in
-    Element.Input.button attributes
+    Element.Input.button (baseTabAttributes bgColor)
         { onPress =
             if current then
                 Nothing
@@ -1380,13 +1366,6 @@ registrationHeaderTab current registeredImages =
                     []
                 ]
 
-        attributes =
-            [ Element.Background.color bgColor
-            , Element.htmlAttribute <| Html.Attributes.style "box-shadow" "none"
-            , padding 10
-            , height (Element.px headerHeight)
-            ]
-
         attributesRegistration =
             [ Element.Background.color bgColor
             , padding 10
@@ -1400,7 +1379,7 @@ registrationHeaderTab current registeredImages =
             attributesRegistration
 
          else
-            attributes
+            baseTabAttributes bgColor
         )
         { onPress =
             if current then
@@ -1421,13 +1400,6 @@ logsHeaderTab current logs =
 
             else
                 Style.white
-
-        attributes =
-            [ Element.Background.color bgColor
-            , Element.htmlAttribute <| Html.Attributes.style "box-shadow" "none"
-            , padding 10
-            , height (Element.px headerHeight)
-            ]
 
         logsState =
             getMaxLevel logs
@@ -1471,7 +1443,7 @@ logsHeaderTab current logs =
     Element.Input.button
         (case logsState of
             NoLogs ->
-                attributes
+                baseTabAttributes bgColor
 
             _ ->
                 attributesLogs
@@ -1484,6 +1456,15 @@ logsHeaderTab current logs =
                 Just (NavigationMsg GoToPageLogs)
         , label = Element.text "Logs"
         }
+
+
+baseTabAttributes : Element.Color -> List (Element.Attribute msg)
+baseTabAttributes bgColor =
+    [ Element.Background.color bgColor
+    , Element.htmlAttribute <| Html.Attributes.style "box-shadow" "none"
+    , padding 10
+    , height (Element.px headerHeight)
+    ]
 
 
 
