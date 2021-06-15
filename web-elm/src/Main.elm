@@ -26,7 +26,6 @@ import Icon
 import Json.Decode exposing (Decoder, Value)
 import Json.Encode exposing (Value)
 import Keyboard exposing (RawKey)
-import Maybe.Extra
 import NumberInput
 import Pivot exposing (Pivot)
 import Set exposing (Set)
@@ -1352,12 +1351,12 @@ registrationHeaderTab current registeredImages =
                 Style.white
 
         buttonAttributes =
-            if Maybe.Extra.isJust registeredImages then
-                Element.inFront (Element.el [ alignRight, padding 2 ] (littleDot "green" |> Element.html))
-                    :: baseTabAttributes bgColor
+            if registeredImages == Nothing then
+                baseTabAttributes bgColor
 
             else
-                baseTabAttributes bgColor
+                Element.inFront (Element.el [ alignRight, padding 2 ] (littleDot "green" |> Element.html))
+                    :: baseTabAttributes bgColor
     in
     Element.Input.button buttonAttributes
         { onPress =
