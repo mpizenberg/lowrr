@@ -1349,12 +1349,6 @@ configHeaderTab current =
             , Element.htmlAttribute <| Html.Attributes.style "box-shadow" "none"
             , padding 10
             , height (Element.px headerHeight)
-            , Element.Border.widthEach
-                { bottom = 0
-                , left = 1
-                , right = 0
-                , top = 0
-                }
             ]
     in
     Element.Input.button attributes
@@ -1398,12 +1392,6 @@ registrationHeaderTab current registeredImages =
             , Element.htmlAttribute <| Html.Attributes.style "box-shadow" "none"
             , padding 10
             , height (Element.px headerHeight)
-            , Element.Border.widthEach
-                { bottom = 0
-                , left = 1
-                , right = 0
-                , top = 0
-                }
             ]
 
         attributesRegistration =
@@ -1412,12 +1400,6 @@ registrationHeaderTab current registeredImages =
             , height (Element.px headerHeight)
             , Element.htmlAttribute <| Html.Attributes.style "box-shadow" "none"
             , Element.inFront (Element.el [ alignRight, padding 2 ] (littleDot |> Element.html))
-            , Element.Border.widthEach
-                { bottom = 0
-                , left = 1
-                , right = 0
-                , top = 0
-                }
             ]
     in
     Element.Input.button
@@ -1452,12 +1434,6 @@ logsHeaderTab current logs =
             , Element.htmlAttribute <| Html.Attributes.style "box-shadow" "none"
             , padding 10
             , height (Element.px headerHeight)
-            , Element.Border.widthEach
-                { bottom = 0
-                , left = 1
-                , right = 0
-                , top = 0
-                }
             ]
 
         logsState =
@@ -1501,12 +1477,6 @@ logsHeaderTab current logs =
             -- , Element.Border.dotted
             , Element.htmlAttribute <| Html.Attributes.style "box-shadow" "none"
             , Element.inFront (Element.el [ alignRight, padding 2 ] (littleDot |> Element.html))
-            , Element.Border.widthEach
-                { bottom = 0
-                , left = 1
-                , right = 0
-                , top = 0
-                }
             ]
     in
     Element.Input.button
