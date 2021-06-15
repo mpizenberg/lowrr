@@ -1027,7 +1027,7 @@ goTo msg data model =
         GoToPageLogs ->
             { model
                 | state = Logs data
-                , seenLogs = List.concat [ model.seenLogs, model.notSeenLogs ]
+                , seenLogs = List.concat [ model.notSeenLogs, model.seenLogs ]
                 , notSeenLogs = []
             }
 
