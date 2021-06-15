@@ -265,7 +265,7 @@ defaultParams : Parameters
 defaultParams =
     { crop = Nothing
     , equalize = True
-    , levels = 4
+    , levels = 1
     , sparse = 0.5
     , lambda = 1.5
     , rho = 0.1
@@ -546,6 +546,15 @@ update msg model =
 
                 oldParamsForm =
                     model.paramsForm
+
+                oldParams =
+                    model.params
+
+                optiLevels =
+                    getOptimumPyramids newLoaded
+
+                anyInt =
+                    NumberInput.intDefault
             in
             if Set.size names == Dict.size newLoaded then
                 case Dict.values newLoaded of
@@ -557,7 +566,17 @@ update msg model =
                         ( { model
                             | state = ViewImgs { images = Pivot.fromCons firstImage otherImages }
                             , viewer = Viewer.fitImage 1.0 ( toFloat firstImage.width, toFloat firstImage.height ) model.viewer
-                            , paramsForm = { oldParamsForm | crop = CropForm.withSize firstImage.width firstImage.height }
+                            , params = { oldParams | levels = optiLevels }
+                            , paramsForm =
+                                { oldParamsForm
+                                    | crop = CropForm.withSize firstImage.width firstImage.height
+                                    , levels =
+                                        { anyInt
+                                            | min = Just 1
+                                            , max = Just 10
+                                        }
+                                            |> NumberInput.setDefaultIntValue optiLevels
+                                }
                             , imagesCount = Set.size names
                           }
                         , Cmd.none
@@ -977,6 +996,62 @@ update msg model =
 
         _ ->
             ( model, Cmd.none )
+
+
+{-|
+
+    We search the number n of level of the pyramid.
+    We know that h/(2^n)>100 and w/(2^n)>100
+            with w the width and h the height of the image
+    So as x -> log_2(x) is monotonous, we have :
+            n < log_2(min{h, w}/100)
+    We choose to use n=floor(...) to get a nice integer result.
+
+    getOptimumPyramids(imgsList) = floor[log_2(min{h, w}/100)]
+
+-}
+getOptimumPyramids : Dict String Image -> Int
+getOptimumPyramids imgs =
+    imgs
+        -- (Dict String/Image)
+        |> Dict.values
+        -- (List Image)
+        |> minWidthHeight
+        -- (Int)
+        |> toFloat
+        -- (Float)
+        |> (*) 0.01
+        -- ~ Divide by 100, the min length -- (Float)
+        |> logBase 2
+        -- (Float)
+        |> floor
+
+
+
+-- (Int) The approximate number of pyramids levels
+-- Just a function to get the minimum side dimension of a list of images.
+-- /!\ It might be useless if all of the images have the same dimension...
+--     But whatever, we can just use the dimensions of the last image.
+
+
+minWidthHeight : List Image -> Int
+minWidthHeight imgs =
+    let
+        maybeMinimum =
+            imgs
+                -- -> (List Image)
+                |> List.map (\img -> min img.width img.height)
+                -- -> (List Int)
+                |> List.minimum
+
+        -- -> (Int)
+    in
+    case maybeMinimum of
+        Nothing ->
+            defaultParams.levels
+
+        Just trueMinimum ->
+            trueMinimum
 
 
 runAndSwitchToLogsPage : { images : Pivot Image } -> Model -> Model
@@ -2034,7 +2109,9 @@ viewConfig ({ params, paramsForm, paramsInfo, notSeenLogs, registeredImages } as
                             }
                         ]
                     , moreInfo paramsInfo.levels "The number of levels for the multi-resolution approach. Each level halves/doubles the resolution of the previous one. The algorithm starts at the lowest resolution and transfers the converged parameters at one resolution to the initialization of the next. Increasing the number of levels enables better convergence for bigger movements but too many levels might make it definitively drift away. Targetting a lowest resolution of about 100x100 is generally good enough. The number of levels also has a joint interaction with the sparse threshold parameter so keep that in mind while changing this parameter."
-                    , Element.text ("(default to " ++ String.fromInt defaultParams.levels ++ ")")
+
+                    -- , Element.text ("(default to " ++ String.fromInt defaultParams.levels ++ ")")
+                    -- /!\ Default number of pyramids removed in order to put a fitting number of pyramids
                     , intInput paramsForm.levels (ParamsMsg << ChangeLevels) "Number of pyramid levels"
                     , displayIntErrors paramsForm.levels.decodedInput
                     ]
