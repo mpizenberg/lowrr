@@ -1855,10 +1855,6 @@ progressBar color progressRatio =
 
 viewLogs : Model -> Element Msg
 viewLogs ({ autoscroll, verbosity, seenLogs, notSeenLogs, registeredImages } as model) =
-    let
-        logs =
-            List.concat [ seenLogs, notSeenLogs ]
-    in
     Element.column [ width fill, height fill ]
         [ headerBar
             [ imagesHeaderTab False
@@ -1886,7 +1882,7 @@ viewLogs ({ autoscroll, verbosity, seenLogs, notSeenLogs, registeredImages } as 
                 , Element.scrollbars
                 , Element.htmlAttribute (Html.Attributes.id "logs")
                 ]
-                (List.filter (\l -> l.lvl <= verbosity) logs
+                (List.filter (\l -> l.lvl <= verbosity) seenLogs
                     |> List.reverse
                     |> List.map viewLog
                 )
