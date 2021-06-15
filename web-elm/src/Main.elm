@@ -1283,13 +1283,6 @@ viewElmUI model =
 -- Header
 
 
-type PageHeader
-    = PageImages
-    | PageConfig
-    | PageRegistration
-    | PageLogs
-
-
 {-| WARNING: this has to be kept consistent with the text size in the header
 -}
 headerHeight : Int
@@ -1471,10 +1464,6 @@ logsHeaderTab current logs =
             [ Element.Background.color bgColor
             , padding 10
             , height (Element.px headerHeight)
-
-            -- , Element.Border.widthXY 0 4
-            -- , Element.Border.color borderColor
-            -- , Element.Border.dotted
             , Element.htmlAttribute <| Html.Attributes.style "box-shadow" "none"
             , Element.inFront (Element.el [ alignRight, padding 2 ] (littleDot |> Element.html))
             ]
@@ -1498,107 +1487,6 @@ logsHeaderTab current logs =
 
 
 
--- | -- pageHeaderElement : Bool -> Int -> Bool -> PageHeader -> Element Msg
--- | -- pageHeaderElement registrationState logsState current page =
--- | --     let
--- | --         bgColor =
--- | --             if current then
--- | --                 Style.almostWhite
--- | --
--- | --             else
--- | --                 Style.white
--- | --
--- | --         attributes =
--- | --             [ Element.Background.color bgColor
--- | --             , Element.htmlAttribute <| Html.Attributes.style "box-shadow" "none"
--- | --             , padding 10
--- | --             , height (Element.px headerHeight)
--- | --             ]
--- | --
--- | --         borderColor =
--- | --             case logsState of
--- | --                 0 ->
--- | --                     Style.errorColor
--- | --
--- | --                 1 ->
--- | --                     Style.warningColor
--- | --
--- | --                 _ ->
--- | --                     Style.black
--- | --
--- | --         attributesRegistration =
--- | --             [ Element.Background.color Style.green
--- | --             , padding 10
--- | --             , height (Element.px headerHeight)
--- | --             , Element.htmlAttribute <| Html.Attributes.style "box-shadow" "none"
--- | --             ]
--- | --
--- | --         attributesLogs =
--- | --             [ Element.Background.color bgColor
--- | --             , padding 10
--- | --             , height (Element.px headerHeight)
--- | --             , Element.Border.width 4
--- | --             , Element.Border.color borderColor
--- | --             , Element.Border.dotted
--- | --             , Element.htmlAttribute <| Html.Attributes.style "box-shadow" "none"
--- | --             ]
--- | --     in
--- | --     case page of
--- | --         PageImages ->
--- | --             Element.Input.button attributes
--- | --                 { onPress =
--- | --                     if current then
--- | --                         Nothing
--- | --
--- | --                     else
--- | --                         Just (NavigationMsg GoToPageImages)
--- | --                 , label = Element.text "Images"
--- | --                 }
--- | --
--- | --         PageConfig ->
--- | --             Element.Input.button attributes
--- | --                 { onPress =
--- | --                     if current then
--- | --                         Nothing
--- | --
--- | --                     else
--- | --                         Just (NavigationMsg GoToPageConfig)
--- | --                 , label = Element.text "Config"
--- | --                 }
--- | --
--- | --         PageRegistration ->
--- | --             Element.Input.button
--- | --                 (if registrationState then
--- | --                     attributesRegistration
--- | --
--- | --                  else
--- | --                     attributes
--- | --                 )
--- | --                 { onPress =
--- | --                     if current then
--- | --                         Nothing
--- | --
--- | --                     else
--- | --                         Just (NavigationMsg GoToPageRegistration)
--- | --                 , label = Element.text "Registration"
--- | --                 }
--- | --
--- | --         PageLogs ->
--- | --             Element.Input.button
--- | --                 (if logsState == 2 then
--- | --                     attributes
--- | --
--- | --                  else
--- | --                     attributesLogs
--- | --                 )
--- | --                 { onPress =
--- | --                     if current then
--- | --                         Nothing
--- | --
--- | --                     else
--- | --                         Just (NavigationMsg GoToPageLogs)
--- | --                 , label = Element.text "Logs"
--- | --                 }
 -- Run progress
 
 
