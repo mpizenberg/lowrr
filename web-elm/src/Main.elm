@@ -26,7 +26,7 @@ import Icon
 import Json.Decode exposing (Decoder, Value)
 import Json.Encode exposing (Value)
 import Keyboard exposing (RawKey)
-import Maybe.Extra exposing (isJust)
+import Maybe.Extra
 import NumberInput
 import Pivot exposing (Pivot)
 import Set exposing (Set)
@@ -35,6 +35,8 @@ import Style
 import Task
 import Viewer exposing (Viewer)
 import Viewer.Canvas
+import Svg exposing (Svg)
+import Svg.Attributes
 
 
 port resizes : (Device.Size -> msg) -> Sub msg
@@ -1257,17 +1259,24 @@ headerHeight =
     40
 
 
-headerBar : Bool -> Int -> List ( PageHeader, Bool ) -> Element Msg
-headerBar registrationState logsState pages =
+-- | -- headerBar : Bool -> Int -> List ( PageHeader, Bool ) -> Element Msg
+-- | -- headerBar registrationState logsState pages =
+-- | --     Element.row
+-- | --         [ height (Element.px headerHeight)
+-- | --         , centerX
+-- | --         ]
+-- | --         (List.map (\( page, current ) -> pageHeaderElement registrationState logsState current page) pages)
+
+headerBar : List (Element Msg) -> Element Msg
+headerBar pages =
     Element.row
         [ height (Element.px headerHeight)
         , centerX
         ]
-        (List.map (\( page, current ) -> pageHeaderElement registrationState logsState current page) pages)
+        pages
 
-
-pageHeaderElement : Bool -> Int -> Bool -> PageHeader -> Element Msg
-pageHeaderElement registrationState logsState current page =
+imagesHeaderTab : Bool -> Element Msg
+imagesHeaderTab current =
     let
         bgColor =
             if current then
@@ -1282,9 +1291,135 @@ pageHeaderElement registrationState logsState current page =
             , padding 10
             , height (Element.px headerHeight)
             ]
+    in
+    Element.Input.button attributes
+        { onPress =
+            if current then
+                Nothing
 
-        borderColor =
-            case logsState of
+            else
+                Just (NavigationMsg GoToPageImages)
+        , label = Element.text "Images"
+        }
+
+
+configHeaderTab : Bool -> Element Msg
+configHeaderTab current =
+    let
+        bgColor =
+            if current then
+                Style.almostWhite
+
+            else
+                Style.white
+
+        attributes =
+            [ Element.Background.color bgColor
+            , Element.htmlAttribute <| Html.Attributes.style "box-shadow" "none"
+            , padding 10
+            , height (Element.px headerHeight)
+            , Element.Border.widthEach { bottom = 0
+                                       , left = 1
+                                       , right = 0
+                                       , top = 0
+                                       }
+            ]
+    in
+    Element.Input.button attributes
+        { onPress =
+            if current then
+                Nothing
+
+            else
+                Just (NavigationMsg GoToPageConfig)
+        , label = Element.text "Config"
+        }
+
+registrationHeaderTab : Bool -> (Maybe (Pivot Image)) -> Element Msg
+registrationHeaderTab current registeredImages =
+    let
+        bgColor =
+            if current then
+                Style.almostWhite
+
+            else
+                Style.white
+
+        littleDot = Svg.svg
+            [ Svg.Attributes.viewBox "0 0 100 100"
+            ]
+            [ Svg.circle
+                [ Svg.Attributes.cx "5"
+                , Svg.Attributes.cy "5"
+                , Svg.Attributes.r  "4"
+                , Svg.Attributes.fill "green"
+                ]
+                []
+            ]
+
+        attributes =
+            [ Element.Background.color bgColor
+            , Element.htmlAttribute <| Html.Attributes.style "box-shadow" "none"
+            , padding 10
+            , height (Element.px headerHeight)
+            , Element.Border.widthEach { bottom = 0
+                                       , left = 1
+                                       , right = 0
+                                       , top = 0
+                                       }
+            ]
+
+        attributesRegistration =
+            [ Element.Background.color bgColor
+            , padding 10
+            , height (Element.px headerHeight)
+            , Element.htmlAttribute <| Html.Attributes.style "box-shadow" "none"
+            , Element.inFront ( Element.el [] (littleDot |> Element.html ) )
+            , Element.Border.widthEach { bottom = 0
+                                       , left = 1
+                                       , right = 0
+                                       , top = 0
+                                       }
+            ]
+    in
+    Element.Input.button
+        (   if Maybe.Extra.isJust registeredImages
+            then attributesRegistration
+            else attributes
+        )
+        { onPress =
+            if current then
+                Nothing
+
+            else
+                Just (NavigationMsg GoToPageRegistration)
+        , label = Element.text "Registration"
+        }
+
+logsHeaderTab : Bool -> List { lvl : Int, content : String } -> Element Msg
+logsHeaderTab current logs =
+    let
+        bgColor =
+            if current then
+                Style.almostWhite
+
+            else
+                Style.white
+
+        attributes =
+            [ Element.Background.color bgColor
+            , Element.htmlAttribute <| Html.Attributes.style "box-shadow" "none"
+            , padding 10
+            , height (Element.px headerHeight)
+            , Element.Border.widthEach { bottom = 0
+                                       , left = 1
+                                       , right = 0
+                                       , top = 0
+                                       }
+            ]
+
+        logsState = getMaxLevel logs
+        borderColor = case logsState of
                 0 ->
                     Style.errorColor
 
@@ -1294,79 +1429,154 @@ pageHeaderElement registrationState logsState current page =
                 _ ->
                     Style.black
 
-        attributesRegistration =
-            [ Element.Background.color Style.green
-            , padding 10
-            , height (Element.px headerHeight)
-            , Element.htmlAttribute <| Html.Attributes.style "box-shadow" "none"
+        littleDot = Svg.svg
+            [ Svg.Attributes.viewBox "0 0 50 50"
             ]
-
+            [ Svg.circle
+                [ Svg.Attributes.cx "5"
+                , Svg.Attributes.cy "5"
+                , Svg.Attributes.r  "4"
+                , Svg.Attributes.fill (case logsState of
+                    0 -> "rgb(180,50,50)"  -- Style.errorColor
+                    1 -> "rgb(220,120,50)" -- Style.warningColor
+                    _ -> "rgb(50,50,50)"   -- Style.darkGrey
+                    )
+                ]
+                []
+            ]
         attributesLogs =
             [ Element.Background.color bgColor
             , padding 10
             , height (Element.px headerHeight)
-            , Element.Border.width 4
-            , Element.Border.color borderColor
-            , Element.Border.dotted
+            -- , Element.Border.widthXY 0 4
+            -- , Element.Border.color borderColor
+            -- , Element.Border.dotted
             , Element.htmlAttribute <| Html.Attributes.style "box-shadow" "none"
+            , Element.inFront ( Element.el [] (littleDot |> Element.html ) )
+            , Element.Border.widthEach { bottom = 0
+                                       , left = 1
+                                       , right = 0
+                                       , top = 0
+                                       }
             ]
     in
-    case page of
-        PageImages ->
-            Element.Input.button attributes
-                { onPress =
-                    if current then
-                        Nothing
+        Element.Input.button
+            (if logsState == 2 then
+                attributes
 
-                    else
-                        Just (NavigationMsg GoToPageImages)
-                , label = Element.text "Images"
-                }
+             else
+                attributesLogs
+            )
+            { onPress =
+                if current then
+                    Nothing
 
-        PageConfig ->
-            Element.Input.button attributes
-                { onPress =
-                    if current then
-                        Nothing
+                else
+                    Just (NavigationMsg GoToPageLogs)
+            , label = Element.text "Logs"
+            }
 
-                    else
-                        Just (NavigationMsg GoToPageConfig)
-                , label = Element.text "Config"
-                }
-
-        PageRegistration ->
-            Element.Input.button
-                (if registrationState then
-                    attributesRegistration
-
-                 else
-                    attributes
-                )
-                { onPress =
-                    if current then
-                        Nothing
-
-                    else
-                        Just (NavigationMsg GoToPageRegistration)
-                , label = Element.text "Registration"
-                }
-
-        PageLogs ->
-            Element.Input.button
-                (if logsState == 2 then
-                    attributes
-
-                 else
-                    attributesLogs
-                )
-                { onPress =
-                    if current then
-                        Nothing
-
-                    else
-                        Just (NavigationMsg GoToPageLogs)
-                , label = Element.text "Logs"
-                }
+-- | -- pageHeaderElement : Bool -> Int -> Bool -> PageHeader -> Element Msg
+-- | -- pageHeaderElement registrationState logsState current page =
+-- | --     let
+-- | --         bgColor =
+-- | --             if current then
+-- | --                 Style.almostWhite
+-- | -- 
+-- | --             else
+-- | --                 Style.white
+-- | -- 
+-- | --         attributes =
+-- | --             [ Element.Background.color bgColor
+-- | --             , Element.htmlAttribute <| Html.Attributes.style "box-shadow" "none"
+-- | --             , padding 10
+-- | --             , height (Element.px headerHeight)
+-- | --             ]
+-- | -- 
+-- | --         borderColor =
+-- | --             case logsState of
+-- | --                 0 ->
+-- | --                     Style.errorColor
+-- | -- 
+-- | --                 1 ->
+-- | --                     Style.warningColor
+-- | -- 
+-- | --                 _ ->
+-- | --                     Style.black
+-- | -- 
+-- | --         attributesRegistration =
+-- | --             [ Element.Background.color Style.green
+-- | --             , padding 10
+-- | --             , height (Element.px headerHeight)
+-- | --             , Element.htmlAttribute <| Html.Attributes.style "box-shadow" "none"
+-- | --             ]
+-- | -- 
+-- | --         attributesLogs =
+-- | --             [ Element.Background.color bgColor
+-- | --             , padding 10
+-- | --             , height (Element.px headerHeight)
+-- | --             , Element.Border.width 4
+-- | --             , Element.Border.color borderColor
+-- | --             , Element.Border.dotted
+-- | --             , Element.htmlAttribute <| Html.Attributes.style "box-shadow" "none"
+-- | --             ]
+-- | --     in
+-- | --     case page of
+-- | --         PageImages ->
+-- | --             Element.Input.button attributes
+-- | --                 { onPress =
+-- | --                     if current then
+-- | --                         Nothing
+-- | -- 
+-- | --                     else
+-- | --                         Just (NavigationMsg GoToPageImages)
+-- | --                 , label = Element.text "Images"
+-- | --                 }
+-- | -- 
+-- | --         PageConfig ->
+-- | --             Element.Input.button attributes
+-- | --                 { onPress =
+-- | --                     if current then
+-- | --                         Nothing
+-- | -- 
+-- | --                     else
+-- | --                         Just (NavigationMsg GoToPageConfig)
+-- | --                 , label = Element.text "Config"
+-- | --                 }
+-- | -- 
+-- | --         PageRegistration ->
+-- | --             Element.Input.button
+-- | --                 (if registrationState then
+-- | --                     attributesRegistration
+-- | -- 
+-- | --                  else
+-- | --                     attributes
+-- | --                 )
+-- | --                 { onPress =
+-- | --                     if current then
+-- | --                         Nothing
+-- | -- 
+-- | --                     else
+-- | --                         Just (NavigationMsg GoToPageRegistration)
+-- | --                 , label = Element.text "Registration"
+-- | --                 }
+-- | -- 
+-- | --         PageLogs ->
+-- | --             Element.Input.button
+-- | --                 (if logsState == 2 then
+-- | --                     attributes
+-- | -- 
+-- | --                  else
+-- | --                     attributesLogs
+-- | --                 )
+-- | --                 { onPress =
+-- | --                     if current then
+-- | --                         Nothing
+-- | -- 
+-- | --                     else
+-- | --                         Just (NavigationMsg GoToPageLogs)
+-- | --                 , label = Element.text "Logs"
+-- | --                 }
 
 
 
@@ -1587,12 +1797,11 @@ progressBar color progressRatio =
 viewLogs : Model -> Element Msg
 viewLogs ({ autoscroll, verbosity, logs, registeredImages } as model) =
     Element.column [ width fill, height fill ]
-        [ headerBar (Maybe.Extra.isJust registeredImages)
-            (getMaxLevel logs)
-            [ ( PageImages, False )
-            , ( PageConfig, False )
-            , ( PageRegistration, False )
-            , ( PageLogs, True )
+        [ headerBar
+            [ imagesHeaderTab       False
+            , configHeaderTab       False
+            , registrationHeaderTab False registeredImages
+            , logsHeaderTab         True  logs
             ]
         , runProgressBar model
         , Element.column [ width fill, height fill, paddingXY 0 18, spacing 18 ]
@@ -1750,12 +1959,11 @@ verbositySlider verbosity =
 viewRegistration : Model -> Element Msg
 viewRegistration ({ registeredImages, registeredViewer, logs } as model) =
     Element.column [ width fill, height fill ]
-        [ headerBar (Maybe.Extra.isJust registeredImages)
-            (getMaxLevel logs)
-            [ ( PageImages, False )
-            , ( PageConfig, False )
-            , ( PageRegistration, True )
-            , ( PageLogs, False )
+        [ headerBar
+            [ imagesHeaderTab       False
+            , configHeaderTab       False
+            , registrationHeaderTab True  registeredImages
+            , logsHeaderTab         False logs
             ]
         , runProgressBar model
         , Element.html <|
@@ -1846,12 +2054,11 @@ viewRegistration ({ registeredImages, registeredViewer, logs } as model) =
 viewConfig : Model -> Element Msg
 viewConfig ({ params, paramsForm, paramsInfo, logs, registeredImages } as model) =
     Element.column [ width fill, height fill ]
-        [ headerBar (Maybe.Extra.isJust registeredImages)
-            (getMaxLevel logs)
-            [ ( PageImages, False )
-            , ( PageConfig, True )
-            , ( PageRegistration, False )
-            , ( PageLogs, False )
+        [ headerBar
+            [ imagesHeaderTab       False
+            , configHeaderTab       True
+            , registrationHeaderTab False registeredImages
+            , logsHeaderTab         False logs
             ]
         , runProgressBar model
         , Element.column [ width fill, height fill, Element.scrollbars ]
@@ -2450,12 +2657,11 @@ viewImgs ({ pointerMode, bboxDrawn, viewer, logs, registeredImages } as model) i
                 [ clearCanvas, renderedImage, renderedBbox ]
     in
     Element.column [ height fill ]
-        [ headerBar (Maybe.Extra.isJust registeredImages)
-            (getMaxLevel logs)
-            [ ( PageImages, True )
-            , ( PageConfig, False )
-            , ( PageRegistration, False )
-            , ( PageLogs, False )
+        [ headerBar
+            [ imagesHeaderTab       True
+            , configHeaderTab       False
+            , registrationHeaderTab False registeredImages
+            , logsHeaderTab         False logs
             ]
         , runProgressBar model
         , Element.html <|
