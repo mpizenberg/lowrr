@@ -124,6 +124,7 @@ type alias BBox =
 type State
     = Home FileDraggingState
     | Loading { names : Set String, loaded : Dict String Image }
+    | SingleImageError FileDraggingState
     | ViewImgs { images : Pivot Image }
     | Config { images : Pivot Image }
     | Registration { images : Pivot Image }
@@ -347,6 +348,7 @@ type Msg
     | ParamsMsg ParamsMsg
     | ParamsInfoMsg ParamsInfoMsg
     | NavigationMsg NavigationMsg
+    | ReturnHome
     | PointerMsg PointerMsg
     | RunAlgorithm Parameters
     | StopRunning
@@ -434,6 +436,9 @@ subscriptions model =
         Home _ ->
             Sub.batch [ resizes WindowResizes, log Log, imageDecoded ImageDecoded ]
 
+        SingleImageError _ ->
+            Sub.batch [ resizes WindowResizes, log Log, imageDecoded ImageDecoded ]
+
         Loading _ ->
             Sub.batch [ resizes WindowResizes, log Log, imageDecoded ImageDecoded ]
 
@@ -468,7 +473,7 @@ update msg model =
         ( DragDropMsg (DragOver _ _), Home _ ) ->
             ( { model | state = Home DraggingSomeFiles }, Cmd.none )
 
-        ( DragDropMsg (Drop file otherFiles), Home _ ) ->
+        ( DragDropMsg (Drop file otherFiles), _ ) ->
             let
                 imageFiles =
                     List.filter (\f -> String.startsWith "image" f.mime) (file :: otherFiles)
@@ -476,8 +481,24 @@ update msg model =
                 names =
                     Set.fromList (List.map .name imageFiles)
             in
-            ( { model | state = Loading { names = names, loaded = Dict.empty } }
-            , decodeImages (List.map File.encode imageFiles)
+            ( { model
+                | state =
+                    if List.isEmpty otherFiles then
+                        SingleImageError Idle
+
+                    else
+                        Loading
+                            { names = names
+                            , loaded = Dict.empty
+                            }
+                , notSeenLogs = []
+                , seenLogs = []
+              }
+            , if List.isEmpty otherFiles then
+                Cmd.none
+
+              else
+                decodeImages (List.map File.encode imageFiles)
             )
 
         ( DragDropMsg DragLeave, Home _ ) ->
@@ -506,22 +527,30 @@ update msg model =
 
                 oldParamsForm =
                     model.paramsForm
+
+                logsState =
+                    getMaxLevel model.notSeenLogs
             in
             if Set.size names == Dict.size newLoaded then
-                case Dict.values newLoaded of
-                    [] ->
-                        -- This should be impossible, there must be at least 1 image
+                case logsState of
+                    ErrorLogs ->
                         ( { model | state = Home Idle }, Cmd.none )
 
-                    firstImage :: otherImages ->
-                        ( { model
-                            | state = ViewImgs { images = Pivot.fromCons firstImage otherImages }
-                            , viewer = Viewer.fitImage 1.0 ( toFloat firstImage.width, toFloat firstImage.height ) model.viewer
-                            , paramsForm = { oldParamsForm | crop = CropForm.withSize firstImage.width firstImage.height }
-                            , imagesCount = Set.size names
-                          }
-                        , Cmd.none
-                        )
+                    _ ->
+                        case Dict.values newLoaded of
+                            [] ->
+                                -- This should be impossible, there must be at least 1 image
+                                ( { model | state = Home Idle }, Cmd.none )
+
+                            firstImage :: otherImages ->
+                                ( { model
+                                    | state = ViewImgs { images = Pivot.fromCons firstImage otherImages }
+                                    , viewer = Viewer.fitImage 1.0 ( toFloat firstImage.width, toFloat firstImage.height ) model.viewer
+                                    , paramsForm = { oldParamsForm | crop = CropForm.withSize firstImage.width firstImage.height }
+                                    , imagesCount = Set.size names
+                                  }
+                                , Cmd.none
+                                )
 
             else
                 ( { model | state = Loading updatedLoadingState }, Cmd.none )
@@ -831,6 +860,21 @@ update msg model =
             else
                 ( { model | seenLogs = newLogs }, Cmd.none )
 
+        ( Log logData, Loading _ ) ->
+            let
+                newLogs =
+                    logData :: model.notSeenLogs
+
+                newState =
+                    case logData.lvl of
+                        0 ->
+                            Home Idle
+
+                        _ ->
+                            model.state
+            in
+            ( { model | notSeenLogs = newLogs, state = newState }, Cmd.none )
+
         ( Log logData, _ ) ->
             let
                 newLogs =
@@ -895,6 +939,9 @@ update msg model =
 
         ( SaveRegisteredImages, _ ) ->
             ( model, saveRegisteredImages model.imagesCount )
+
+        ( ReturnHome, _ ) ->
+            ( { model | state = Home Idle }, Cmd.none )
 
         ( ClearLogs, _ ) ->
             ( { model
@@ -1260,10 +1307,13 @@ viewElmUI : Model -> Element Msg
 viewElmUI model =
     case model.state of
         Home draggingState ->
-            viewHome draggingState
+            viewHome model draggingState
 
         Loading loadData ->
-            viewLoading loadData
+            viewLoading model loadData
+
+        SingleImageError draggingState ->
+            viewSingleImageError model draggingState
 
         ViewImgs { images } ->
             viewImgs model images
@@ -2595,16 +2645,96 @@ zoomWheelMsg viewer event =
         ZoomMsg (ZoomToward coordinates)
 
 
-viewHome : FileDraggingState -> Element Msg
-viewHome draggingState =
+viewHome : Model -> FileDraggingState -> Element Msg
+viewHome model draggingState =
+    let
+        errorLogs =
+            case getMaxLevel model.notSeenLogs of
+                ErrorLogs ->
+                    Element.column
+                        [ padding 18
+                        , height fill
+                        , width fill
+                        , centerX
+                        , centerY
+                        , Style.fontMonospace
+                        , Element.Font.size 14
+                        , Element.scrollbars
+                        , Element.htmlAttribute (Html.Attributes.id "logs")
+                        ]
+                        (List.filter (\l -> l.lvl == 0) model.notSeenLogs
+                            |> List.reverse
+                            |> List.map viewLog
+                            |> List.append
+                                [ clearLogsButton ]
+                        )
+
+                _ ->
+                    Element.none
+    in
     Element.column (padding 20 :: width fill :: height fill :: onDropAttributes)
         [ viewTitle
         , dropAndLoadArea draggingState
+        , errorLogs
         ]
 
 
-viewLoading : { names : Set String, loaded : Dict String Image } -> Element Msg
-viewLoading { names, loaded } =
+viewSingleImageError : Model -> FileDraggingState -> Element Msg
+viewSingleImageError model draggingState =
+    let
+        errorLogs =
+            case getMaxLevel model.notSeenLogs of
+                ErrorLogs ->
+                    Element.column
+                        [ padding 18
+                        , height fill
+                        , width fill
+                        , centerX
+                        , centerY
+                        , Style.fontMonospace
+                        , Element.Font.size 14
+                        , Element.scrollbars
+                        , Element.htmlAttribute (Html.Attributes.id "logs")
+                        ]
+                        (List.filter (\l -> l.lvl == 0) model.notSeenLogs
+                            |> List.reverse
+                            |> List.map viewLog
+                            |> List.append
+                                [ clearLogsButton ]
+                        )
+
+                _ ->
+                    Element.none
+
+        singleImageWarning =
+            Element.paragraph
+                [ centerX ]
+                [ Element.el [ Element.Font.color Style.errorColor ]
+                    (Element.text "You uploaded only one image to align with itself, please ")
+                , Element.html
+                    (File.hiddenInputMultiple
+                        "TheFileInput2"
+                        [ "image/*" ]
+                        (\file otherFiles -> DragDropMsg (Drop file otherFiles))
+                    )
+                , Element.el [ Element.Font.underline ]
+                    (Element.html
+                        (Html.label [ Html.Attributes.for "TheFileInput2", Html.Attributes.style "cursor" "pointer" ]
+                            [ Html.text "choose at least two." ]
+                        )
+                    )
+                ]
+    in
+    Element.column (padding 20 :: width fill :: height fill :: onDropAttributes)
+        [ viewTitle
+        , dropAndLoadArea draggingState
+        , singleImageWarning
+        , errorLogs
+        ]
+
+
+viewLoading : Model -> { names : Set String, loaded : Dict String Image } -> Element Msg
+viewLoading model { names, loaded } =
     let
         totalCount =
             Set.size names
@@ -2621,7 +2751,36 @@ viewLoading { names, loaded } =
                 , Element.el [ centerX ] (Element.text ("Loading " ++ String.fromInt totalCount ++ " images"))
                 ]
             )
-        , clearLogsButton
+        , Element.column
+            [ padding 18
+            , height fill
+            , width fill
+            , centerX
+            , centerY
+            , Style.fontMonospace
+            , Element.Font.size 14
+            , Element.scrollbars
+            , Element.htmlAttribute (Html.Attributes.id "logs")
+            ]
+            (List.filter (\l -> l.lvl == 0) model.notSeenLogs
+                |> List.reverse
+                |> List.map viewLog
+                |> List.append
+                    [ Element.row [ padding 10 ]
+                        [ Element.Input.button
+                            [ Element.Background.color Style.almostWhite
+                            , padding 9
+                            , Element.Border.dotted
+                            , Element.Border.width 2
+                            ]
+                            { onPress = Just ReturnHome
+                            , label = Element.text "Return home"
+                            }
+                        , Element.el [ padding 10 ] (Element.text "Return home, forgetting the loaded images.")
+                        ]
+                    , clearLogsButton
+                    ]
+            )
         ]
 
 
