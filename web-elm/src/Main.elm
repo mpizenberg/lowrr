@@ -430,6 +430,22 @@ type LogsState
     | RegularLogs
 
 
+logsStatus : List { lvl : Int, content : String } -> LogsState
+logsStatus logs =
+    case List.minimum (List.map .lvl logs) of
+        Nothing ->
+            NoLogs
+
+        Just 0 ->
+            ErrorLogs
+
+        Just 1 ->
+            WarningLogs
+
+        Just _ ->
+            RegularLogs
+
+
 subscriptions : Model -> Sub Msg
 subscriptions model =
     case model.state of
@@ -521,12 +537,9 @@ update msg model =
 
                 oldParamsForm =
                     model.paramsForm
-
-                logsState =
-                    getMaxLevel model.notSeenLogs
             in
             if Set.size names == Dict.size newLoaded then
-                case logsState of
+                case logsStatus model.notSeenLogs of
                     ErrorLogs ->
                         ( { model | state = Home Idle }, Cmd.none )
 
@@ -1410,8 +1423,8 @@ registrationHeaderTab current registeredImages =
         }
 
 
-logsHeaderTab : Bool -> List { lvl : Int, content : String } -> Element Msg
-logsHeaderTab current logs =
+logsHeaderTab : Bool -> LogsState -> Element Msg
+logsHeaderTab current logsState =
     let
         bgColor =
             if current then
@@ -1419,9 +1432,6 @@ logsHeaderTab current logs =
 
             else
                 Style.white
-
-        logsState =
-            getMaxLevel logs
 
         fillColor =
             case logsState of
@@ -1705,7 +1715,7 @@ viewLogs ({ autoscroll, verbosity, seenLogs, notSeenLogs, registeredImages } as 
             [ imagesHeaderTab False
             , configHeaderTab False
             , registrationHeaderTab False registeredImages
-            , logsHeaderTab True notSeenLogs
+            , logsHeaderTab True (logsStatus notSeenLogs)
             ]
         , runProgressBar model
         , Element.column [ width fill, height fill, paddingXY 0 18, spacing 18 ]
@@ -1867,7 +1877,7 @@ viewRegistration ({ registeredImages, registeredViewer, notSeenLogs } as model) 
             [ imagesHeaderTab False
             , configHeaderTab False
             , registrationHeaderTab True registeredImages
-            , logsHeaderTab False notSeenLogs
+            , logsHeaderTab False (logsStatus notSeenLogs)
             ]
         , runProgressBar model
         , Element.html <|
@@ -1962,7 +1972,7 @@ viewConfig ({ params, paramsForm, paramsInfo, notSeenLogs, registeredImages } as
             [ imagesHeaderTab False
             , configHeaderTab True
             , registrationHeaderTab False registeredImages
-            , logsHeaderTab False notSeenLogs
+            , logsHeaderTab False (logsStatus notSeenLogs)
             ]
         , runProgressBar model
         , Element.column [ width fill, height fill, Element.scrollbars ]
@@ -2565,7 +2575,7 @@ viewImgs ({ pointerMode, bboxDrawn, viewer, notSeenLogs, registeredImages } as m
             [ imagesHeaderTab True
             , configHeaderTab False
             , registrationHeaderTab False registeredImages
-            , logsHeaderTab False notSeenLogs
+            , logsHeaderTab False (logsStatus notSeenLogs)
             ]
         , runProgressBar model
         , Element.html <|
@@ -2585,36 +2595,6 @@ viewImgs ({ pointerMode, bboxDrawn, viewer, notSeenLogs, registeredImages } as m
             ]
             (Element.html canvasViewer)
         ]
-
-
-getLevel : { lvl : Int, content : String } -> Int
-getLevel { lvl, content } =
-    lvl
-
-
-{-| Morally get the most important type of error :
--- 0 if there is an error
--- 1 if there is no error but at least one warning
--- 2 if there is no logs (less than one, because there is an auto-log at the begining)
--- else 3
--}
-getMaxLevel : List { lvl : Int, content : String } -> LogsState
-getMaxLevel logs =
-    let
-        l =
-            List.map getLevel logs
-    in
-    if List.member 0 l then
-        ErrorLogs
-
-    else if List.member 1 l then
-        WarningLogs
-
-    else if List.length l < 1 then
-        NoLogs
-
-    else
-        RegularLogs
 
 
 msgOn : String -> Decoder msg -> Html.Attribute msg
@@ -2640,7 +2620,7 @@ viewHome : Model -> FileDraggingState -> Element Msg
 viewHome model draggingState =
     let
         errorLogs =
-            case getMaxLevel model.notSeenLogs of
+            case logsStatus model.notSeenLogs of
                 ErrorLogs ->
                     Element.column
                         [ padding 18
