@@ -125,6 +125,7 @@ type alias BBox =
 type State
     = Home FileDraggingState
     | Loading { names : Set String, loaded : Dict String Image }
+    | LoadingError
     | ViewImgs { images : Pivot Image }
     | Config { images : Pivot Image }
     | Registration { images : Pivot Image }
@@ -453,6 +454,9 @@ subscriptions model =
             Sub.batch [ resizes WindowResizes, log Log, imageDecoded ImageDecoded ]
 
         Loading _ ->
+            Sub.batch [ resizes WindowResizes, log Log, imageDecoded ImageDecoded ]
+
+        LoadingError ->
             Sub.batch [ resizes WindowResizes, log Log, imageDecoded ImageDecoded ]
 
         ViewImgs _ ->
@@ -865,12 +869,11 @@ update msg model =
         ( Log logData, Loading _ ) ->
             let
                 newState =
-                    case logData.lvl of
-                        0 ->
-                            Home Idle
+                    if logData.lvl == 0 then
+                        LoadingError
 
-                        _ ->
-                            model.state
+                    else
+                        model.state
             in
             ( { model | notSeenLogs = logData :: model.notSeenLogs, state = newState }, Cmd.none )
 
@@ -1302,6 +1305,9 @@ viewElmUI model =
 
         Loading loadData ->
             viewLoading loadData
+
+        LoadingError ->
+            viewLoadingError model
 
         ViewImgs { images } ->
             viewImgs model images
@@ -2651,6 +2657,39 @@ viewLoading { names, loaded } =
                 [ Element.el loadingBoxBorderAttributes (loadBar loadCount totalCount)
                 , Element.el [ centerX ] (Element.text ("Loading " ++ String.fromInt totalCount ++ " images"))
                 ]
+            )
+        ]
+
+
+viewLoadingError : Model -> Element Msg
+viewLoadingError model =
+    Element.column [ padding 20, width fill, height fill, spacing 48 ]
+        [ viewTitle
+        , Element.paragraph [ width (Element.maximum 400 fill), centerX ]
+            [ Element.text "An unrecoverable error occured while loading the images, please reload the page." ]
+        , Element.Input.button
+            [ Element.Background.color Style.almostWhite
+            , Element.Border.dotted
+            , Element.Border.width 2
+            , padding 16
+            , centerX
+            ]
+            { onPress = Just ReturnHome
+            , label = Element.text "Woops, reload the page"
+            }
+        , Element.column
+            [ padding 18
+            , height fill
+            , width fill
+            , centerX
+            , Style.fontMonospace
+            , Element.Font.size 18
+            , Element.scrollbars
+            , Element.htmlAttribute (Html.Attributes.id "logs")
+            ]
+            (List.filter (\l -> l.lvl <= 0) model.notSeenLogs
+                |> List.reverse
+                |> List.map viewLog
             )
         ]
 
