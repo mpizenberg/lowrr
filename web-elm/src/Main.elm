@@ -125,7 +125,6 @@ type alias BBox =
 type State
     = Home FileDraggingState
     | Loading { names : Set String, loaded : Dict String Image }
-    | SingleImageError FileDraggingState
     | ViewImgs { images : Pivot Image }
     | Config { images : Pivot Image }
     | Registration { images : Pivot Image }
@@ -437,9 +436,6 @@ subscriptions model =
         Home _ ->
             Sub.batch [ resizes WindowResizes, log Log, imageDecoded ImageDecoded ]
 
-        SingleImageError _ ->
-            Sub.batch [ resizes WindowResizes, log Log, imageDecoded ImageDecoded ]
-
         Loading _ ->
             Sub.batch [ resizes WindowResizes, log Log, imageDecoded ImageDecoded ]
 
@@ -481,25 +477,22 @@ update msg model =
 
                 names =
                     Set.fromList (List.map .name imageFiles)
-            in
-            ( { model
-                | state =
+
+                ( newState, cmd, errorLogs ) =
                     if List.isEmpty otherFiles then
-                        SingleImageError Idle
+                        ( Home Idle
+                        , Cmd.none
+                        , [ { lvl = 0, content = "Only 1 image was selected. Please pick at least 2." } ]
+                        )
 
                     else
-                        Loading
-                            { names = names
-                            , loaded = Dict.empty
-                            }
-                , notSeenLogs = []
-                , seenLogs = []
-              }
-            , if List.isEmpty otherFiles then
-                Cmd.none
-
-              else
-                decodeImages (List.map File.encode imageFiles)
+                        ( Loading { names = names, loaded = Dict.empty }
+                        , decodeImages (List.map File.encode imageFiles)
+                        , []
+                        )
+            in
+            ( { model | state = newState, notSeenLogs = errorLogs }
+            , cmd
             )
 
         ( DragDropMsg DragLeave, Home _ ) ->
@@ -1312,9 +1305,6 @@ viewElmUI model =
 
         Loading loadData ->
             viewLoading model loadData
-
-        SingleImageError draggingState ->
-            viewSingleImageError model draggingState
 
         ViewImgs { images } ->
             viewImgs model images
@@ -2676,60 +2666,6 @@ viewHome model draggingState =
     Element.column (padding 20 :: width fill :: height fill :: onDropAttributes)
         [ viewTitle
         , dropAndLoadArea draggingState
-        , errorLogs
-        ]
-
-
-viewSingleImageError : Model -> FileDraggingState -> Element Msg
-viewSingleImageError model draggingState =
-    let
-        errorLogs =
-            case getMaxLevel model.notSeenLogs of
-                ErrorLogs ->
-                    Element.column
-                        [ padding 18
-                        , height fill
-                        , width fill
-                        , centerX
-                        , centerY
-                        , Style.fontMonospace
-                        , Element.Font.size 14
-                        , Element.scrollbars
-                        , Element.htmlAttribute (Html.Attributes.id "logs")
-                        ]
-                        (List.filter (\l -> l.lvl == 0) model.notSeenLogs
-                            |> List.reverse
-                            |> List.map viewLog
-                            |> List.append
-                                [ clearLogsButton ]
-                        )
-
-                _ ->
-                    Element.none
-
-        singleImageWarning =
-            Element.paragraph
-                [ centerX ]
-                [ Element.el [ Element.Font.color Style.errorColor ]
-                    (Element.text "You uploaded only one image to align with itself, please ")
-                , Element.html
-                    (File.hiddenInputMultiple
-                        "TheFileInput2"
-                        [ "image/*" ]
-                        (\file otherFiles -> DragDropMsg (Drop file otherFiles))
-                    )
-                , Element.el [ Element.Font.underline ]
-                    (Element.html
-                        (Html.label [ Html.Attributes.for "TheFileInput2", Html.Attributes.style "cursor" "pointer" ]
-                            [ Html.text "choose at least two." ]
-                        )
-                    )
-                ]
-    in
-    Element.column (padding 20 :: width fill :: height fill :: onDropAttributes)
-        [ viewTitle
-        , dropAndLoadArea draggingState
-        , singleImageWarning
         , errorLogs
         ]
 
