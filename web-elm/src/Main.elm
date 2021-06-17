@@ -1304,7 +1304,7 @@ viewElmUI model =
             viewHome model draggingState
 
         Loading loadData ->
-            viewLoading model loadData
+            viewLoading loadData
 
         ViewImgs { images } ->
             viewImgs model images
@@ -2670,8 +2670,8 @@ viewHome model draggingState =
         ]
 
 
-viewLoading : Model -> { names : Set String, loaded : Dict String Image } -> Element Msg
-viewLoading model { names, loaded } =
+viewLoading : { names : Set String, loaded : Dict String Image } -> Element Msg
+viewLoading { names, loaded } =
     let
         totalCount =
             Set.size names
@@ -2687,35 +2687,6 @@ viewLoading model { names, loaded } =
                 [ Element.el loadingBoxBorderAttributes (loadBar loadCount totalCount)
                 , Element.el [ centerX ] (Element.text ("Loading " ++ String.fromInt totalCount ++ " images"))
                 ]
-            )
-        , Element.column
-            [ padding 18
-            , height fill
-            , width fill
-            , centerX
-            , centerY
-            , Style.fontMonospace
-            , Element.Font.size 14
-            , Element.scrollbars
-            , Element.htmlAttribute (Html.Attributes.id "logs")
-            ]
-            (List.filter (\l -> l.lvl == 0) model.notSeenLogs
-                |> List.reverse
-                |> List.map viewLog
-                |> List.append
-                    [ Element.row [ padding 10 ]
-                        [ Element.Input.button
-                            [ Element.Background.color Style.almostWhite
-                            , padding 9
-                            , Element.Border.dotted
-                            , Element.Border.width 2
-                            ]
-                            { onPress = Just ReturnHome
-                            , label = Element.text "Woops, stop and reload the page"
-                            }
-                        ]
-                    , clearLogsButton
-                    ]
             )
         ]
 
