@@ -2,6 +2,7 @@ port module Main exposing (main)
 
 import Browser
 import Browser.Dom
+import Browser.Navigation
 import Canvas
 import Canvas.Settings
 import Canvas.Settings.Advanced
@@ -941,7 +942,7 @@ update msg model =
             ( model, saveRegisteredImages model.imagesCount )
 
         ( ReturnHome, _ ) ->
-            ( { model | state = Home Idle }, Cmd.none )
+            ( model, Browser.Navigation.reload )
 
         ( ClearLogs, _ ) ->
             ( { model
@@ -2774,9 +2775,8 @@ viewLoading model { names, loaded } =
                             , Element.Border.width 2
                             ]
                             { onPress = Just ReturnHome
-                            , label = Element.text "Return home"
+                            , label = Element.text "Woops, stop and reload the page"
                             }
-                        , Element.el [ padding 10 ] (Element.text "Return home, forgetting the loaded images.")
                         ]
                     , clearLogsButton
                     ]
