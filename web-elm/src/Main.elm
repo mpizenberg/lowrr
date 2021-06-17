@@ -2658,6 +2658,16 @@ viewLoading { names, loaded } =
                 , Element.el [ centerX ] (Element.text ("Loading " ++ String.fromInt totalCount ++ " images"))
                 ]
             )
+        , Element.Input.button
+            [ Element.Background.color Style.almostWhite
+            , Element.Border.dotted
+            , Element.Border.width 2
+            , padding 16
+            , centerX
+            ]
+            { onPress = Just ReturnHome
+            , label = Element.text "Woops, stop and reload the page"
+            }
         ]
 
 
