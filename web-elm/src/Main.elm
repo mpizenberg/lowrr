@@ -539,25 +539,20 @@ update msg model =
                     model.paramsForm
             in
             if Set.size names == Dict.size newLoaded then
-                case logsStatus model.notSeenLogs of
-                    ErrorLogs ->
+                case Dict.values newLoaded of
+                    [] ->
+                        -- This should be impossible, there must be at least 1 image
                         ( { model | state = Home Idle }, Cmd.none )
 
-                    _ ->
-                        case Dict.values newLoaded of
-                            [] ->
-                                -- This should be impossible, there must be at least 1 image
-                                ( { model | state = Home Idle }, Cmd.none )
-
-                            firstImage :: otherImages ->
-                                ( { model
-                                    | state = ViewImgs { images = Pivot.fromCons firstImage otherImages }
-                                    , viewer = Viewer.fitImage 1.0 ( toFloat firstImage.width, toFloat firstImage.height ) model.viewer
-                                    , paramsForm = { oldParamsForm | crop = CropForm.withSize firstImage.width firstImage.height }
-                                    , imagesCount = Set.size names
-                                  }
-                                , Cmd.none
-                                )
+                    firstImage :: otherImages ->
+                        ( { model
+                            | state = ViewImgs { images = Pivot.fromCons firstImage otherImages }
+                            , viewer = Viewer.fitImage 1.0 ( toFloat firstImage.width, toFloat firstImage.height ) model.viewer
+                            , paramsForm = { oldParamsForm | crop = CropForm.withSize firstImage.width firstImage.height }
+                            , imagesCount = Set.size names
+                          }
+                        , Cmd.none
+                        )
 
             else
                 ( { model | state = Loading updatedLoadingState }, Cmd.none )
@@ -869,9 +864,6 @@ update msg model =
 
         ( Log logData, Loading _ ) ->
             let
-                newLogs =
-                    logData :: model.notSeenLogs
-
                 newState =
                     case logData.lvl of
                         0 ->
@@ -880,18 +872,10 @@ update msg model =
                         _ ->
                             model.state
             in
-            ( { model | notSeenLogs = newLogs, state = newState }, Cmd.none )
+            ( { model | notSeenLogs = logData :: model.notSeenLogs, state = newState }, Cmd.none )
 
         ( Log logData, _ ) ->
-            let
-                newLogs =
-                    logData :: model.notSeenLogs
-            in
-            if model.autoscroll then
-                ( { model | notSeenLogs = newLogs }, scrollLogsToEndCmd )
-
-            else
-                ( { model | notSeenLogs = newLogs }, Cmd.none )
+            ( { model | notSeenLogs = logData :: model.notSeenLogs }, Cmd.none )
 
         ( VerbosityChange floatVerbosity, _ ) ->
             ( { model | verbosity = round floatVerbosity }, Cmd.none )
