@@ -500,7 +500,7 @@ update msg model =
 
                 ( newState, cmd, errorLogs ) =
                     if List.isEmpty otherFiles then
-                        ( Home Idle
+                        ( LoadingError
                         , Cmd.none
                         , [ { lvl = 0, content = "Only 1 image was selected. Please pick at least 2." } ]
                         )
@@ -1301,7 +1301,7 @@ viewElmUI : Model -> Element Msg
 viewElmUI model =
     case model.state of
         Home draggingState ->
-            viewHome model draggingState
+            viewHome draggingState
 
         Loading loadData ->
             viewLoading loadData
@@ -2606,37 +2606,11 @@ zoomWheelMsg viewer event =
         ZoomMsg (ZoomToward coordinates)
 
 
-viewHome : Model -> FileDraggingState -> Element Msg
-viewHome model draggingState =
-    let
-        errorLogs =
-            case logsStatus model.notSeenLogs of
-                ErrorLogs ->
-                    Element.column
-                        [ padding 18
-                        , height fill
-                        , width fill
-                        , centerX
-                        , centerY
-                        , Style.fontMonospace
-                        , Element.Font.size 14
-                        , Element.scrollbars
-                        , Element.htmlAttribute (Html.Attributes.id "logs")
-                        ]
-                        (List.filter (\l -> l.lvl == 0) model.notSeenLogs
-                            |> List.reverse
-                            |> List.map viewLog
-                            |> List.append
-                                [ clearLogsButton ]
-                        )
-
-                _ ->
-                    Element.none
-    in
+viewHome : FileDraggingState -> Element Msg
+viewHome draggingState =
     Element.column (padding 20 :: width fill :: height fill :: onDropAttributes)
         [ viewTitle
         , dropAndLoadArea draggingState
-        , errorLogs
         ]
 
 
