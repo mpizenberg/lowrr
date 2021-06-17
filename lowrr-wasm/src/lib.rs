@@ -107,6 +107,8 @@ impl LowrrInner {
             .expect("Cursor io never fails");
         // let image = reader.decode().expect("Error decoding the image");
         let dyn_img = reader.decode().map_err(utils::report_error)?;
+        let reported_err =
+            |str_msg: &str| Err(utils::report_error(anyhow::anyhow!(str_msg.to_string())));
 
         match (&dyn_img, &mut self.dataset) {
             // Loading the first image (empty dataset)
@@ -153,13 +155,19 @@ impl LowrrInner {
                 imgs.push(dyn_img.into_dmatrix());
                 self.image_ids.push(id);
             }
-            (DynamicImage::ImageBgr8(_), _) => return Err("BGR order not supported".into()),
-            (DynamicImage::ImageBgra8(_), _) => return Err("BGR order not supported".into()),
-            (DynamicImage::ImageLumaA8(_), _) => return Err("Alpha channel not supported".into()),
-            (DynamicImage::ImageLumaA16(_), _) => return Err("Alpha channel not supported".into()),
-            (DynamicImage::ImageRgba8(_), _) => return Err("Alpha channel not supported".into()),
-            (DynamicImage::ImageRgba16(_), _) => return Err("Alpha channel not supported".into()),
-            _ => return Err("Images are not all of the same type".into()),
+            (DynamicImage::ImageBgr8(_), _) => return reported_err("BGR order not supported"),
+            (DynamicImage::ImageBgra8(_), _) => return reported_err("Alpha channel not supported"),
+            (DynamicImage::ImageLumaA8(_), _) => {
+                return reported_err("Alpha channel not supported")
+            }
+            (DynamicImage::ImageLumaA16(_), _) => {
+                return reported_err("Alpha channel not supported")
+            }
+            (DynamicImage::ImageRgba8(_), _) => return reported_err("Alpha channel not supported"),
+            (DynamicImage::ImageRgba16(_), _) => {
+                return reported_err("Alpha channel not supported")
+            }
+            _ => return reported_err("Images are not all of the same type"),
         }
 
         Ok(())

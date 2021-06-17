@@ -2,6 +2,7 @@ port module Main exposing (main)
 
 import Browser
 import Browser.Dom
+import Browser.Navigation
 import Canvas
 import Canvas.Settings
 import Canvas.Settings.Advanced
@@ -124,6 +125,7 @@ type alias BBox =
 type State
     = Home FileDraggingState
     | Loading { names : Set String, loaded : Dict String Image }
+    | LoadingError
     | ViewImgs { images : Pivot Image }
     | Config { images : Pivot Image }
     | Registration { images : Pivot Image }
@@ -347,6 +349,7 @@ type Msg
     | ParamsMsg ParamsMsg
     | ParamsInfoMsg ParamsInfoMsg
     | NavigationMsg NavigationMsg
+    | ReturnHome
     | PointerMsg PointerMsg
     | RunAlgorithm Parameters
     | StopRunning
@@ -428,6 +431,22 @@ type LogsState
     | RegularLogs
 
 
+logsStatus : List { lvl : Int, content : String } -> LogsState
+logsStatus logs =
+    case List.minimum (List.map .lvl logs) of
+        Nothing ->
+            NoLogs
+
+        Just 0 ->
+            ErrorLogs
+
+        Just 1 ->
+            WarningLogs
+
+        Just _ ->
+            RegularLogs
+
+
 subscriptions : Model -> Sub Msg
 subscriptions model =
     case model.state of
@@ -435,6 +454,9 @@ subscriptions model =
             Sub.batch [ resizes WindowResizes, log Log, imageDecoded ImageDecoded ]
 
         Loading _ ->
+            Sub.batch [ resizes WindowResizes, log Log, imageDecoded ImageDecoded ]
+
+        LoadingError ->
             Sub.batch [ resizes WindowResizes, log Log, imageDecoded ImageDecoded ]
 
         ViewImgs _ ->
@@ -468,16 +490,29 @@ update msg model =
         ( DragDropMsg (DragOver _ _), Home _ ) ->
             ( { model | state = Home DraggingSomeFiles }, Cmd.none )
 
-        ( DragDropMsg (Drop file otherFiles), Home _ ) ->
+        ( DragDropMsg (Drop file otherFiles), _ ) ->
             let
                 imageFiles =
                     List.filter (\f -> String.startsWith "image" f.mime) (file :: otherFiles)
 
                 names =
                     Set.fromList (List.map .name imageFiles)
+
+                ( newState, cmd, errorLogs ) =
+                    if List.isEmpty otherFiles then
+                        ( LoadingError
+                        , Cmd.none
+                        , [ { lvl = 0, content = "Only 1 image was selected. Please pick at least 2." } ]
+                        )
+
+                    else
+                        ( Loading { names = names, loaded = Dict.empty }
+                        , decodeImages (List.map File.encode imageFiles)
+                        , []
+                        )
             in
-            ( { model | state = Loading { names = names, loaded = Dict.empty } }
-            , decodeImages (List.map File.encode imageFiles)
+            ( { model | state = newState, notSeenLogs = errorLogs }
+            , cmd
             )
 
         ( DragDropMsg DragLeave, Home _ ) ->
@@ -831,16 +866,19 @@ update msg model =
             else
                 ( { model | seenLogs = newLogs }, Cmd.none )
 
-        ( Log logData, _ ) ->
+        ( Log logData, Loading _ ) ->
             let
-                newLogs =
-                    logData :: model.notSeenLogs
-            in
-            if model.autoscroll then
-                ( { model | notSeenLogs = newLogs }, scrollLogsToEndCmd )
+                newState =
+                    if logData.lvl == 0 then
+                        LoadingError
 
-            else
-                ( { model | notSeenLogs = newLogs }, Cmd.none )
+                    else
+                        model.state
+            in
+            ( { model | notSeenLogs = logData :: model.notSeenLogs, state = newState }, Cmd.none )
+
+        ( Log logData, _ ) ->
+            ( { model | notSeenLogs = logData :: model.notSeenLogs }, Cmd.none )
 
         ( VerbosityChange floatVerbosity, _ ) ->
             ( { model | verbosity = round floatVerbosity }, Cmd.none )
@@ -895,6 +933,9 @@ update msg model =
 
         ( SaveRegisteredImages, _ ) ->
             ( model, saveRegisteredImages model.imagesCount )
+
+        ( ReturnHome, _ ) ->
+            ( model, Browser.Navigation.reload )
 
         ( ClearLogs, _ ) ->
             ( { model
@@ -1265,6 +1306,9 @@ viewElmUI model =
         Loading loadData ->
             viewLoading loadData
 
+        LoadingError ->
+            viewLoadingError model
+
         ViewImgs { images } ->
             viewImgs model images
 
@@ -1369,8 +1413,8 @@ registrationHeaderTab current registeredImages =
         }
 
 
-logsHeaderTab : Bool -> List { lvl : Int, content : String } -> Element Msg
-logsHeaderTab current logs =
+logsHeaderTab : Bool -> LogsState -> Element Msg
+logsHeaderTab current logsState =
     let
         bgColor =
             if current then
@@ -1378,9 +1422,6 @@ logsHeaderTab current logs =
 
             else
                 Style.white
-
-        logsState =
-            getMaxLevel logs
 
         fillColor =
             case logsState of
@@ -1664,7 +1705,7 @@ viewLogs ({ autoscroll, verbosity, seenLogs, notSeenLogs, registeredImages } as 
             [ imagesHeaderTab False
             , configHeaderTab False
             , registrationHeaderTab False registeredImages
-            , logsHeaderTab True notSeenLogs
+            , logsHeaderTab True (logsStatus notSeenLogs)
             ]
         , runProgressBar model
         , Element.column [ width fill, height fill, paddingXY 0 18, spacing 18 ]
@@ -1826,7 +1867,7 @@ viewRegistration ({ registeredImages, registeredViewer, notSeenLogs } as model) 
             [ imagesHeaderTab False
             , configHeaderTab False
             , registrationHeaderTab True registeredImages
-            , logsHeaderTab False notSeenLogs
+            , logsHeaderTab False (logsStatus notSeenLogs)
             ]
         , runProgressBar model
         , Element.html <|
@@ -1921,7 +1962,7 @@ viewConfig ({ params, paramsForm, paramsInfo, notSeenLogs, registeredImages } as
             [ imagesHeaderTab False
             , configHeaderTab True
             , registrationHeaderTab False registeredImages
-            , logsHeaderTab False notSeenLogs
+            , logsHeaderTab False (logsStatus notSeenLogs)
             ]
         , runProgressBar model
         , Element.column [ width fill, height fill, Element.scrollbars ]
@@ -2524,7 +2565,7 @@ viewImgs ({ pointerMode, bboxDrawn, viewer, notSeenLogs, registeredImages } as m
             [ imagesHeaderTab True
             , configHeaderTab False
             , registrationHeaderTab False registeredImages
-            , logsHeaderTab False notSeenLogs
+            , logsHeaderTab False (logsStatus notSeenLogs)
             ]
         , runProgressBar model
         , Element.html <|
@@ -2544,36 +2585,6 @@ viewImgs ({ pointerMode, bboxDrawn, viewer, notSeenLogs, registeredImages } as m
             ]
             (Element.html canvasViewer)
         ]
-
-
-getLevel : { lvl : Int, content : String } -> Int
-getLevel { lvl, content } =
-    lvl
-
-
-{-| Morally get the most important type of error :
--- 0 if there is an error
--- 1 if there is no error but at least one warning
--- 2 if there is no logs (less than one, because there is an auto-log at the begining)
--- else 3
--}
-getMaxLevel : List { lvl : Int, content : String } -> LogsState
-getMaxLevel logs =
-    let
-        l =
-            List.map getLevel logs
-    in
-    if List.member 0 l then
-        ErrorLogs
-
-    else if List.member 1 l then
-        WarningLogs
-
-    else if List.length l < 1 then
-        NoLogs
-
-    else
-        RegularLogs
 
 
 msgOn : String -> Decoder msg -> Html.Attribute msg
@@ -2621,7 +2632,49 @@ viewLoading { names, loaded } =
                 , Element.el [ centerX ] (Element.text ("Loading " ++ String.fromInt totalCount ++ " images"))
                 ]
             )
-        , clearLogsButton
+        , Element.Input.button
+            [ Element.Background.color Style.almostWhite
+            , Element.Border.dotted
+            , Element.Border.width 2
+            , padding 16
+            , centerX
+            ]
+            { onPress = Just ReturnHome
+            , label = Element.text "Woops, stop and reload the page"
+            }
+        ]
+
+
+viewLoadingError : Model -> Element Msg
+viewLoadingError model =
+    Element.column [ padding 20, width fill, height fill, spacing 48 ]
+        [ viewTitle
+        , Element.paragraph [ width (Element.maximum 400 fill), centerX ]
+            [ Element.text "An unrecoverable error occured while loading the images, please reload the page." ]
+        , Element.Input.button
+            [ Element.Background.color Style.almostWhite
+            , Element.Border.dotted
+            , Element.Border.width 2
+            , padding 16
+            , centerX
+            ]
+            { onPress = Just ReturnHome
+            , label = Element.text "Woops, reload the page"
+            }
+        , Element.column
+            [ padding 18
+            , height fill
+            , width fill
+            , centerX
+            , Style.fontMonospace
+            , Element.Font.size 18
+            , Element.scrollbars
+            , Element.htmlAttribute (Html.Attributes.id "logs")
+            ]
+            (List.filter (\l -> l.lvl <= 0) model.notSeenLogs
+                |> List.reverse
+                |> List.map viewLog
+            )
         ]
 
 
