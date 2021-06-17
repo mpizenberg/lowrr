@@ -613,6 +613,21 @@ where
     })
 }
 
+pub fn warp_black_extrap<T, V, O>(img: &DMatrix<T>, motion_params: &Vector6<f32>) -> DMatrix<O>
+where
+    O: Scalar,
+    V: Add<Output = V>,
+    f32: Mul<V, Output = V>,
+    T: Scalar + Copy + CanLinearInterpolate<V, O>,
+{
+    let (nrows, ncols) = img.shape();
+    let motion_mat = projection_mat(motion_params);
+    DMatrix::from_fn(nrows, ncols, |i, j| {
+        let new_pos = motion_mat * Vector3::new(j as f32, i as f32, 1.0);
+        crate::img::interpolation::linear_black_extrap(new_pos.x, new_pos.y, img)
+    })
+}
+
 /// Computes the sqrt of the sum of squared values.
 /// This is the L2 norm of the vectorized version of the matrix.
 fn norm(matrix: &DMatrix<f32>) -> f32 {
