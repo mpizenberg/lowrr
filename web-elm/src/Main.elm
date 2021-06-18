@@ -544,19 +544,22 @@ update msg model =
                     , loaded = newLoaded
                     }
 
+                finished = (Set.size names == Dict.size newLoaded)
+
                 oldParamsForm =
                     model.paramsForm
 
                 oldParams =
                     model.params
 
-                optiLevels =
-                    getOptimumPyramids newLoaded
+                optiLevels = if finished
+                    then getOptimumPyramids newLoaded
+                    else model.params.levels
 
                 anyInt =
                     NumberInput.intDefault
             in
-            if Set.size names == Dict.size newLoaded then
+            if finished then
                 case Dict.values newLoaded of
                     [] ->
                         -- This should be impossible, there must be at least 1 image
