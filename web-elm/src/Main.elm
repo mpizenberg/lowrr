@@ -29,6 +29,7 @@ import Json.Encode exposing (Value)
 import Keyboard exposing (RawKey)
 import NumberInput
 import Pivot exposing (Pivot)
+import Process
 import Set exposing (Set)
 import Simple.Transition as Transition
 import Style
@@ -96,6 +97,7 @@ type alias Model =
     , registeredImages : Maybe (Pivot Image)
     , seenLogs : List { lvl : Int, content : String }
     , notSeenLogs : List { lvl : Int, content : String }
+    , scrollPos : Float
     , verbosity : Int
     , autoscroll : Bool
     , runStep : RunStep
@@ -251,6 +253,7 @@ initialModel size =
     , registeredImages = Nothing
     , seenLogs = []
     , notSeenLogs = []
+    , scrollPos = 0.0
     , verbosity = 2
     , autoscroll = True
     , runStep = StepNotStarted
@@ -349,6 +352,7 @@ type Msg
     | ParamsMsg ParamsMsg
     | ParamsInfoMsg ParamsInfoMsg
     | NavigationMsg NavigationMsg
+    | GetScrollPosThenNavigationMsg NavigationMsg
     | ReturnHome
     | PointerMsg PointerMsg
     | RunAlgorithm Parameters
@@ -356,6 +360,7 @@ type Msg
     | UpdateRunStep { step : String, progress : Maybe Int }
     | Log { lvl : Int, content : String }
     | ClearLogs
+    | GotScrollPos (Result Browser.Dom.Error Browser.Dom.Viewport)
     | VerbosityChange Float
     | ScrollLogsToEnd
     | ToggleAutoScroll Bool
@@ -589,17 +594,35 @@ update msg model =
         ( ParamsInfoMsg paramsInfoMsg, Config _ ) ->
             ( { model | paramsInfo = updateParamsInfo paramsInfoMsg model.paramsInfo }, Cmd.none )
 
+        ( NavigationMsg GoToPageLogs, ViewImgs data ) ->
+            ( goTo GoToPageLogs data model, scrollLogsToPos model.scrollPos )
+
         ( NavigationMsg navMsg, ViewImgs data ) ->
             ( goTo navMsg data model, Cmd.none )
 
+        ( NavigationMsg GoToPageLogs, Config data ) ->
+            ( goTo GoToPageLogs data model, scrollLogsToPos model.scrollPos )
+
         ( NavigationMsg navMsg, Config data ) ->
             ( goTo navMsg data model, Cmd.none )
+
+        ( NavigationMsg GoToPageLogs, Registration data ) ->
+            ( goTo GoToPageLogs data model, scrollLogsToPos model.scrollPos )
 
         ( NavigationMsg navMsg, Registration data ) ->
             ( goTo navMsg data model, Cmd.none )
 
         ( NavigationMsg navMsg, Logs data ) ->
             ( goTo navMsg data model, Cmd.none )
+
+        ( GetScrollPosThenNavigationMsg navMsg, Logs _ ) ->
+            ( model
+            , Cmd.batch
+                [ Task.attempt GotScrollPos (Browser.Dom.getViewportOf "logs")
+                , Process.sleep 0
+                    |> Task.perform (always (NavigationMsg navMsg))
+                ]
+            )
 
         ( ZoomMsg zoomMsg, ViewImgs _ ) ->
             ( { model | viewer = zoomViewer zoomMsg model.viewer }, Cmd.none )
@@ -880,6 +903,9 @@ update msg model =
         ( Log logData, _ ) ->
             ( { model | notSeenLogs = logData :: model.notSeenLogs }, Cmd.none )
 
+        ( GotScrollPos (Ok { viewport }), Logs data ) ->
+            ( { model | scrollPos = viewport.y }, Cmd.none )
+
         ( VerbosityChange floatVerbosity, _ ) ->
             ( { model | verbosity = round floatVerbosity }, Cmd.none )
 
@@ -961,6 +987,11 @@ runAndSwitchToLogsPage imgs model =
 scrollLogsToEndCmd : Cmd Msg
 scrollLogsToEndCmd =
     Task.attempt (\_ -> NoMsg) (Browser.Dom.setViewportOf "logs" 0 1.0e14)
+
+
+scrollLogsToPos : Float -> Cmd Msg
+scrollLogsToPos pos =
+    Task.attempt (\_ -> NoMsg) (Browser.Dom.setViewportOf "logs" 0 pos)
 
 
 imageFromValue : { id : String, img : Value } -> Maybe Image
@@ -1342,86 +1373,54 @@ headerBar pages =
         pages
 
 
-imagesHeaderTab : Bool -> Element Msg
-imagesHeaderTab current =
+headerTab : String -> Maybe Msg -> Element Msg
+headerTab label msg =
+    headerTabWithAttributes label msg []
+
+
+headerTabWithAttributes : String -> Maybe Msg -> List (Element.Attribute Msg) -> Element Msg
+headerTabWithAttributes label msg otherAttributes =
     let
         bgColor =
-            if current then
+            if msg == Nothing then
                 Style.almostWhite
 
             else
                 Style.white
     in
-    Element.Input.button (baseTabAttributes bgColor)
-        { onPress =
-            if current then
-                Nothing
-
-            else
-                Just (NavigationMsg GoToPageImages)
-        , label = Element.text "Images"
+    Element.Input.button (otherAttributes ++ baseTabAttributes bgColor)
+        { onPress = msg
+        , label = Element.text label
         }
 
 
-configHeaderTab : Bool -> Element Msg
-configHeaderTab current =
+baseTabAttributes : Element.Color -> List (Element.Attribute msg)
+baseTabAttributes bgColor =
+    [ Element.Background.color bgColor
+    , Element.htmlAttribute <| Html.Attributes.style "box-shadow" "none"
+    , padding 10
+    , height (Element.px headerHeight)
+    ]
+
+
+registrationHeaderTab : Maybe Msg -> Maybe (Pivot Image) -> Element Msg
+registrationHeaderTab msg registeredImages =
     let
-        bgColor =
-            if current then
-                Style.almostWhite
-
-            else
-                Style.white
-    in
-    Element.Input.button (baseTabAttributes bgColor)
-        { onPress =
-            if current then
-                Nothing
-
-            else
-                Just (NavigationMsg GoToPageConfig)
-        , label = Element.text "Config"
-        }
-
-
-registrationHeaderTab : Bool -> Maybe (Pivot Image) -> Element Msg
-registrationHeaderTab current registeredImages =
-    let
-        bgColor =
-            if current then
-                Style.almostWhite
-
-            else
-                Style.white
-
-        buttonAttributes =
+        otherAttributes =
             if registeredImages == Nothing then
-                baseTabAttributes bgColor
+                []
 
             else
-                Element.inFront (Element.el [ alignRight, padding 2 ] (littleDot "green" |> Element.html))
-                    :: baseTabAttributes bgColor
+                [ Element.inFront (Element.el [ alignRight, padding 2 ] (littleDot "green" |> Element.html)) ]
     in
-    Element.Input.button buttonAttributes
-        { onPress =
-            if current then
-                Nothing
-
-            else
-                Just (NavigationMsg GoToPageRegistration)
-        , label = Element.text "Registration"
-        }
+    headerTabWithAttributes "Registration" msg otherAttributes
 
 
-logsHeaderTab : Bool -> LogsState -> Element Msg
-logsHeaderTab current logsState =
+logsHeaderTab : Maybe Msg -> List { lvl : Int, content : String } -> Element Msg
+logsHeaderTab msg logs =
     let
-        bgColor =
-            if current then
-                Style.almostWhite
-
-            else
-                Style.white
+        logsState =
+            logsStatus logs
 
         fillColor =
             case logsState of
@@ -1437,33 +1436,15 @@ logsHeaderTab current logsState =
                 _ ->
                     "rgb(50,50,50)"
 
-        buttonAttributes =
+        otherAttributes =
             case logsState of
                 NoLogs ->
-                    baseTabAttributes bgColor
+                    []
 
                 _ ->
-                    Element.inFront (Element.el [ alignRight, padding 2 ] (littleDot fillColor |> Element.html))
-                        :: baseTabAttributes bgColor
+                    [ Element.inFront (Element.el [ alignRight, padding 2 ] (littleDot fillColor |> Element.html)) ]
     in
-    Element.Input.button buttonAttributes
-        { onPress =
-            if current then
-                Nothing
-
-            else
-                Just (NavigationMsg GoToPageLogs)
-        , label = Element.text "Logs"
-        }
-
-
-baseTabAttributes : Element.Color -> List (Element.Attribute msg)
-baseTabAttributes bgColor =
-    [ Element.Background.color bgColor
-    , Element.htmlAttribute <| Html.Attributes.style "box-shadow" "none"
-    , padding 10
-    , height (Element.px headerHeight)
-    ]
+    headerTabWithAttributes "Logs" msg otherAttributes
 
 
 littleDot : String -> Html msg
@@ -1702,10 +1683,10 @@ viewLogs : Model -> Element Msg
 viewLogs ({ autoscroll, verbosity, seenLogs, notSeenLogs, registeredImages } as model) =
     Element.column [ width fill, height fill ]
         [ headerBar
-            [ imagesHeaderTab False
-            , configHeaderTab False
-            , registrationHeaderTab False registeredImages
-            , logsHeaderTab True (logsStatus notSeenLogs)
+            [ headerTab "Images" (Just (GetScrollPosThenNavigationMsg GoToPageImages))
+            , headerTab "Config" (Just (GetScrollPosThenNavigationMsg GoToPageConfig))
+            , registrationHeaderTab (Just (GetScrollPosThenNavigationMsg GoToPageRegistration)) registeredImages
+            , logsHeaderTab Nothing notSeenLogs
             ]
         , runProgressBar model
         , Element.column [ width fill, height fill, paddingXY 0 18, spacing 18 ]
@@ -1864,10 +1845,10 @@ viewRegistration : Model -> Element Msg
 viewRegistration ({ registeredImages, registeredViewer, notSeenLogs } as model) =
     Element.column [ width fill, height fill ]
         [ headerBar
-            [ imagesHeaderTab False
-            , configHeaderTab False
-            , registrationHeaderTab True registeredImages
-            , logsHeaderTab False (logsStatus notSeenLogs)
+            [ headerTab "Images" (Just (NavigationMsg GoToPageImages))
+            , headerTab "Config" (Just (NavigationMsg GoToPageConfig))
+            , registrationHeaderTab Nothing registeredImages
+            , logsHeaderTab (Just (NavigationMsg GoToPageLogs)) notSeenLogs
             ]
         , runProgressBar model
         , Element.html <|
@@ -1959,10 +1940,10 @@ viewConfig : Model -> Element Msg
 viewConfig ({ params, paramsForm, paramsInfo, notSeenLogs, registeredImages } as model) =
     Element.column [ width fill, height fill ]
         [ headerBar
-            [ imagesHeaderTab False
-            , configHeaderTab True
-            , registrationHeaderTab False registeredImages
-            , logsHeaderTab False (logsStatus notSeenLogs)
+            [ headerTab "Images" (Just (NavigationMsg GoToPageImages))
+            , headerTab "Config" Nothing
+            , registrationHeaderTab (Just (NavigationMsg GoToPageRegistration)) registeredImages
+            , logsHeaderTab (Just (NavigationMsg GoToPageLogs)) notSeenLogs
             ]
         , runProgressBar model
         , Element.column [ width fill, height fill, Element.scrollbars ]
@@ -2562,10 +2543,10 @@ viewImgs ({ pointerMode, bboxDrawn, viewer, notSeenLogs, registeredImages } as m
     in
     Element.column [ height fill ]
         [ headerBar
-            [ imagesHeaderTab True
-            , configHeaderTab False
-            , registrationHeaderTab False registeredImages
-            , logsHeaderTab False (logsStatus notSeenLogs)
+            [ headerTab "Images" Nothing
+            , headerTab "Config" (Just (NavigationMsg GoToPageConfig))
+            , registrationHeaderTab (Just (NavigationMsg GoToPageRegistration)) registeredImages
+            , logsHeaderTab (Just (NavigationMsg GoToPageLogs)) notSeenLogs
             ]
         , runProgressBar model
         , Element.html <|
