@@ -203,6 +203,7 @@ type alias ParametersForm =
     , maxIterations : NumberInput.Field Int NumberInput.IntError
     , convergenceThreshold : NumberInput.Field Float NumberInput.FloatError
     , levels : NumberInput.Field Int NumberInput.IntError
+    , defaultLevels : Int
     , sparse : NumberInput.Field Float NumberInput.FloatError
     , lambda : NumberInput.Field Float NumberInput.FloatError
     , rho : NumberInput.Field Float NumberInput.FloatError
@@ -300,6 +301,7 @@ defaultParamsForm =
     , levels =
         { anyInt | min = Just 1, max = Just 10 }
             |> NumberInput.setDefaultIntValue defaultParams.levels
+    , defaultLevels = 0
     , sparse =
         { anyFloat | min = Just 0.0, max = Just 1.0 }
             |> NumberInput.setDefaultFloatValue defaultParams.sparse
@@ -579,6 +581,7 @@ update msg model =
                                             , max = Just 10
                                         }
                                             |> NumberInput.setDefaultIntValue optiLevels
+                                    , defaultLevels = optiLevels
                                 }
                             , imagesCount = Set.size names
                           }
@@ -2113,8 +2116,7 @@ viewConfig ({ params, paramsForm, paramsInfo, notSeenLogs, registeredImages } as
                         ]
                     , moreInfo paramsInfo.levels "The number of levels for the multi-resolution approach. Each level halves/doubles the resolution of the previous one. The algorithm starts at the lowest resolution and transfers the converged parameters at one resolution to the initialization of the next. Increasing the number of levels enables better convergence for bigger movements but too many levels might make it definitively drift away. Targetting a lowest resolution of about 100x100 is generally good enough. The number of levels also has a joint interaction with the sparse threshold parameter so keep that in mind while changing this parameter."
 
-                    -- , Element.text ("(default to " ++ String.fromInt defaultParams.levels ++ ")")
-                    -- /!\ Default number of pyramids removed in order to put a fitting number of pyramids
+                    , Element.text ("(default to " ++ String.fromInt model.paramsForm.defaultLevels ++ ")")
                     , intInput paramsForm.levels (ParamsMsg << ChangeLevels) "Number of pyramid levels"
                     , displayIntErrors paramsForm.levels.decodedInput
                     ]
