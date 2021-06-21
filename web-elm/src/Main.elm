@@ -371,7 +371,7 @@ type Msg
 
 
 type DragDropMsg
-    = DragOver File (List File)
+    = DragOver
     | Drop File (List File)
     | DragLeave
 
@@ -388,7 +388,7 @@ type PointerMsg
     = PointerDownRaw Value
       -- = PointerDown ( Float, Float )
     | PointerMove ( Float, Float )
-    | PointerUp ( Float, Float )
+    | PointerUp
 
 
 type ViewImgMsg
@@ -494,7 +494,7 @@ update msg model =
             , Cmd.none
             )
 
-        ( DragDropMsg (DragOver _ _), Home _ ) ->
+        ( DragDropMsg (DragOver), Home _ ) ->
             ( { model | state = Home DraggingSomeFiles }, Cmd.none )
 
         ( DragDropMsg (Drop file otherFiles), _ ) ->
@@ -651,7 +651,7 @@ update msg model =
                     , Cmd.none
                     )
 
-                ( PointerUp _, PointerMovingFromClientCoords _ ) ->
+                ( PointerUp, PointerMovingFromClientCoords _ ) ->
                     ( { model | pointerMode = WaitingMove }, Cmd.none )
 
                 -- Drawing the cropped area
@@ -696,7 +696,7 @@ update msg model =
                     , Cmd.none
                     )
 
-                ( PointerUp _, PointerDrawFromOffsetAndClient _ _ ) ->
+                ( PointerUp, PointerDrawFromOffsetAndClient _ _ ) ->
                     case model.bboxDrawn of
                         Just { left, right, top, bottom } ->
                             let
@@ -953,7 +953,7 @@ update msg model =
                     , Cmd.none
                     )
 
-                ( PointerUp _, PointerMovingFromClientCoords _ ) ->
+                ( PointerUp, PointerMovingFromClientCoords _ ) ->
                     ( { model | pointerMode = WaitingMove }, Cmd.none )
 
                 _ ->
@@ -1909,7 +1909,7 @@ viewRegistration ({ registeredImages, registeredViewer, notSeenLogs } as model) 
                             , Html.Attributes.style "display" "block"
                             , Wheel.onWheel (zoomWheelMsg registeredViewer)
                             , msgOn "pointerdown" (Json.Decode.map (PointerMsg << PointerDownRaw) Json.Decode.value)
-                            , Pointer.onUp (\e -> PointerMsg (PointerUp e.pointer.offsetPos))
+                            , Pointer.onUp (\e -> PointerMsg (PointerUp))
                             , Html.Attributes.style "touch-action" "none"
                             , Html.Events.preventDefaultOn "pointermove" <|
                                 Json.Decode.map (\coords -> ( PointerMsg (PointerMove coords), True )) <|
@@ -2533,7 +2533,7 @@ viewImgs ({ pointerMode, bboxDrawn, viewer, notSeenLogs, registeredImages } as m
                 , Html.Attributes.style "display" "block"
                 , Wheel.onWheel (zoomWheelMsg viewer)
                 , msgOn "pointerdown" (Json.Decode.map (PointerMsg << PointerDownRaw) Json.Decode.value)
-                , Pointer.onUp (\e -> PointerMsg (PointerUp e.pointer.offsetPos))
+                , Pointer.onUp (\e -> PointerMsg (PointerUp))
                 , Html.Attributes.style "touch-action" "none"
                 , Html.Events.preventDefaultOn "pointermove" <|
                     Json.Decode.map (\coords -> ( PointerMsg (PointerMove coords), True )) <|
@@ -2803,7 +2803,7 @@ onDropAttributes : List (Element.Attribute Msg)
 onDropAttributes =
     List.map Element.htmlAttribute
         (File.onDrop
-            { onOver = \file otherFiles -> DragDropMsg (DragOver file otherFiles)
+            { onOver = \file otherFiles -> DragDropMsg (DragOver)
             , onDrop = \file otherFiles -> DragDropMsg (Drop file otherFiles)
             , onLeave = Just { id = "FileDropArea", msg = DragDropMsg DragLeave }
             }
