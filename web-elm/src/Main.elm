@@ -903,7 +903,7 @@ update msg model =
         ( Log logData, _ ) ->
             ( { model | notSeenLogs = logData :: model.notSeenLogs }, Cmd.none )
 
-        ( GotScrollPos (Ok { viewport }), Logs data ) ->
+        ( GotScrollPos (Ok { viewport }), Logs _ ) ->
             ( { model | scrollPos = viewport.y }, Cmd.none )
 
         ( VerbosityChange floatVerbosity, _ ) ->
@@ -1343,13 +1343,13 @@ viewElmUI model =
         ViewImgs { images } ->
             viewImgs model images
 
-        Config { images } ->
+        Config _ ->
             viewConfig model
 
-        Registration { images } ->
+        Registration _ ->
             viewRegistration model
 
-        Logs { images } ->
+        Logs _ ->
             viewLogs model
 
 
