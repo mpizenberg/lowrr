@@ -63,9 +63,10 @@ lightGrey =
     Element.rgb255 187 187 187
 
 
-darkGrey : Element.Color
-darkGrey =
-    Element.rgb255 50 50 50
+
+-- | -- darkGrey : Element.Color
+-- | -- darkGrey =
+-- | --     Element.rgb255 50 50 50
 
 
 green : Element.Color
@@ -73,14 +74,13 @@ green =
     Element.rgb255 39 203 139
 
 
-red : Element.Color
-red =
-    Element.rgb255 203 60 60
 
-
-darkRed : Element.Color
-darkRed =
-    Element.rgb255 70 20 20
+-- | -- red : Element.Color
+-- | -- red =
+-- | --     Element.rgb255 203 60 60
+-- | -- darkRed : Element.Color
+-- | -- darkRed =
+-- | --     Element.rgb255 70 20 20
 
 
 white : Element.Color
