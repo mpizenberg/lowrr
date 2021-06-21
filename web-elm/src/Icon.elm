@@ -1,4 +1,4 @@
-module Icon exposing (arrowDown, arrowLeftCircle, arrowRightCircle, boundingBox, fileText, github, maximize, move, save, settings, trash, zoomFit, zoomIn, zoomOut)
+module Icon exposing (arrowDown, arrowLeftCircle, arrowRightCircle, boundingBox, fileText, github, maximize, move, settings, trash, zoomFit, zoomIn, zoomOut)
 
 import Element exposing (Element)
 import FeatherIcons
@@ -85,11 +85,6 @@ move =
 settings : Float -> Element msg
 settings =
     featherIcon FeatherIcons.settings
-
-
-save : Float -> Element msg
-save =
-    featherIcon FeatherIcons.save
 
 
 trash : Float -> Element msg
