@@ -40,6 +40,7 @@ type Orientation
 classify : Size -> Device
 classify { width, height } =
     let
+        deviceOrientation : Orientation
         deviceOrientation =
             if width < height then
                 Portrait
@@ -47,6 +48,7 @@ classify { width, height } =
             else
                 Landscape
 
+        minDimension : Float
         minDimension =
             if deviceOrientation == Portrait then
                 width
@@ -54,6 +56,7 @@ classify { width, height } =
             else
                 height
 
+        deviceKind : Kind
         deviceKind =
             if minDimension < 450 then
                 Phone

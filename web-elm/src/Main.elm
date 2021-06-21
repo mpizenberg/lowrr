@@ -278,9 +278,11 @@ defaultParams =
 defaultParamsForm : ParametersForm
 defaultParamsForm =
     let
+        anyInt : NumberInput.Field Int NumberInput.IntError
         anyInt =
             NumberInput.intDefault
 
+        anyFloat : NumberInput.Field Float NumberInput.FloatError
         anyFloat =
             NumberInput.floatDefault
     in
