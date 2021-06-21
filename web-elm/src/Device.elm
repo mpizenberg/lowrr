@@ -9,7 +9,6 @@ module Device exposing
     , Orientation(..)
     , Size
     , classify
-    , default
     )
 
 
@@ -23,14 +22,6 @@ type alias Device =
 type alias Size =
     { width : Float
     , height : Float
-    }
-
-
-default : Device
-default =
-    { kind = Phone
-    , orientation = Portrait
-    , size = { width = 360, height = 480 }
     }
 
 
