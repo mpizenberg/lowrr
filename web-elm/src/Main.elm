@@ -33,7 +33,7 @@ import Process
 import Set exposing (Set)
 import Simple.Transition as Transition
 import Style
-import Svg exposing (Svg)
+import Svg
 import Svg.Attributes
 import Task
 import Viewer exposing (Viewer)
