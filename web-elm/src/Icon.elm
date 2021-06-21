@@ -87,11 +87,6 @@ settings =
     featherIcon FeatherIcons.settings
 
 
-download : Float -> Element msg
-download =
-    featherIcon FeatherIcons.download
-
-
 save : Float -> Element msg
 save =
     featherIcon FeatherIcons.save
