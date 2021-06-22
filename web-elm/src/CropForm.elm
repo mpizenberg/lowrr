@@ -43,6 +43,7 @@ for the left, top, right and bottom bounds
 withSize : Int -> Int -> State
 withSize width height =
     let
+        anyInt : Field Int NumberInput.IntError
         anyInt =
             NumberInput.intDefault
     in
@@ -121,6 +122,7 @@ toggle newActive data =
 updateLeft : String -> State -> State
 updateLeft str ({ active, left, top, right, bottom } as state) =
     let
+        newLeft : Field Int NumberInput.IntError
         newLeft =
             NumberInput.updateInt str left
     in
@@ -147,6 +149,7 @@ updateRight str state =
 updateTop : String -> State -> State
 updateTop str ({ active, left, top, right, bottom } as state) =
     let
+        newTop : Field Int NumberInput.IntError
         newTop =
             NumberInput.updateInt str top
     in
@@ -269,6 +272,7 @@ onBorderAttributes =
 cropField : String -> (String -> msg) -> Field Int IntError -> Element msg
 cropField label msgTag field =
     let
+        fontColor : Element.Color
         fontColor =
             case field.decodedInput of
                 Ok _ ->

@@ -1,5 +1,5 @@
 module NumberInput exposing
-    ( Field, setMinBound, setMaxBound
+    ( Field, setMinBound
     , IntError(..), intErrorToString, intDefault, setDefaultIntValue, updateInt
     , FloatError(..), floatErrorToString, floatDefault, setDefaultFloatValue, updateFloat
     )
@@ -31,11 +31,6 @@ type alias Field num err =
 setMinBound : Maybe number -> Field number err -> Field number err
 setMinBound newMin field =
     { field | min = newMin }
-
-
-setMaxBound : Maybe number -> Field number err -> Field number err
-setMaxBound newMax field =
-    { field | max = newMax }
 
 
 
