@@ -494,7 +494,7 @@ update msg model =
             , Cmd.none
             )
 
-        ( DragDropMsg (DragOver), Home _ ) ->
+        ( DragDropMsg DragOver, Home _ ) ->
             ( { model | state = Home DraggingSomeFiles }, Cmd.none )
 
         ( DragDropMsg (Drop file otherFiles), _ ) ->
@@ -544,9 +544,10 @@ update msg model =
                         Just image ->
                             Dict.insert id image loaded
 
-                updatedLoadingState : { names : Set String
-                                      , loaded : Dict String Image
-                                      }
+                updatedLoadingState :
+                    { names : Set String
+                    , loaded : Dict String Image
+                    }
                 updatedLoadingState =
                     { names = names
                     , loaded = newLoaded
@@ -739,11 +740,13 @@ update msg model =
                                     newCropForm =
                                         snapBBox (BBox left top right bottom) oldParamsForm.crop
 
-                                    newCrop : Maybe { left : Int
-                                                    , top : Int
-                                                    , right : Int
-                                                    , bottom : Int
-                                                    }
+                                    newCrop :
+                                        Maybe
+                                            { left : Int
+                                            , top : Int
+                                            , right : Int
+                                            , bottom : Int
+                                            }
                                     newCrop =
                                         CropForm.decoded newCropForm
                                 in
@@ -812,11 +815,13 @@ update msg model =
                     newCropForm =
                         snapBBox (BBox left top right bottom) oldParamsForm.crop
 
-                    newCrop : Maybe { left : Int
-                                    , top : Int
-                                    , right : Int
-                                    , bottom : Int
-                                    }
+                    newCrop :
+                        Maybe
+                            { left : Int
+                            , top : Int
+                            , right : Int
+                            , bottom : Int
+                            }
                     newCrop =
                         CropForm.decoded newCropForm
                 in
@@ -1341,11 +1346,13 @@ changeCropSide updateSide model =
         newCropForm =
             updateSide paramsForm.crop
 
-        newCrop : Maybe { left : Int
-                        , top : Int
-                        , right : Int
-                        , bottom : Int
-                        }
+        newCrop :
+            Maybe
+                { left : Int
+                , top : Int
+                , right : Int
+                , bottom : Int
+                }
         newCrop =
             CropForm.decoded newCropForm
     in
@@ -1948,11 +1955,12 @@ viewRegistration ({ registeredImages, registeredViewer, notSeenLogs } as model) 
                     img =
                         Pivot.getC images
 
-                    clickButton : Element.Attribute Msg
-                               -> Msg
-                               -> String
-                               -> (Float -> Element Msg)
-                               -> Element Msg
+                    clickButton :
+                        Element.Attribute Msg
+                        -> Msg
+                        -> String
+                        -> (Float -> Element Msg)
+                        -> Element Msg
                     clickButton alignment msg title icon =
                         Element.Input.button
                             [ padding 6
@@ -1997,7 +2005,7 @@ viewRegistration ({ registeredImages, registeredViewer, notSeenLogs } as model) 
                             , Html.Attributes.style "display" "block"
                             , Wheel.onWheel (zoomWheelMsg registeredViewer)
                             , msgOn "pointerdown" (Json.Decode.map (PointerMsg << PointerDownRaw) Json.Decode.value)
-                            , Pointer.onUp (\_ -> PointerMsg (PointerUp))
+                            , Pointer.onUp (\_ -> PointerMsg PointerUp)
                             , Html.Attributes.style "touch-action" "none"
                             , Html.Events.preventDefaultOn "pointermove" <|
                                 Json.Decode.map (\coords -> ( PointerMsg (PointerMove coords), True )) <|
@@ -2524,12 +2532,13 @@ viewImgs ({ pointerMode, bboxDrawn, viewer, notSeenLogs, registeredImages } as m
         img =
             Pivot.getC images
 
-        clickButton : Element.Attribute Msg
-                   -> Bool
-                   -> Msg
-                   -> String
-                   -> (Float -> Element Msg)
-                   -> Element Msg
+        clickButton :
+            Element.Attribute Msg
+            -> Bool
+            -> Msg
+            -> String
+            -> (Float -> Element Msg)
+            -> Element Msg
         clickButton alignment abled msg title icon =
             let
                 strokeColor : Element.Color
@@ -2552,11 +2561,12 @@ viewImgs ({ pointerMode, bboxDrawn, viewer, notSeenLogs, registeredImages } as m
                 , label = icon 32
                 }
 
-        modeButton : Bool
-                  -> Msg
-                  -> String
-                  -> (Float -> Element Msg)
-                  -> Element Msg
+        modeButton :
+            Bool
+            -> Msg
+            -> String
+            -> (Float -> Element Msg)
+            -> Element Msg
         modeButton selected msg title icon =
             let
                 ( bgColor, action ) =
@@ -2655,7 +2665,7 @@ viewImgs ({ pointerMode, bboxDrawn, viewer, notSeenLogs, registeredImages } as m
                 , Html.Attributes.style "display" "block"
                 , Wheel.onWheel (zoomWheelMsg viewer)
                 , msgOn "pointerdown" (Json.Decode.map (PointerMsg << PointerDownRaw) Json.Decode.value)
-                , Pointer.onUp (\_ -> PointerMsg (PointerUp))
+                , Pointer.onUp (\_ -> PointerMsg PointerUp)
                 , Html.Attributes.style "touch-action" "none"
                 , Html.Events.preventDefaultOn "pointermove" <|
                     Json.Decode.map (\coords -> ( PointerMsg (PointerMove coords), True )) <|
@@ -2701,7 +2711,7 @@ msgOn event =
 zoomWheelMsg : Viewer -> Wheel.Event -> Msg
 zoomWheelMsg viewer event =
     let
-        coordinates : (Float, Float)
+        coordinates : ( Float, Float )
         coordinates =
             Viewer.coordinatesAt event.mouseEvent.offsetPos viewer
     in
@@ -2932,7 +2942,7 @@ onDropAttributes : List (Element.Attribute Msg)
 onDropAttributes =
     List.map Element.htmlAttribute
         (File.onDrop
-            { onOver = \_ _ -> DragDropMsg (DragOver)
+            { onOver = \_ _ -> DragDropMsg DragOver
             , onDrop = \file otherFiles -> DragDropMsg (Drop file otherFiles)
             , onLeave = Just { id = "FileDropArea", msg = DragDropMsg DragLeave }
             }
