@@ -1997,7 +1997,7 @@ viewRegistration ({ registeredImages, registeredViewer, notSeenLogs } as model) 
                             , Html.Attributes.style "display" "block"
                             , Wheel.onWheel (zoomWheelMsg registeredViewer)
                             , msgOn "pointerdown" (Json.Decode.map (PointerMsg << PointerDownRaw) Json.Decode.value)
-                            , Pointer.onUp (\e -> PointerMsg (PointerUp))
+                            , Pointer.onUp (\_ -> PointerMsg (PointerUp))
                             , Html.Attributes.style "touch-action" "none"
                             , Html.Events.preventDefaultOn "pointermove" <|
                                 Json.Decode.map (\coords -> ( PointerMsg (PointerMove coords), True )) <|
@@ -2655,7 +2655,7 @@ viewImgs ({ pointerMode, bboxDrawn, viewer, notSeenLogs, registeredImages } as m
                 , Html.Attributes.style "display" "block"
                 , Wheel.onWheel (zoomWheelMsg viewer)
                 , msgOn "pointerdown" (Json.Decode.map (PointerMsg << PointerDownRaw) Json.Decode.value)
-                , Pointer.onUp (\e -> PointerMsg (PointerUp))
+                , Pointer.onUp (\_ -> PointerMsg (PointerUp))
                 , Html.Attributes.style "touch-action" "none"
                 , Html.Events.preventDefaultOn "pointermove" <|
                     Json.Decode.map (\coords -> ( PointerMsg (PointerMove coords), True )) <|
@@ -2932,7 +2932,7 @@ onDropAttributes : List (Element.Attribute Msg)
 onDropAttributes =
     List.map Element.htmlAttribute
         (File.onDrop
-            { onOver = \file otherFiles -> DragDropMsg (DragOver)
+            { onOver = \_ _ -> DragDropMsg (DragOver)
             , onDrop = \file otherFiles -> DragDropMsg (Drop file otherFiles)
             , onLeave = Just { id = "FileDropArea", msg = DragDropMsg DragLeave }
             }
