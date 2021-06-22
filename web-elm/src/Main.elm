@@ -499,9 +499,11 @@ update msg model =
 
         ( DragDropMsg (Drop file otherFiles), _ ) ->
             let
+                imageFiles : List File
                 imageFiles =
                     List.filter (\f -> String.startsWith "image" f.mime) (file :: otherFiles)
 
+                names : Set String
                 names =
                     Set.fromList (List.map .name imageFiles)
 
@@ -532,6 +534,7 @@ update msg model =
 
         ( ImageDecoded ({ id } as imgValue), Loading { names, loaded } ) ->
             let
+                newLoaded : Dict String Image
                 newLoaded =
                     case imageFromValue imgValue of
                         Nothing ->
@@ -541,11 +544,15 @@ update msg model =
                         Just image ->
                             Dict.insert id image loaded
 
+                updatedLoadingState : { names : Set String
+                                      , loaded : Dict String Image
+                                      }
                 updatedLoadingState =
                     { names = names
                     , loaded = newLoaded
                     }
 
+                oldParamsForm : ParametersForm
                 oldParamsForm =
                     model.paramsForm
             in
@@ -680,15 +687,19 @@ update msg model =
                         ( x2, y2 ) =
                             Viewer.coordinatesAt ( oX + newX - cX, oY + newY - cY ) model.viewer
 
+                        left : Float
                         left =
                             min x1 x2
 
+                        top : Float
                         top =
                             min y1 y2
 
+                        right : Float
                         right =
                             max x1 x2
 
+                        bottom : Float
                         bottom =
                             max y1 y2
                     in
@@ -700,12 +711,15 @@ update msg model =
                     case model.bboxDrawn of
                         Just { left, right, top, bottom } ->
                             let
+                                img : Image
                                 img =
                                     Pivot.getC (Pivot.goToStart images)
 
+                                oldParams : Parameters
                                 oldParams =
                                     model.params
 
+                                oldParamsForm : ParametersForm
                                 oldParamsForm =
                                     model.paramsForm
                             in
@@ -721,9 +735,15 @@ update msg model =
                                     && (top < toFloat img.height)
                             then
                                 let
+                                    newCropForm : CropForm.State
                                     newCropForm =
                                         snapBBox (BBox left top right bottom) oldParamsForm.crop
 
+                                    newCrop : Maybe { left : Int
+                                                    , top : Int
+                                                    , right : Int
+                                                    , bottom : Int
+                                                    }
                                     newCrop =
                                         CropForm.decoded newCropForm
                                 in
@@ -754,6 +774,7 @@ update msg model =
 
         ( ViewImgMsg CropCurrentFrame, ViewImgs { images } ) ->
             let
+                img : Image
                 img =
                     Pivot.getC (Pivot.goToStart images)
 
@@ -763,15 +784,19 @@ update msg model =
                 ( width, height ) =
                     model.viewer.size
 
+                right : Float
                 right =
                     left + model.viewer.scale * width
 
+                bottom : Float
                 bottom =
                     top + model.viewer.scale * height
 
+                oldParams : Parameters
                 oldParams =
                     model.params
 
+                oldParamsForm : ParametersForm
                 oldParamsForm =
                     model.paramsForm
             in
@@ -783,9 +808,15 @@ update msg model =
                     && (top < toFloat img.height)
             then
                 let
+                    newCropForm : CropForm.State
                     newCropForm =
                         snapBBox (BBox left top right bottom) oldParamsForm.crop
 
+                    newCrop : Maybe { left : Int
+                                    , top : Int
+                                    , right : Int
+                                    , bottom : Int
+                                    }
                     newCrop =
                         CropForm.decoded newCropForm
                 in
@@ -849,6 +880,7 @@ update msg model =
 
         ( UpdateRunStep { step, progress }, _ ) ->
             let
+                runStep : RunStep
                 runStep =
                     case ( model.runStep, step, progress ) of
                         ( _, "Precompute multiresolution pyramid", _ ) ->
@@ -882,6 +914,7 @@ update msg model =
 
         ( Log logData, Logs _ ) ->
             let
+                newLogs : List { lvl : Int, content : String }
                 newLogs =
                     logData :: model.seenLogs
             in
@@ -893,6 +926,7 @@ update msg model =
 
         ( Log logData, Loading _ ) ->
             let
+                newState : State
                 newState =
                     if logData.lvl == 0 then
                         LoadingError
@@ -1004,6 +1038,7 @@ imageFromValue { id, img } =
 
         Just texture ->
             let
+                imgSize : { height : Float, width : Float }
                 imgSize =
                     Canvas.Texture.dimensions texture
             in
@@ -1039,23 +1074,29 @@ toBBox { left, top, right, bottom } =
 snapBBox : BBox -> CropForm.State -> CropForm.State
 snapBBox { left, top, right, bottom } state =
     let
+        maxRight : Int
         maxRight =
             -- Should never be Nothing
             Maybe.withDefault 0 state.right.max
 
+        maxBottom : Int
         maxBottom =
             -- Should never be Nothing
             Maybe.withDefault 0 state.bottom.max
 
+        leftCrop : Int
         leftCrop =
             round (max 0 left)
 
+        topCrop : Int
         topCrop =
             round (max 0 top)
 
+        rightCrop : Int
         rightCrop =
             min (round right) maxRight
 
+        bottomCrop : Int
         bottomCrop =
             min (round bottom) maxBottom
     in
@@ -1113,9 +1154,11 @@ updateParams msg ({ params, paramsForm } as model) =
 
         ChangeMaxVerbosity str ->
             let
+                updatedField : NumberInput.Field Int NumberInput.IntError
                 updatedField =
                     NumberInput.updateInt str paramsForm.maxVerbosity
 
+                updatedForm : ParametersForm
                 updatedForm =
                     { paramsForm | maxVerbosity = updatedField }
             in
@@ -1131,9 +1174,11 @@ updateParams msg ({ params, paramsForm } as model) =
 
         ChangeMaxIter str ->
             let
+                updatedField : NumberInput.Field Int NumberInput.IntError
                 updatedField =
                     NumberInput.updateInt str paramsForm.maxIterations
 
+                updatedForm : ParametersForm
                 updatedForm =
                     { paramsForm | maxIterations = updatedField }
             in
@@ -1149,9 +1194,11 @@ updateParams msg ({ params, paramsForm } as model) =
 
         ChangeConvergenceThreshold str ->
             let
+                updatedField : NumberInput.Field Float NumberInput.FloatError
                 updatedField =
                     NumberInput.updateFloat str paramsForm.convergenceThreshold
 
+                updatedForm : ParametersForm
                 updatedForm =
                     { paramsForm | convergenceThreshold = updatedField }
             in
@@ -1167,9 +1214,11 @@ updateParams msg ({ params, paramsForm } as model) =
 
         ChangeLevels str ->
             let
+                updatedField : NumberInput.Field Int NumberInput.IntError
                 updatedField =
                     NumberInput.updateInt str paramsForm.levels
 
+                updatedForm : ParametersForm
                 updatedForm =
                     { paramsForm | levels = updatedField }
             in
@@ -1185,9 +1234,11 @@ updateParams msg ({ params, paramsForm } as model) =
 
         ChangeSparse str ->
             let
+                updatedField : NumberInput.Field Float NumberInput.FloatError
                 updatedField =
                     NumberInput.updateFloat str paramsForm.sparse
 
+                updatedForm : ParametersForm
                 updatedForm =
                     { paramsForm | sparse = updatedField }
             in
@@ -1203,9 +1254,11 @@ updateParams msg ({ params, paramsForm } as model) =
 
         ChangeLambda str ->
             let
+                updatedField : NumberInput.Field Float NumberInput.FloatError
                 updatedField =
                     NumberInput.updateFloat str paramsForm.lambda
 
+                updatedForm : ParametersForm
                 updatedForm =
                     { paramsForm | lambda = updatedField }
             in
@@ -1221,9 +1274,11 @@ updateParams msg ({ params, paramsForm } as model) =
 
         ChangeRho str ->
             let
+                updatedField : NumberInput.Field Float NumberInput.FloatError
                 updatedField =
                     NumberInput.updateFloat str paramsForm.rho
 
+                updatedForm : ParametersForm
                 updatedForm =
                     { paramsForm | rho = updatedField }
             in
@@ -1239,6 +1294,7 @@ updateParams msg ({ params, paramsForm } as model) =
 
         ToggleCrop activeCrop ->
             let
+                newCropForm : CropForm.State
                 newCropForm =
                     CropForm.toggle activeCrop paramsForm.crop
             in
@@ -1273,15 +1329,23 @@ updateParams msg ({ params, paramsForm } as model) =
 changeCropSide : (CropForm.State -> CropForm.State) -> Model -> Model
 changeCropSide updateSide model =
     let
+        params : Parameters
         params =
             model.params
 
+        paramsForm : ParametersForm
         paramsForm =
             model.paramsForm
 
+        newCropForm : CropForm.State
         newCropForm =
             updateSide paramsForm.crop
 
+        newCrop : Maybe { left : Int
+                        , top : Int
+                        , right : Int
+                        , bottom : Int
+                        }
         newCrop =
             CropForm.decoded newCropForm
     in
@@ -1383,6 +1447,7 @@ headerTab label msg =
 headerTabWithAttributes : String -> Maybe Msg -> List (Element.Attribute Msg) -> Element Msg
 headerTabWithAttributes label msg otherAttributes =
     let
+        bgColor : Element.Color
         bgColor =
             if msg == Nothing then
                 Style.almostWhite
@@ -1408,6 +1473,7 @@ baseTabAttributes bgColor =
 registrationHeaderTab : Maybe Msg -> Maybe (Pivot Image) -> Element Msg
 registrationHeaderTab msg registeredImages =
     let
+        otherAttributes : List (Element.Attribute Msg)
         otherAttributes =
             if registeredImages == Nothing then
                 []
@@ -1421,9 +1487,11 @@ registrationHeaderTab msg registeredImages =
 logsHeaderTab : Maybe Msg -> List { lvl : Int, content : String } -> Element Msg
 logsHeaderTab msg logs =
     let
+        logsState : LogsState
         logsState =
             logsStatus logs
 
+        fillColor : String
         fillColor =
             case logsState of
                 -- Style.errorColor
@@ -1438,6 +1506,7 @@ logsHeaderTab msg logs =
                 _ ->
                     "rgb(50,50,50)"
 
+        otherAttributes : List (Element.Attribute Msg)
         otherAttributes =
             case logsState of
                 NoLogs ->
@@ -1480,6 +1549,7 @@ progressBarHeight =
 runProgressBar : Model -> Element Msg
 runProgressBar model =
     let
+        progressBarRunButton : Element Msg
         progressBarRunButton =
             case model.runStep of
                 StepNotStarted ->
@@ -1491,6 +1561,7 @@ runProgressBar model =
                 _ ->
                     Element.none
 
+        progressBarStopButton : Element Msg
         progressBarStopButton =
             if model.runStep == StepNotStarted || model.runStep == StepDone then
                 Element.none
@@ -1498,6 +1569,7 @@ runProgressBar model =
             else
                 stopButton
 
+        progressBarSaveButton : Element Msg
         progressBarSaveButton =
             if model.runStep == StepDone then
                 saveButton
@@ -1521,6 +1593,7 @@ runProgressBar model =
 runButton : String -> Parameters -> ParametersForm -> Element Msg
 runButton content params paramsForm =
     let
+        hasNoError : Bool
         hasNoError =
             List.isEmpty (CropForm.errors paramsForm.crop)
                 && isOk paramsForm.maxIterations.decodedInput
@@ -1621,12 +1694,15 @@ progressMessage model =
 estimateProgress : Model -> Float
 estimateProgress model =
     let
+        subprogress : Int -> Int -> Float
         subprogress n nCount =
             toFloat n / toFloat nCount
 
+        lvlCount : Int
         lvlCount =
             model.params.levels
 
+        levelProgress : Int -> Float
         levelProgress lvl =
             subprogress (lvlCount - lvl - 1) lvlCount
     in
@@ -1664,6 +1740,7 @@ estimateProgress model =
 progressBar : Element.Color -> Float -> Element Msg
 progressBar color progressRatio =
     let
+        scaleX : String
         scaleX =
             "scaleX(" ++ String.fromFloat progressRatio ++ ")"
     in
@@ -1778,9 +1855,11 @@ viewLog { lvl, content } =
 verbositySlider : Int -> Element Msg
 verbositySlider verbosity =
     let
+        thumbSize : Int
         thumbSize =
             32
 
+        circle : Element.Color -> Int -> List (Element.Attribute Msg)
         circle color size =
             [ Element.Border.color color
             , width (Element.px size)
@@ -1820,6 +1899,7 @@ verbositySlider verbosity =
         -- Here is where we're creating the "thumb"
         , thumb =
             let
+                color : Element.Color
                 color =
                     if verbosity == 0 then
                         Style.errorColor
@@ -1864,9 +1944,15 @@ viewRegistration ({ registeredImages, registeredViewer, notSeenLogs } as model) 
 
             Just images ->
                 let
+                    img : Image
                     img =
                         Pivot.getC images
 
+                    clickButton : Element.Attribute Msg
+                               -> Msg
+                               -> String
+                               -> (Float -> Element Msg)
+                               -> Element Msg
                     clickButton alignment msg title icon =
                         Element.Input.button
                             [ padding 6
@@ -1880,6 +1966,7 @@ viewRegistration ({ registeredImages, registeredViewer, notSeenLogs } as model) 
                             , label = icon 32
                             }
 
+                    buttonsRow : Element Msg
                     buttonsRow =
                         Element.row [ centerX ]
                             [ clickButton centerX (ZoomMsg (ZoomFit img)) "Fit zoom to image" Icon.zoomFit
@@ -1903,6 +1990,7 @@ viewRegistration ({ registeredImages, registeredViewer, notSeenLogs } as model) 
                             ( 0, 0 )
                             img.texture
 
+                    canvasViewer : Html Msg
                     canvasViewer =
                         Canvas.toHtml ( round viewerWidth, round viewerHeight )
                             [ Html.Attributes.id "theCanvas"
@@ -2187,6 +2275,7 @@ displayIntErrors result =
 intInput : NumberInput.Field Int NumberInput.IntError -> (String -> msg) -> String -> Element msg
 intInput field msgTag label =
     let
+        textField : Element msg
         textField =
             Element.Input.text [ Element.Border.width 0, Element.Font.center, width (Element.px 100) ]
                 { onChange = msgTag
@@ -2210,12 +2299,15 @@ intInput field msgTag label =
 
         Ok current ->
             let
+                increased : Int
                 increased =
                     field.increase current
 
+                decreased : Int
                 decreased =
                     field.decrease current
 
+                decrementMsg : Maybe msg
                 decrementMsg =
                     case field.min of
                         Nothing ->
@@ -2228,6 +2320,7 @@ intInput field msgTag label =
                             else
                                 Just (msgTag (String.fromInt <| max decreased minBound))
 
+                incrementMsg : Maybe msg
                 incrementMsg =
                     case field.max of
                         Nothing ->
@@ -2250,6 +2343,7 @@ intInput field msgTag label =
 numberSideButton : Maybe msg -> String -> Element msg
 numberSideButton maybeMsg label =
     let
+        textColor : Element.Color
         textColor =
             if maybeMsg == Nothing then
                 Style.lightGrey
@@ -2284,6 +2378,7 @@ displayFloatErrors result =
 floatInput : NumberInput.Field Float NumberInput.FloatError -> (String -> msg) -> String -> Element msg
 floatInput field msgTag label =
     let
+        textField : Element msg
         textField =
             Element.Input.text [ Element.Border.width 0, Element.Font.center, width (Element.px 140) ]
                 { onChange = msgTag
@@ -2307,12 +2402,15 @@ floatInput field msgTag label =
 
         Ok current ->
             let
+                increased : Float
                 increased =
                     field.increase current
 
+                decreased : Float
                 decreased =
                     field.decrease current
 
+                decrementMsg : Maybe msg
                 decrementMsg =
                     case field.min of
                         Nothing ->
@@ -2325,6 +2423,7 @@ floatInput field msgTag label =
                             else
                                 Just (msgTag (String.fromFloat <| max decreased minBound))
 
+                incrementMsg : Maybe msg
                 incrementMsg =
                     case field.max of
                         Nothing ->
@@ -2368,12 +2467,15 @@ toggle msg checked toggleHeight label =
 toggleCheckboxWidget : { offColor : Element.Color, onColor : Element.Color, sliderColor : Element.Color, toggleWidth : Int, toggleHeight : Int } -> Bool -> Element msg
 toggleCheckboxWidget { offColor, onColor, sliderColor, toggleWidth, toggleHeight } checked =
     let
+        pad : Int
         pad =
             3
 
+        sliderSize : Int
         sliderSize =
             toggleHeight - 2 * pad
 
+        translation : String
         translation =
             (toggleWidth - sliderSize - pad)
                 |> String.fromInt
@@ -2396,7 +2498,7 @@ toggleCheckboxWidget { offColor, onColor, sliderColor, toggleWidth, toggleHeight
                     , Element.width <| Element.px <| sliderSize
                     , Element.height <| Element.px <| sliderSize
                     , Element.centerY
-                    , Element.moveRight pad
+                    , Element.moveRight <| toFloat pad
                     , Element.htmlAttribute <|
                         Html.Attributes.style "transition" ".4s"
                     , Element.htmlAttribute <|
@@ -2418,11 +2520,19 @@ toggleCheckboxWidget { offColor, onColor, sliderColor, toggleWidth, toggleHeight
 viewImgs : Model -> Pivot Image -> Element Msg
 viewImgs ({ pointerMode, bboxDrawn, viewer, notSeenLogs, registeredImages } as model) images =
     let
+        img : Image
         img =
             Pivot.getC images
 
+        clickButton : Element.Attribute Msg
+                   -> Bool
+                   -> Msg
+                   -> String
+                   -> (Float -> Element Msg)
+                   -> Element Msg
         clickButton alignment abled msg title icon =
             let
+                strokeColor : Element.Color
                 strokeColor =
                     if abled then
                         Style.black
@@ -2442,6 +2552,11 @@ viewImgs ({ pointerMode, bboxDrawn, viewer, notSeenLogs, registeredImages } as m
                 , label = icon 32
                 }
 
+        modeButton : Bool
+                  -> Msg
+                  -> String
+                  -> (Float -> Element Msg)
+                  -> Element Msg
         modeButton selected msg title icon =
             let
                 ( bgColor, action ) =
@@ -2462,6 +2577,7 @@ viewImgs ({ pointerMode, bboxDrawn, viewer, notSeenLogs, registeredImages } as m
                 , label = icon 32
                 }
 
+        isMovingMode : Bool
         isMovingMode =
             case pointerMode of
                 WaitingMove ->
@@ -2476,6 +2592,7 @@ viewImgs ({ pointerMode, bboxDrawn, viewer, notSeenLogs, registeredImages } as m
                 PointerDrawFromOffsetAndClient _ _ ->
                     False
 
+        buttonsRow : Element Msg
         buttonsRow =
             Element.row [ width fill ]
                 [ clickButton centerX True (ZoomMsg (ZoomFit img)) "Fit zoom to image" Icon.zoomFit
@@ -2503,6 +2620,7 @@ viewImgs ({ pointerMode, bboxDrawn, viewer, notSeenLogs, registeredImages } as m
                 ( 0, 0 )
                 img.texture
 
+        renderedBbox : Canvas.Renderable
         renderedBbox =
             case bboxDrawn of
                 Nothing ->
@@ -2510,12 +2628,15 @@ viewImgs ({ pointerMode, bboxDrawn, viewer, notSeenLogs, registeredImages } as m
 
                 Just { left, top, right, bottom } ->
                     let
+                        bboxWidth : Float
                         bboxWidth =
                             right - left
 
+                        bboxHeight : Float
                         bboxHeight =
                             bottom - top
 
+                        strokeWidth : Float
                         strokeWidth =
                             viewer.scale * 2
                     in
@@ -2527,6 +2648,7 @@ viewImgs ({ pointerMode, bboxDrawn, viewer, notSeenLogs, registeredImages } as m
                         ]
                         [ Canvas.rect ( left, top ) bboxWidth bboxHeight ]
 
+        canvasViewer : Html Msg
         canvasViewer =
             Canvas.toHtml ( round viewerWidth, round viewerHeight )
                 [ Html.Attributes.id "theCanvas"
@@ -2579,6 +2701,7 @@ msgOn event =
 zoomWheelMsg : Viewer -> Wheel.Event -> Msg
 zoomWheelMsg viewer event =
     let
+        coordinates : (Float, Float)
         coordinates =
             Viewer.coordinatesAt event.mouseEvent.offsetPos viewer
     in
@@ -2600,9 +2723,11 @@ viewHome draggingState =
 viewLoading : { names : Set String, loaded : Dict String Image } -> Element Msg
 viewLoading { names, loaded } =
     let
+        totalCount : Int
         totalCount =
             Set.size names
 
+        loadCount : Int
         loadCount =
             Dict.size loaded
     in
@@ -2664,6 +2789,7 @@ viewLoadingError model =
 loadBar : Int -> Int -> Element msg
 loadBar loaded total =
     let
+        barLength : Int
         barLength =
             (325 - 2 * 4) * loaded // total
     in
@@ -2701,6 +2827,7 @@ viewTitle =
 dropAndLoadArea : FileDraggingState -> Element Msg
 dropAndLoadArea draggingState =
     let
+        borderStyle : Element.Attribute Msg
         borderStyle =
             case draggingState of
                 Idle ->
@@ -2709,6 +2836,7 @@ dropAndLoadArea draggingState =
                 DraggingSomeFiles ->
                     Element.Border.solid
 
+        dropOrLoadText : Element Msg
         dropOrLoadText =
             Element.row [ centerX ]
                 [ Element.text "Drop images or "
@@ -2726,6 +2854,7 @@ dropAndLoadArea draggingState =
                     )
                 ]
 
+        useDirectlyProvided : Element Msg
         useDirectlyProvided =
             Element.paragraph [ centerX, Element.Font.center ]
                 [ Element.text "You can also directly use "
