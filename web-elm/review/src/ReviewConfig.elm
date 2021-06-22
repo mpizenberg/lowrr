@@ -18,7 +18,7 @@ import NoImportingEverything
 import NoMissingSubscriptionsCall
 import NoMissingTypeAnnotation
 import NoMissingTypeAnnotationInLetIn
--- import NoMissingTypeExpose
+import NoMissingTypeExpose
 import NoRecursiveUpdate
 import NoUnused.CustomTypeConstructorArgs
 import NoUnused.Dependencies
@@ -53,7 +53,8 @@ config =
     , NoImportingEverything.rule [ "Svg.Attributes" ]
     , NoMissingTypeAnnotation.rule
     , NoMissingTypeAnnotationInLetIn.rule
-    -- , NoMissingTypeExpose.rule
+    , NoMissingTypeExpose.rule
+        |> Review.Rule.ignoreErrorsForFiles [ "src/Main.elm" ]
 
     -- no debug in code to permit --optimize for make
     , NoDebug.Log.rule
