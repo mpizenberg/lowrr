@@ -20,6 +20,7 @@ import NoMissingTypeAnnotation
 import NoMissingTypeAnnotationInLetIn
 import NoMissingTypeExpose
 import NoRecursiveUpdate
+import NoUnoptimizedRecursion
 import NoUnused.CustomTypeConstructorArgs
 import NoUnused.Dependencies
 import NoUnused.Exports
@@ -60,4 +61,8 @@ config =
     , NoDebug.Log.rule
     , NoDebug.TodoOrToString.rule
     , Simplify.rule Simplify.defaults
+
+    -- force tail-call recursions
+    , NoUnoptimizedRecursion.rule
+        (NoUnoptimizedRecursion.optOutWithComment "IGNORE TAIL-OPTI")
     ]
