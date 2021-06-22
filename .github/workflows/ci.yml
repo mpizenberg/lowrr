@@ -173,3 +173,22 @@ jobs:
 
       - name: Check formatting
         run: cd web-elm && elm-format src --validate
+
+  elm-review:
+    name: Check elm-review rules
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Install elm, elm-format and cache the ELM_HOME directory
+        uses: mpizenberg/elm-tooling-action@v1.2
+        with:
+          cache-key: elm-review-${{ hashFiles('web-elm/elm-tooling.json', 'web-elm/elm.json', 'web-elm/review/src/ReviewConfig.elm') }}
+          cache-restore-key: elm-review
+          elm-tooling-dir: web-elm
+
+      - name: Install elm-review
+        run: npm install elm-review
+
+      - name: Check elm-review
+        run: cd web-elm && npx elm-review
